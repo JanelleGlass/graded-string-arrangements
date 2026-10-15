@@ -1,21 +1,26 @@
 # Graded String Arrangements
 
 A free, public website: hymns and carols arranged in six levels for violin, viola, cello and bass,
-with a play-along reader for each piece.
+with a play-along reader for each piece. Live at https://graded-string-arrangements.vercel.app
 
 ## What's here
 
 - `index.html` – the home page, with the list of pieces.
-- `songs/<piece>/index.html` – the reader for one piece; `songs/<piece>/<piece>.xml` is its score.
+- `songs/<piece>/index.html` – the reader for one piece (generated); `songs/<piece>/<piece>.xml` is its score.
 - `assets/` – shared by every piece: the music font (Bravura) and the string sounds (GeneralUser GS),
   each with its licence file.
+- `reader/reader.html` – the reader every song page is built from.
+- `songs.json`, `tools/build_site.py` – the song list and the script that builds the pages from it.
+- `tests/smoke.py` – a browser test of the home page, every song, and the conductor.
 
-It is a plain static site: no build step. Vercel (or any static host) serves the folder as it is.
+The site itself is plain static files; Vercel serves the folder as it is (the working files above are
+left out by `.vercelignore`). `CLAUDE.md` has the full how-to.
 
 ## Adding a piece
 
-1. Add `songs/<new-piece>/` with its reader page and score.
-2. Add a card for it to the list in `index.html`.
+1. Put its 24-part score at `songs/<new-piece>/<new-piece>.xml`.
+2. Add it to `songs.json`.
+3. `python tools/build_site.py`, then `python tests/smoke.py`.
 
 ## Credits
 

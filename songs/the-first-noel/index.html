@@ -523,7 +523,7 @@ body.following .host-only { display: none !important; }
   // String sounds: GeneralUser GS cut down to the violin, viola, cello, bass and pizzicato presets, as base64 text.
   const SOUNDFONT_URL = '../../assets/soundfont/strings-generaluser-sf2.b64.txt';
   const PDF_URL = ''; // Paste the Payhip product link here when it exists.
-  const BASE_TEMPO = 100; // Andante, from bar 1 of the score
+  const BASE_TEMPO = 100; // written tempo, from bar 1 of the score
 
   const INSTRUMENTS = ['Violin', 'Viola', 'Cello', 'Bass'];
   const TIERS = [
@@ -565,8 +565,8 @@ body.following .host-only { display: none !important; }
   const QN = '<svg class="qn" viewBox="0 0 10 24" aria-hidden="true"><ellipse cx="4.6" cy="19.2" rx="4.4" ry="3.1" transform="rotate(-22 4.6 19.2)"/><rect x="7.7" y="1" width="1.5" height="18.2"/></svg>';
   const ZOOMS = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.15, 1.3, 1.5, 1.75];
   const store = {
-    get() { try { return JSON.parse(localStorage.getItem('first-noel-reader') || '{}'); } catch { return {}; } },
-    set(v) { try { localStorage.setItem('first-noel-reader', JSON.stringify(v)); } catch {} },
+    get() { try { return JSON.parse(localStorage.getItem('the-first-noel-reader') || '{}'); } catch { return {}; } },
+    set(v) { try { localStorage.setItem('the-first-noel-reader', JSON.stringify(v)); } catch {} },
   };
   const saved = store.get();
   // The title opens and closes the song's details card.
@@ -818,8 +818,14 @@ body.following .host-only { display: none !important; }
     $('g-tempo').setAttribute('aria-label', 'Tempo, ' + state.tempo);
   }
   $('muteMine').addEventListener('change', (e) => { state.muteMine = e.target.checked; changed({ audio: true }); });
+  // The slider moves in steps of 5, but the written tempo is always reachable even when it isn't a multiple of 5,
+  // and the range stretches to include it.
+  const TEMPO_MIN = Math.min(40, BASE_TEMPO), TEMPO_MAX = Math.max(130, BASE_TEMPO);
+  $('tempo').min = TEMPO_MIN; $('tempo').max = TEMPO_MAX;
+  if (BASE_TEMPO % 5) $('tempo').step = 1; // so the slider can sit exactly on the written tempo
   function setTempo(v) {
-    state.tempo = Math.min(130, Math.max(40, Math.round(v / 5) * 5));
+    const r = v === BASE_TEMPO ? v : Math.round(v / 5) * 5;
+    state.tempo = Math.min(TEMPO_MAX, Math.max(TEMPO_MIN, r));
     showTempo();
     if (api) api.playbackSpeed = state.tempo / BASE_TEMPO;
     save();
