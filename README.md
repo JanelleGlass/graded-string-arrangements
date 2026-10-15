@@ -8,7 +8,8 @@ with a play-along reader for each piece. Live at https://graded-string-arrangeme
 - `index.html` – the home page, with the list of pieces.
 - `songs/<piece>/index.html` – the reader for one piece (generated); `songs/<piece>/<piece>.xml` is its score.
 - `assets/` – shared by every piece: the music font (Bravura) and the string sounds (GeneralUser GS),
-  each with its licence file.
+  each with its licence file, and the site icons.
+- `manifest.webmanifest` – lets a phone add the site to its home screen, where it opens like an app.
 - `reader/reader.html` – the reader every song page is built from.
 - `songs.json`, `tools/build_site.py` – the song list and the script that builds the pages from it.
 - `tests/smoke.py` – a browser test of the home page, every song, and the conductor.

@@ -8,6 +8,11 @@
 <meta name="theme-color" content="#E6EAE8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0F1513" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Graded Strings">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,500;0,600;1,500&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -49,6 +54,8 @@ h2 { margin: 0 0 14px; font-family: var(--font-display); font-weight: 600; font-
 .how li::before { content: counter(step); display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 800; margin-bottom: 8px; }
 .how b { display: block; margin-bottom: 2px; }
 .how span { color: var(--muted); font-size: 0.93rem; }
+.tip { margin: 14px 0 0; max-width: 46rem; color: var(--muted); font-size: 0.93rem; }
+.tip b { color: var(--ink); }
 .levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px 22px; margin: 0; }
 .levels div { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: 0 10px; }
 .levels dt { grid-row: span 2; font-family: var(--font-display); font-size: 1.6rem; font-weight: 600; color: var(--accent); line-height: 1.1; }
@@ -90,6 +97,7 @@ footer p { margin: 0 0 6px; }
       <li><b>Press Play</b><span>The music scrolls and the notes pulse with the beat. Choose who plays along with you and set the tempo.</span></li>
       <li><b>Practise a tricky spot</b><span>Drag across bars (on a phone, hold and drag) to loop them, with a count-in each time if you like.</span></li>
     </ol>
+    <p class="tip"><b>Full screen on a phone or tablet:</b> add this site to your home screen (in your browser’s Share or ⋮ menu, choose Add to Home Screen). It then opens like an app, without the address bar.</p>
   </section>
 
   <section aria-labelledby="h-levels">

@@ -57,6 +57,11 @@ HEAD = '''<!doctype html>
 <meta name="theme-color" content="#E6EAE8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0F1513" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="../../assets/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Graded Strings">
 <style>body{margin:0;padding:0}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 '''
 HOME_LINK_CSS = ('.home-link { display: inline-block; margin: 0 0 6px; color: var(--muted); font-size: 0.86rem; '
@@ -172,7 +177,8 @@ def home_cards(songs, facts):
 def main():
     reader = READER.read_text(encoding='utf-8')
     songs = json.loads((ROOT / 'songs.json').read_text(encoding='utf-8'))
-    for need in ['assets/font/Bravura.woff2', 'assets/soundfont/strings-generaluser-sf2.b64.txt', 'assets/icon.svg']:
+    for need in ['assets/font/Bravura.woff2', 'assets/soundfont/strings-generaluser-sf2.b64.txt', 'assets/icon.svg',
+                 'assets/apple-touch-icon.png', 'manifest.webmanifest']:
         if not (ROOT / need).exists():
             fail(f'missing {need}')
     seen, facts = set(), {}
