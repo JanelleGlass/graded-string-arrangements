@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Graded String Arrangements</title>
+<meta name="description" content="Hymns and carols arranged in six levels for violin, viola, cello and bass. Pick your part and play along.">
+<meta name="theme-color" content="#E6EAE8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0F1513" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,500;0,600;1,500&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --stand: #E6EAE8; --panel: #F5F7F6; --paper: #FFFFFF; --ink: #17201C; --muted: #55615B; --line: #C9D2CE;
+  --accent: #1D5B72; --accent-ink: #FFFFFF; --accent-soft: #D8E7ED;
+  --shadow: 0 1px 2px rgba(20, 30, 26, 0.06), 0 10px 30px -18px rgba(20, 30, 26, 0.35);
+  --str-e: #F0B000; --str-a: #DC2626; --str-d: #1D4ED8; --str-g: #15803D; --str-c: #7C3AED;
+  --font-display: "EB Garamond", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-body: "Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --stand: #0F1513; --panel: #17201C; --paper: #1B2420; --ink: #E2E9E5; --muted: #9AA8A1; --line: #2B3632;
+    --accent: #8CC7DB; --accent-ink: #0A1D24; --accent-soft: #1C3540; --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 34px -20px rgba(0, 0, 0, 0.8); color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--stand); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.5; }
+a { color: inherit; }
+.wrap { max-width: 980px; margin: 0 auto; padding: 48px 24px 56px; display: grid; gap: 40px; }
+header { display: grid; gap: 14px; max-width: 46rem; }
+.eyebrow { margin: 0; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: clamp(2.3rem, 6vw, 3.4rem); line-height: 1.02; letter-spacing: -0.01em; }
+.lede { margin: 0; font-size: 1.12rem; color: var(--muted); max-width: 40rem; }
+.strings { display: inline-flex; gap: 6px; margin-top: 4px; }
+.strings i { width: 26px; height: 18px; border-radius: 50%; transform: rotate(-18deg); display: inline-block; }
+h2 { margin: 0 0 14px; font-family: var(--font-display); font-weight: 600; font-size: 1.7rem; }
+.songs { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 16px; }
+.song { display: grid; gap: 6px; padding: 20px 22px 22px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); text-decoration: none; transition: transform 0.15s, border-color 0.15s; }
+.song:hover { border-color: var(--accent); transform: translateY(-2px); }
+.song:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.song .eyebrow { font-size: 0.72rem; }
+.song h3 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 1.75rem; line-height: 1.1; }
+.song p { margin: 0; color: var(--muted); font-size: 0.93rem; }
+.song .go { margin-top: 10px; justify-self: start; display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: var(--accent-ink); border-radius: 999px; padding: 8px 16px; font-weight: 700; font-size: 0.92rem; }
+.how { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
+.how li { counter-increment: step; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+.how li::before { content: counter(step); display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 800; margin-bottom: 8px; }
+.how b { display: block; margin-bottom: 2px; }
+.how span { color: var(--muted); font-size: 0.93rem; }
+.levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px 22px; margin: 0; }
+.levels div { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: 0 10px; }
+.levels dt { grid-row: span 2; font-family: var(--font-display); font-size: 1.6rem; font-weight: 600; color: var(--accent); line-height: 1.1; }
+.levels dd { margin: 0; }
+.levels .name { font-weight: 700; }
+.levels .note { color: var(--muted); font-size: 0.92rem; }
+footer { color: var(--muted); font-size: 0.84rem; border-top: 1px solid var(--line); padding-top: 18px; max-width: 46rem; }
+footer p { margin: 0 0 6px; }
+@media (max-width: 560px) { .wrap { padding: 32px 18px 44px; gap: 32px; } .lede { font-size: 1.02rem; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Hymns and carols for string players</p>
+    <h1>Graded String Arrangements</h1>
+    <p class="lede">Every piece is arranged in six levels for violin, viola, cello and bass, so players at every stage can play the same music together. Pick your instrument and level, press Play, and follow along.</p>
+    <span class="strings" aria-hidden="true"><i style="background:var(--str-e)"></i><i style="background:var(--str-a)"></i><i style="background:var(--str-d)"></i><i style="background:var(--str-g)"></i><i style="background:var(--str-c)"></i></span>
+  </header>
+
+  <section aria-labelledby="h-songs">
+    <h2 id="h-songs">Pieces</h2>
+    <div class="songs">
+      <a class="song" href="songs/the-first-noel/">
+        <span class="eyebrow">Christmas</span>
+        <h3>The First Noel</h3>
+        <p>Traditional English carol · D major · 3/4</p>
+        <span class="go">Open and play along →</span>
+      </a>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-how">
+    <h2 id="h-how">How it works</h2>
+    <ol class="how">
+      <li><b>Choose your part</b><span>Your instrument and your level. Notes are colored by string, with finger numbers.</span></li>
+      <li><b>Press Play</b><span>The music scrolls and the notes pulse with the beat. Choose who plays along with you and set the tempo.</span></li>
+      <li><b>Practise a tricky spot</b><span>Drag across bars (on a phone, hold and drag) to loop them, with a count-in each time if you like.</span></li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="h-levels">
+    <h2 id="h-levels">The six levels</h2>
+    <dl class="levels">
+      <div><dt>1</dt><dd class="name">Open Strings</dd><dd class="note">Plucked open strings, one on each new chord. No fingers needed.</dd></div>
+      <div><dt>2</dt><dd class="name">Easy</dd><dd class="note">The tune with the quick notes folded in, so it moves in quarter notes and longer.</dd></div>
+      <div><dt>3</dt><dd class="name">Melody</dd><dd class="note">The tune as written. Cello and bass play it lower.</dd></div>
+      <div><dt>4</dt><dd class="name">Harmony</dd><dd class="note">Chord tones under the tune, a different line for each instrument.</dd></div>
+      <div><dt>5</dt><dd class="name">Advanced Melody</dd><dd class="note">The tune as a variation in eighth notes, into third position.</dd></div>
+      <div><dt>6</dt><dd class="name">Obbligato</dd><dd class="note">Its own line for each instrument: a descant, a countermelody, broken chords.</dd></div>
+    </dl>
+  </section>
+
+  <footer>
+    <p>Free to read and play along. Playback is synthesized, so treat it as a guide for notes and timing rather than a model for tone.</p>
+    <p>Music drawn and played with alphaTab (alphatab.net) · Bravura music font (SIL Open Font License) · string sounds from the GeneralUser GS sound bank by S. Christian Collins.</p>
+  </footer>
+</div>
+</body>
+</html>
