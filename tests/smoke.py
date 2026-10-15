@@ -7,9 +7,12 @@ Needs Playwright for Python and its Chromium, once per computer:
     python3 -m playwright install chromium
 
 What it checks
-  1. Home page: a card for every song in songs.json, no script errors.
+  1. Home page: a card for every song in songs.json, the home-screen app file and icons load,
+     no script errors.
   2. Every song page, at laptop and phone-landscape size: the score loads with all parts,
      notes are drawn, Play moves the music forward, nothing scrolls sideways, no script errors.
+     Laptop: the Full screen button goes in and out of full screen. Phone (acting like an iPhone,
+     which doesn't allow it): no Full screen button.
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
      the teacher conducts, a student follows, and the student's music keeps up with the teacher's.
 
@@ -73,6 +76,9 @@ async def song_checks(browser, base):
         for label, w, h in [('laptop', 1366, 860), ('phone landscape', 844, 390)]:
             ctx = await browser.new_context(device_scale_factor=1)
             await setup(ctx)
+            if label == 'phone landscape':
+                # Like an iPhone: the browser won't let a page go full screen.
+                await ctx.add_init_script("for (const k of ['fullscreenEnabled', 'webkitFullscreenEnabled']) Object.defineProperty(Document.prototype, k, { get: () => false });")
             errors = []
             try:
                 pg = await open_reader(ctx, f'{base}/songs/{slug}/', errors, slug, w, h)
@@ -88,6 +94,19 @@ async def song_checks(browser, base):
             check(drawn > 0, f'{label}: notes are drawn')
             wide = await pg.evaluate('() => document.documentElement.scrollWidth - window.innerWidth')
             check(wide <= 1, f'{label}: no sideways scrolling ({wide}px extra)')
+            shown = await pg.evaluate("() => !!document.getElementById('fullBtn').offsetParent")
+            if label == 'phone landscape':
+                check(not shown, f'{label}: no Full screen button where the browser does not allow it')
+            else:
+                check(shown, f'{label}: Full screen button shows')
+                await pg.click('#fullBtn')
+                await pg.wait_for_timeout(500)
+                on = await pg.evaluate("() => [!!document.fullscreenElement, document.getElementById('fullBtn').getAttribute('aria-label')]")
+                await pg.click('#fullBtn')
+                await pg.wait_for_timeout(500)
+                off = await pg.evaluate("() => [!!document.fullscreenElement, document.getElementById('fullBtn').getAttribute('aria-label')]")
+                check(on == [True, 'Leave full screen'] and off == [False, 'Full screen'],
+                      f'{label}: Full screen button goes in and out of full screen ({on}, {off})')
             await pg.click('#play')
             await pg.wait_for_timeout(3500)
             tick = await pg.evaluate('() => reader.at()')
@@ -109,6 +128,16 @@ async def home_checks(browser, base):
     for s in SONGS:
         check(f"songs/{s['slug']}/" in links, f"card for {s['title']}")
     check(len(links) == len(SONGS), f'{len(links)} cards for {len(SONGS)} songs')
+    # Added to a phone's home screen, the site opens like an app (no address bar): the app file and its icons load.
+    app = await pg.evaluate("""async () => {
+      const link = document.querySelector('link[rel=manifest]'), touch = document.querySelector('link[rel=apple-touch-icon]');
+      if (!link || !touch) return 'missing link';
+      const m = await (await fetch(link.href)).json();
+      for (const src of [...m.icons.map(i => new URL(i.src, link.href).href), touch.href])
+        if (!(await fetch(src)).ok) return 'missing ' + src;
+      return m.display;
+    }""")
+    check(app == 'standalone', f'home-screen app file and icons load ({app})')
     check(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
     await ctx.close()
 

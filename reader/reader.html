@@ -496,6 +496,9 @@ body.following .host-only { display: none !important; }
     <button class="fab-btn host-only cyc" id="g-metro" type="button"></button>
     <button class="fab-btn host-only" id="restart" type="button" aria-label="Back to the start" title="Back to the start"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h2.2v12H6zm3.6 6L18 18V6z"/></svg></button>
     </div>
+    <div class="fab-set" id="fullSet" role="group" aria-label="Screen" hidden>
+    <button class="fab-btn" id="fullBtn" type="button" aria-label="Full screen" title="Full screen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg></button>
+    </div>
     </div>
   </div>
 </div>
@@ -2734,6 +2737,37 @@ body.following .host-only { display: none !important; }
   try { new ResizeObserver(placeFab).observe(mainCol); new ResizeObserver(setDockH).observe($('fabMain')); } catch {}
   window.addEventListener('resize', placeFab);
   placeFab();
+
+  // Full screen: the browser's address bar and buttons go away and the music gets the whole screen. Only where
+  // the browser lets a page do this (Android phones, iPads, computers); iPhones don't, so there the button stays
+  // hidden. (Added to an iPhone's home screen, the site opens without the address bar instead.)
+  (() => {
+    const root = document.documentElement;
+    const enter = root.requestFullscreen ? () => root.requestFullscreen({ navigationUI: 'hide' })
+      : root.webkitRequestFullscreen ? () => root.webkitRequestFullscreen() : null;
+    const leave = document.exitFullscreen ? () => document.exitFullscreen()
+      : document.webkitExitFullscreen ? () => document.webkitExitFullscreen() : null;
+    if (!enter || !leave || !(document.fullscreenEnabled || document.webkitFullscreenEnabled)) return;
+    const isFull = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+    const btn = $('fullBtn'), ICON_FULL = btn.innerHTML;
+    const ICON_LEAVE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>';
+    // Turned down after all (some app views): take the button away rather than leave one that does nothing.
+    const unavailable = () => { $('fullSet').hidden = true; setDockH(); };
+    btn.addEventListener('click', () => {
+      if (isFull()) { try { Promise.resolve(leave()).catch(() => {}); } catch {} return; }
+      try { Promise.resolve(enter()).catch(unavailable); } catch { unavailable(); }
+    });
+    for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(ev, () => {
+      const on = isFull();
+      btn.innerHTML = on ? ICON_LEAVE : ICON_FULL;
+      btn.setAttribute('aria-label', on ? 'Leave full screen' : 'Full screen');
+      btn.title = on ? 'Leave full screen' : 'Full screen';
+      // Fit the music to the new height, even when the screen grew by less than a sliding toolbar.
+      lastH = 0;
+      window.dispatchEvent(new Event('resize'));
+    });
+    $('fullSet').hidden = false;
+  })();
 
   // ---- Boot ----
   function fail(msg) { $('err').textContent = msg; $('loading').hidden = true; }
