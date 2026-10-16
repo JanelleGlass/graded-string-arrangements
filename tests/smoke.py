@@ -11,9 +11,8 @@ What it checks
      no script errors.
   2. Every song page, at laptop and phone-landscape size: the score loads with all parts,
      notes are drawn, Play moves the music forward, nothing scrolls sideways, no script errors.
-     The page settings are separate buttons in the strip; on a laptop the music button switches
-     between pages and one long line, and the finger button puts the finger numbers inside the
-     notes or to their right.
+     The page settings are separate buttons in the strip; On the note steps through its five looks,
+     each drawn as it says; on a laptop the music button switches between pages and one long line.
      Laptop: the Full screen button goes in and out of full screen. Phone (acting like an iPhone,
      which doesn't allow it): no Full screen button, and pinching the music makes it bigger and smaller.
      The Parts panel: the music runs a little under a tab at the right edge, which pulls the panel out over it, each part's eye
@@ -126,55 +125,56 @@ async def song_checks(browser, base):
             wide = await pg.evaluate('() => document.documentElement.scrollWidth - window.innerWidth')
             check(wide <= 1, f'{label}: no sideways scrolling ({wide}px extra)')
             # What's drawn on the page: one tap-to-change button per setting in the strip, no "On the page" panel.
-            strip = await pg.evaluate('''() => ['g-colors', 'g-ltype', 'g-fnum', 'g-fpos', 'g-layout', 'g-count', 'g-page', 'countTog']
+            strip = await pg.evaluate('''() => ['g-colors', 'g-ltype', 'g-fnum', 'g-fpos', 'g-look', 'g-layout', 'g-count', 'g-page', 'countTog']
               .filter(id => { const e = document.getElementById(id); return e && e.offsetParent && e.closest('#fabRow'); })''')
-            # The same buttons on every screen, always in the same place (a choice that doesn't apply is greyed out).
-            want = ['g-colors', 'g-ltype', 'g-fnum', 'g-fpos', 'g-count']
+            # The same buttons on every screen, always in the same place.
+            want = ['g-colors', 'g-look', 'g-count']
             check(strip == want, f'{label}: the page settings are separate buttons in the strip ({strip})')
             # The size of the music, and on bigger screens Line or Pages, sit at the top right of the music.
             top = await pg.evaluate('''() => ['zoomOut', 'zoomIn', 'g-layout'].filter(id => { const e = document.getElementById(id); return e.offsetParent && e.closest('#topTools'); })''')
             above = await pg.evaluate("() => document.getElementById('topTools').getBoundingClientRect().bottom <= document.querySelector('#sheet .at-surface').getBoundingClientRect().top + 1")
             want_top = ['zoomOut', 'zoomIn', 'g-layout'] if label == 'laptop' else ['zoomOut', 'zoomIn']
             check(top == want_top and above, f'{label}: the size buttons{" and Line/Pages" if label == "laptop" else ""} sit at the top, above the music ({top})')
-            letters = (await pg.text_content('#g-ltype .cyc-badge')).strip()
-            check(letters == ('Note Names: Off' if label == 'laptop' else 'Note Names: All'), f'{label}: note names start {"off" if label == "laptop" else "on"} ("{letters}")')
-            # Note names on: they go inside the notes, the finger numbers go to the right, and the placement button is
-            # greyed out in its place. Off: it can be used again.
-            taps = 1 if label == 'laptop' else 2  # laptop: Off -> All; phone: All -> 1st -> Off
-            for _ in range(taps): await pg.click('#g-ltype')
-            await pg.wait_for_timeout(2500)
-            got = await pg.evaluate('''() => { const b = document.getElementById('g-fpos');
-              return { letters: [...document.querySelectorAll('#sheet text.fin')].some(t => /^[A-G]/.test(t.textContent)),
-                       placement: !!b.offsetParent && b.getAttribute('aria-disabled') !== 'true', greyed: !!b.offsetParent && b.getAttribute('aria-disabled') === 'true' }; }''')
-            if label == 'laptop':
-                check(got['letters'] and got['greyed'], f'{label}: with note names on, they are drawn in the notes and the placement button greys out in its place ({got})')
-                for _ in range(2): await pg.click('#g-ltype')  # All -> 1st -> Off
-            else:
-                check(not got['letters'] and got['placement'], f'{label}: with note names off, the placement button can be used ({got})')
-                await pg.click('#g-ltype')  # Off -> All
-            await pg.wait_for_timeout(1500)
-            said = (await pg.text_content('#g-count')).strip()
+            # On the note: one button steps through five looks. Laptops start on finger numbers inside the notes, phones
+            # on note names with finger numbers to the right. Each look draws what it says, at the same size.
+            look_js = '''() => { const fin = [...document.querySelectorAll('#sheet text.fin')].map(t => t.textContent);
+              return { look: document.querySelector('#g-look .now').textContent, names: fin.some(x => /^[A-G]/.test(x)),
+                       fingers: fin.some(x => /^[0-4]/.test(x)), size: reader.api.settings.display.scale }; }'''
+            seen = [await pg.evaluate(look_js)]
+            for _ in range(5):
+                await pg.click('#g-look'); await pg.wait_for_timeout(2200)
+                seen.append(await pg.evaluate(look_js))
+            order = ['Fingers inside', 'Fingers to the right', 'Note names and fingers', 'Note names', 'Plain notes']
+            first = 0 if label == 'laptop' else 2
+            want_looks = [order[(first + k) % 5] for k in range(6)]
+            check([x['look'] for x in seen] == want_looks, f'{label}: the On the note button steps through the five looks ({[x["look"] for x in seen]})')
+            drawn = {x['look']: (x['names'], x['fingers']) for x in seen}
+            check(drawn == {'Fingers inside': (False, True), 'Fingers to the right': (False, True), 'Note names and fingers': (True, True),
+                            'Note names': (True, False), 'Plain notes': (False, False)}, f'{label}: each look draws what it says ({drawn})')
+            sizes = {x['look']: x['size'] for x in seen}
+            check(sizes['Fingers inside'] == sizes['Fingers to the right'], f'{label}: the notes stay the same size with finger numbers inside or to the right ({sizes})')
+            if label != 'laptop':
+                for _ in range(3): await pg.click('#g-look')  # back to where a phone starts
+                await pg.wait_for_timeout(1500)
+            said = (await pg.text_content('#g-count .now')).strip()
             check(said == 'Counting: On', f'{label}: the Counting button says so in words ("{said}")')
             await pg.click('#g-count')
             off = await pg.evaluate("() => document.getElementById('sheet').classList.contains('counts-off')")
             await pg.click('#g-count')
             on = await pg.evaluate("() => !document.getElementById('sheet').classList.contains('counts-off')")
             check(off and on, f'{label}: the Counting button in the strip hides and shows the counts')
+            # Nothing in the strip moves as labels change: each changing button keeps one width.
+            widths = []
+            for _ in range(5):
+                widths.append(await pg.evaluate("() => [...document.querySelectorAll('#fabRow .fab-btn')].filter(e => e.offsetParent).map(e => Math.round(e.getBoundingClientRect().left))"))
+                await pg.click('#g-look'); await pg.wait_for_timeout(600)
+            check(all(w == widths[0] for w in widths), f'{label}: the buttons stay in the same place as On the note changes')
             if label == 'laptop':
                 await pg.click('#g-layout'); await pg.wait_for_timeout(1500)
                 paged = await pg.evaluate("() => !document.getElementById('sheet').classList.contains('line') && document.getElementById('g-layout').title")
                 await pg.click('#g-layout'); await pg.wait_for_timeout(1500)
                 lined = await pg.evaluate("() => document.getElementById('sheet').classList.contains('line') && document.getElementById('g-layout').title")
                 check(paged == 'Music: pages' and lined == 'Music: one long line', f'{label}: the music button switches between pages and one long line')
-                size_in = await pg.evaluate('() => reader.api.settings.display.scale')
-                await pg.click('#g-fpos')
-                fpos = await pg.get_attribute('#g-fpos', 'title')
-                size_right = await pg.evaluate('() => reader.api.settings.display.scale')
-                await pg.click('#g-fpos')
-                back = await pg.get_attribute('#g-fpos', 'title')
-                check(size_in == size_right, f'{label}: the notes stay the same size inside or right ({size_in}, {size_right})')
-                check(fpos == 'Finger numbers go right of the notes' and back == 'Finger numbers go inside the notes',
-                      f'{label}: the finger button puts the finger numbers inside the notes or to their right ("{fpos}", "{back}")')
             shown = await pg.evaluate("() => !!document.getElementById('fullBtn').offsetParent")
             if label == 'phone landscape':
                 check(not shown, f'{label}: no Full screen button where the browser does not allow it')

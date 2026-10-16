@@ -383,6 +383,11 @@ html.small .small-only[hidden], html.small .big-only { display: none !important;
 .fab-btn.cyc { gap: 6px; padding: 0 11px; }
 .fab-btn svg.cyc-ico { flex: none; }
 .cyc-badge { font-size: 0.74rem; font-weight: 800; color: #55615B; letter-spacing: 0.02em; }
+/* A tap-to-change button is as wide as its longest label, so the strip never shifts as labels change: every label sits
+   in the same spot, and only the current one shows. */
+.cyc-badge.stack { display: inline-grid; justify-items: start; }
+.cyc-badge.stack > span { grid-area: 1 / 1; }
+.cyc-badge.stack > span:not(.now) { visibility: hidden; }
 .toast { padding: 7px 14px; border-radius: 999px; background: #17201C; color: #FFFFFF; font-size: 0.88rem; font-weight: 600; box-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.5); }
 .toast[hidden] { display: none; }
 /* A device following the conductor shows only what it can use */
@@ -431,7 +436,7 @@ body.following .host-only { display: none !important; }
   .fab { bottom: calc(5px + env(safe-area-inset-bottom, 0px)); gap: 6px; }
   /* Every setting on one compact row along the bottom */
   .fab-row { gap: 5px 6px; }
-  .fab-btn.cyc { gap: 4px; padding: 0 8px; }
+  .fab-btn.cyc { gap: 4px; padding: 0 7px; }
   html.small #g-together:not(.on):not(.offer) .fab-lbl { display: none; }
   .fab-set { gap: 5px; }
   .fab-btn, .play { height: 38px; }
@@ -552,9 +557,7 @@ body.following .host-only { display: none !important; }
     <div class="fab-more" id="fabMore" hidden>
     <div class="fab-set" role="group" aria-label="Your part and the page">
     <button class="fab-btn cyc" id="g-colors" type="button"></button>
-    <button class="fab-btn cyc" id="g-ltype" type="button"></button>
-    <button class="fab-btn cyc" id="g-fnum" type="button"></button>
-    <button class="fab-btn cyc" id="g-fpos" type="button"></button>
+    <button class="fab-btn cyc" id="g-look" type="button"></button>
     <button class="fab-btn cyc" id="g-count" type="button"></button>
     </div>
     <div class="fab-set" role="group" aria-label="Playback settings">
@@ -667,7 +670,8 @@ body.following .host-only { display: none !important; }
     // What plays when Hear is open: the mix chosen there, kept while Hear is closed (none until it's first opened).
     heard: indexList(saved.heard, 24) || oldHeard(),
     colorMode: MARK_MODES.some(m => m.id === saved.colorMode) ? saved.colorMode : saved.colors === false ? 'off' : 'all',
-    fingerMode: MARK_MODES.some(m => m.id === saved.fingerMode) ? saved.fingerMode : saved.colors === false ? 'off' : 'all',
+    // Finger numbers and note names are on (every note) or off; "first time only", saved before, counts as on.
+    fingerMode: saved.fingerMode === 'off' || (!saved.fingerMode && saved.colors === false) ? 'off' : 'all',
     tempo: saved.tempo || SPEED_BASE,
     // The beat is always shown the same way: pulsing notes, with the counts under the notes matching the notes.
     follow: 'pulse',
@@ -678,8 +682,8 @@ body.following .host-only { display: none !important; }
     countAlong: saved.counts !== 'off',
     layout: saved.layout === 'page' ? 'page' : 'line',
     // Letter names inside the notes: phones start with them on, bigger screens off (each kept on its own).
-    letterMode: MARK_MODES.some(m => m.id === saved.letterMode) ? saved.letterMode : 'all',
-    letterModeBig: MARK_MODES.some(m => m.id === saved.lettersBig) ? saved.lettersBig : 'off',
+    letterMode: saved.letterMode === 'off' ? 'off' : 'all',
+    letterModeBig: saved.lettersBig && saved.lettersBig !== 'off' ? 'all' : 'off',
     // One button steps through: metronome on, metronome on with a count-in, a count-in only, metronome off.
     metro: ['off', 'on', 'count', 'countonly'].includes(saved.metro) ? saved.metro : 'off',
     // Bigger or smaller music (the − and + in the corner): a step on ZOOMS.
@@ -781,55 +785,51 @@ body.following .host-only { display: none !important; }
   const GREY = '#B5BEBA';
   const dotsIco = (on) => '<svg class="cyc-ico" viewBox="0 0 26 12" style="width:26px;height:12px" aria-hidden="true">' +
     ['#F0B000', '#DC2626', '#1D4ED8', '#15803D'].map((c, i) => `<circle cx="${4 + i * 6}" cy="6" r="3.3" fill="${on ? c : GREY}"/>`).join('') + '</svg>';
-  const headIco = (on, num, ch = '1') => `<svg class="cyc-ico" viewBox="0 0 22 16" style="width:24px;height:18px" aria-hidden="true"><ellipse cx="11" cy="8" rx="8.6" ry="6" transform="rotate(-20 11 8)" fill="${on ? '#1D4ED8' : GREY}"/>` +
-    (num ? `<text x="11" y="11.4" text-anchor="middle" font-size="9.5" font-weight="800" fill="#fff" font-family="Figtree, Arial, sans-serif">${ch}</text>` : '') + '</svg>';
-  // A note head (the button's own words say "Fingers").
-  const fingerIco = (on) => `<svg class="cyc-ico" viewBox="0 0 18 16" style="width:18px;height:16px" aria-hidden="true"><ellipse cx="9" cy="8" rx="7.6" ry="5.4" transform="rotate(-20 9 8)" fill="${on ? '#1D4ED8' : GREY}"/></svg>`;
-  // Where the finger numbers go: a note head with its "1" inside it, or to its right.
-  const FPOS_STEPS = ['inside', 'right'];
-  const FPOS_WORD = { inside: 'inside the notes', right: 'right of the notes' };
-  const FPOS_BADGE = { inside: 'Inside the note', right: 'Right of the note' };
-  const FPOS_AT = { inside: [15, 15.4, '#fff'], right: [26, 15.4, '#17201C'] };
-  const fposIco = (at) => { const [x, y, c] = FPOS_AT[at];
-    return `<svg class="cyc-ico" viewBox="0 0 30 20" style="width:28px;height:19px" aria-hidden="true"><ellipse cx="15" cy="12" rx="7.4" ry="5.3" transform="rotate(-20 15 12)" fill="#1D4ED8"/>` +
-      `<text x="${x}" y="${y}" text-anchor="middle" font-size="${at === 'inside' ? 8.5 : 9.5}" font-weight="800" fill="${c}" font-family="Figtree, Arial, sans-serif">1</text></svg>`; };
+  // What's on the notes: one button stepping through five looks. Only one thing fits inside a note head, so with note
+  // names the finger numbers go to the right.
+  const LOOKS = [
+    { id: 'fin-in', word: 'Fingers inside', say: 'finger numbers inside the notes', names: false, fingers: true, spot: 'inside' },
+    { id: 'fin-right', word: 'Fingers to the right', say: 'finger numbers to the right of the notes', names: false, fingers: true, spot: 'right' },
+    { id: 'names-fin', word: 'Note names and fingers', say: 'note names inside the notes, finger numbers to the right', names: true, fingers: true },
+    { id: 'names', word: 'Note names', say: 'note names inside the notes', names: true, fingers: false },
+    { id: 'plain', word: 'Plain notes', say: 'nothing on the notes', names: false, fingers: false },
+  ];
+  const lookNow = () => LOOKS.find(l => l.id === (lettersOn() ? (state.fingerMode !== 'off' ? 'names-fin' : 'names')
+    : state.fingerMode === 'off' ? 'plain' : state.fingers === 'right' ? 'fin-right' : 'fin-in'));
+  function setLook(l) {
+    state[letterKey()] = l.names ? 'all' : 'off';
+    state.fingerMode = l.fingers ? 'all' : 'off';
+    if (l.spot) state.fingers = l.spot;
+  }
+  // A note head showing the look: a "1" inside it or to its right, an "A" inside it, both, or neither.
+  const lookIco = (l) => {
+    const t = (x, ch, fill, size) => `<text x="${x}" y="15.2" text-anchor="middle" font-size="${size}" font-weight="800" fill="${fill}" font-family="Figtree, Arial, sans-serif">${ch}</text>`;
+    const inside = l.names ? 'A' : l.fingers && l.spot === 'inside' ? '1' : '';
+    const right = l.fingers && (l.names || l.spot === 'right');
+    return `<svg class="cyc-ico" viewBox="0 0 30 20" style="width:28px;height:19px" aria-hidden="true"><ellipse cx="13" cy="12" rx="7.6" ry="5.4" transform="rotate(-20 13 12)" fill="#1D4ED8"/>` +
+      (inside ? t(13, inside, '#fff', 8.5) : '') + (right ? t(25, '1', '#17201C', 9.5) : '') + '</svg>';
+  };
   // One long line (a staff running off to the right) or pages (lines of music stacked on a page).
   const layoutIco = (layout) => `<svg class="cyc-ico" viewBox="0 0 28 18" style="width:26px;height:17px" aria-hidden="true">` + (layout === 'line'
     ? '<path d="M1 6h21M1 9h21M1 12h21" stroke="#1D5B72" stroke-width="1.5" fill="none"/><path d="M22.5 5l4.5 4-4.5 4z" fill="#1D5B72"/>'
     : '<rect x="7" y="1" width="14" height="16" rx="1.8" fill="none" stroke="#1D5B72" stroke-width="1.4"/><path d="M9.5 4.6h9M9.5 6.8h9M9.5 11h9M9.5 13.2h9" stroke="#1D5B72" stroke-width="1.1" fill="none"/>') + '</svg>';
+  // A button's labels, all in one spot (the button is as wide as the longest), with the current one showing.
+  const stackBadge = (labels, now) => '<span class="cyc-badge stack">' + labels.map(t => '<span' + (t === now ? ' class="now"' : '') + '>' + t + '</span>').join('') + '</span>';
   function renderCycles() {
-    $('g-metro').innerHTML = metroIco(state.metro !== 'off') + '<span class="cyc-badge">' + METRO_BADGE[state.metro] + '</span>';
+    $('g-metro').innerHTML = metroIco(state.metro !== 'off') + stackBadge(Object.values(METRO_BADGE), METRO_BADGE[state.metro]);
     $('g-metro').setAttribute('aria-label', METRO_WORD[state.metro] + '. Tap to change.');
-    $('g-colors').innerHTML = dotsIco(state.colorMode !== 'off') + '<span class="cyc-badge">' + MARK_BADGE[state.colorMode] + '</span>';
+    $('g-colors').innerHTML = dotsIco(state.colorMode !== 'off') + stackBadge(Object.values(MARK_BADGE), MARK_BADGE[state.colorMode]);
     $('g-colors').setAttribute('aria-label', 'String colors: ' + MARK_WORD[state.colorMode] + '. Tap to change.');
-    const lMode = state[letterKey()], lOn = lMode !== 'off';
-    $('g-ltype').innerHTML = headIco(lOn, lOn, 'A') + '<span class="cyc-badge">Note Names: ' + MARK_BADGE[lMode] + '</span>';
-    $('g-ltype').setAttribute('aria-label', 'Note names inside the notes: ' + MARK_WORD[lMode] + '. Tap to change.');
-    $('g-fnum').innerHTML = fingerIco(state.fingerMode !== 'off') + '<span class="cyc-badge">Fingers: ' + MARK_BADGE[state.fingerMode] + '</span>';
-    $('g-fnum').setAttribute('aria-label', 'Finger numbers: ' + MARK_WORD[state.fingerMode] + '. Tap to change.');
-    const spot = fingerSpot();
-    $('g-fpos').innerHTML = fposIco(spot) + '<span class="cyc-badge">' + FPOS_BADGE[spot] + '</span>';
-    $('g-fpos').setAttribute('aria-label', 'Finger numbers go ' + FPOS_WORD[spot] + '. Tap to change.');
-    $('g-layout').innerHTML = layoutIco(state.layout) + '<span class="cyc-badge">' + (state.layout === 'line' ? 'Line' : 'Pages') + '</span>';
+    const look = lookNow();
+    $('g-look').innerHTML = lookIco(look) + stackBadge(LOOKS.map(l => l.word), look.word);
+    $('g-look').setAttribute('aria-label', 'On the notes: ' + look.say + '. Tap to change.');
+    $('g-layout').innerHTML = layoutIco(state.layout) + stackBadge(['Line', 'Pages'], state.layout === 'line' ? 'Line' : 'Pages');
     $('g-layout').setAttribute('aria-label', 'Music: ' + (state.layout === 'line' ? 'one long line' : 'pages') + '. Tap to change.');
     // Pointing at a button (mouse) says what it does, as the panel used to.
     const cOn = state.countAlong;
-    $('g-count').innerHTML = '<span class="cyc-badge">Counting: ' + (cOn ? 'On' : 'Off') + '</span>';
+    $('g-count').innerHTML = stackBadge(['Counting: On', 'Counting: Off'], cOn ? 'Counting: On' : 'Counting: Off');
     $('g-count').setAttribute('aria-label', 'Counts under the notes: ' + (cOn ? 'on' : 'off') + '. Tap to change.');
-    for (const id of ['g-metro', 'g-colors', 'g-ltype', 'g-fnum', 'g-fpos', 'g-layout', 'g-count']) $(id).title = $(id).getAttribute('aria-label').replace(/\. Tap to change\.$/, '');
-    // Choices that don't apply right now stay in place, greyed out.
-    for (const id of ['g-fnum', 'g-fpos']) {
-      const why = unavailable(id), b = $(id);
-      b.setAttribute('aria-disabled', String(!!why));
-      if (why) { b.title = why; b.setAttribute('aria-label', b.getAttribute('aria-label').replace(/\. Tap to change\.$/, '. ' + why)); }
-    }
-  }
-  // Why a button can't be used right now (nothing when it can).
-  function unavailable(id) {
-    if (!fingersShown()) return 'Open Strings parts have no finger numbers';
-    if (id === 'g-fpos' && state.fingerMode === 'off') return 'Turn finger numbers on to choose where they go';
-    if (id === 'g-fpos' && lettersOn()) return 'Finger numbers go to the right of the note while note names are on';
-    return '';
+    for (const id of ['g-metro', 'g-colors', 'g-look', 'g-layout', 'g-count']) $(id).title = $(id).getAttribute('aria-label').replace(/\. Tap to change\.$/, '');
   }
   function toast(text, ms = 1700) {
     const el = $('toast');
@@ -859,17 +859,13 @@ body.following .host-only { display: none !important; }
     toast(METRO_WORD[state.metro]);
   });
   $('g-colors').addEventListener('click', () => { setPop(null); state.colorMode = nextOf(STEP_MARKS, state.colorMode); changed({ marks: true, size: true }); toast('String colors: ' + MARK_WORD[state.colorMode]); });
-  $('g-fnum').addEventListener('click', () => { setPop(null); if (unavailable('g-fnum')) return toast(unavailable('g-fnum'), 2400); state.fingerMode = nextOf(STEP_MARKS, state.fingerMode); changed({ marks: true, size: true }); toast('Finger numbers: ' + MARK_WORD[state.fingerMode]); });
-  $('g-ltype').addEventListener('click', () => {
+  $('g-look').addEventListener('click', () => {
     setPop(null);
-    const key = letterKey(), was = lettersOn();
-    state[key] = nextOf(STEP_MARKS, state[key]);
+    const next = LOOKS[(LOOKS.indexOf(lookNow()) + 1) % LOOKS.length];
+    setLook(next);
     changed({ marks: true, size: true });
-    // Turning note names on moves finger numbers that were inside the notes out to the right (and back again).
-    const moved = fingersShown() && state.fingerMode !== 'off' && state.fingers === 'inside' && was !== lettersOn();
-    toast('Note names: ' + MARK_WORD[state[key]] + (moved ? (lettersOn() ? '. Finger numbers move to the right.' : '. Finger numbers go back inside.') : ''), moved ? 2600 : 1700);
+    toast(next.word + (next.fingers && !fingersShown() ? ' (Open Strings parts have no finger numbers)' : ''), next.fingers && !fingersShown() ? 2600 : 1700);
   });
-  $('g-fpos').addEventListener('click', () => { setPop(null); if (unavailable('g-fpos')) return toast(unavailable('g-fpos'), 2400); state.fingers = nextOf(FPOS_STEPS, state.fingers); changed({ marks: true, size: true }); toast('Finger numbers: ' + FPOS_WORD[state.fingers]); });
   $('g-layout').addEventListener('click', () => {
     setPop(null);
     state.layout = state.layout === 'line' ? 'page' : 'line';
