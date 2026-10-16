@@ -15,7 +15,7 @@ What it checks
      between pages and one long line, and the finger button puts the finger numbers inside the
      notes or to their right.
      Laptop: the Full screen button goes in and out of full screen. Phone (acting like an iPhone,
-     which doesn't allow it): no Full screen button.
+     which doesn't allow it): no Full screen button, and pinching the music makes it bigger and smaller.
      The Parts panel: the music runs a little under a tab at the right edge, which pulls the panel out over it, each part's eye
      puts it on the page, the parts on the page play until "Hear the parts I see" is unticked and a
      speaker for each part chooses, and choices survive a reload.
@@ -128,13 +128,30 @@ async def song_checks(browser, base):
             # What's drawn on the page: one tap-to-change button per setting in the strip, no "On the page" panel.
             strip = await pg.evaluate('''() => ['g-colors', 'g-ltype', 'g-fnum', 'g-fpos', 'g-layout', 'g-count', 'g-page', 'countTog']
               .filter(id => { const e = document.getElementById(id); return e && e.offsetParent && e.closest('#fabRow'); })''')
-            want = ['g-colors', 'g-fnum', 'g-fpos', 'g-count'] if label == 'laptop' else ['g-colors', 'g-ltype', 'g-fnum', 'g-count']
+            # Laptops start with letter names off (so the finger placement button shows), phones with them on.
+            want = ['g-colors', 'g-ltype', 'g-fnum', 'g-fpos', 'g-count'] if label == 'laptop' else ['g-colors', 'g-ltype', 'g-fnum', 'g-count']
             check(strip == want, f'{label}: the page settings are separate buttons in the strip ({strip})')
             # The size of the music, and on bigger screens Line or Pages, sit at the top right of the music.
             top = await pg.evaluate('''() => ['zoomOut', 'zoomIn', 'g-layout'].filter(id => { const e = document.getElementById(id); return e.offsetParent && e.closest('#topTools'); })''')
             above = await pg.evaluate("() => document.getElementById('topTools').getBoundingClientRect().bottom <= document.querySelector('#sheet .at-surface').getBoundingClientRect().top + 1")
             want_top = ['zoomOut', 'zoomIn', 'g-layout'] if label == 'laptop' else ['zoomOut', 'zoomIn']
             check(top == want_top and above, f'{label}: the size buttons{" and Line/Pages" if label == "laptop" else ""} sit at the top, above the music ({top})')
+            letters = (await pg.text_content('#g-ltype .cyc-badge')).strip()
+            check(letters == ('Letters: Off' if label == 'laptop' else 'Letters: All'), f'{label}: letter names start {"off" if label == "laptop" else "on"} ("{letters}")')
+            # Letter names on: they go inside the notes, the finger numbers go to the right, and there is no placement
+            # choice. Off: the placement button is back.
+            taps = 1 if label == 'laptop' else 2  # laptop: Off -> All; phone: All -> 1st -> Off
+            for _ in range(taps): await pg.click('#g-ltype')
+            await pg.wait_for_timeout(2500)
+            got = await pg.evaluate('''() => ({ letters: [...document.querySelectorAll('#sheet text.fin')].some(t => /^[A-G]/.test(t.textContent)),
+              placement: !!document.getElementById('g-fpos').offsetParent })''')
+            if label == 'laptop':
+                check(got['letters'] and not got['placement'], f'{label}: with letter names on, they are drawn in the notes and the placement button goes ({got})')
+                for _ in range(2): await pg.click('#g-ltype')  # All -> 1st -> Off
+            else:
+                check(not got['letters'] and got['placement'], f'{label}: with letter names off, the placement button appears ({got})')
+                await pg.click('#g-ltype')  # Off -> All
+            await pg.wait_for_timeout(1500)
             said = (await pg.text_content('#g-count')).strip()
             check(said == 'Counting: On', f'{label}: the Counting button says so in words ("{said}")')
             await pg.click('#g-count')
@@ -148,10 +165,13 @@ async def song_checks(browser, base):
                 await pg.click('#g-layout'); await pg.wait_for_timeout(1500)
                 lined = await pg.evaluate("() => document.getElementById('sheet').classList.contains('line') && document.getElementById('g-layout').title")
                 check(paged == 'Music: pages' and lined == 'Music: one long line', f'{label}: the music button switches between pages and one long line')
+                size_in = await pg.evaluate('() => reader.api.settings.display.scale')
                 await pg.click('#g-fpos')
                 fpos = await pg.get_attribute('#g-fpos', 'title')
+                size_right = await pg.evaluate('() => reader.api.settings.display.scale')
                 await pg.click('#g-fpos')
                 back = await pg.get_attribute('#g-fpos', 'title')
+                check(size_in == size_right, f'{label}: the notes stay the same size inside or right ({size_in}, {size_right})')
                 check(fpos == 'Finger numbers go right of the notes' and back == 'Finger numbers go inside the notes',
                       f'{label}: the finger button puts the finger numbers inside the notes or to their right ("{fpos}", "{back}")')
             shown = await pg.evaluate("() => !!document.getElementById('fullBtn').offsetParent")
@@ -167,6 +187,27 @@ async def song_checks(browser, base):
                 off = await pg.evaluate("() => [!!document.fullscreenElement, document.getElementById('fullBtn').getAttribute('aria-label')]")
                 check(on == [True, 'Leave full screen'] and off == [False, 'Full screen'],
                       f'{label}: Full screen button goes in and out of full screen ({on}, {off})')
+            if label == 'phone landscape':
+                # Pinch to zoom: two fingers spread on the music make it bigger; pinched together, smaller.
+                cdp = await ctx.new_cdp_session(pg)
+                await cdp.send('Emulation.setTouchEmulationEnabled', {'enabled': True, 'maxTouchPoints': 5})
+                cx, cy = await pg.evaluate("() => { const r = document.getElementById('sheet').getBoundingClientRect(); return [r.left + r.width * 0.55, r.top + r.height * 0.45]; }")
+
+                async def pinch_to(ratio, d0=80):
+                    pts = lambda d: [{'x': cx - d / 2, 'y': cy, 'id': 0}, {'x': cx + d / 2, 'y': cy, 'id': 1}]
+                    await cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': pts(d0)})
+                    for k in range(1, 7):
+                        await cdp.send('Input.dispatchTouchEvent', {'type': 'touchMove', 'touchPoints': pts(d0 * (1 + (ratio - 1) * k / 6))})
+                    live = await pg.evaluate("() => document.querySelector('#sheet .at-surface').style.transform")
+                    await cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []})
+                    await pg.wait_for_timeout(1800)
+                    return live, await pg.evaluate('() => reader.api.settings.display.scale')
+
+                before = await pg.evaluate('() => reader.api.settings.display.scale')
+                live, bigger = await pinch_to(1.6)
+                _, smaller = await pinch_to(0.5)
+                check(live.startswith('scale(') and bigger > before and smaller < bigger,
+                      f'{label}: pinching the music makes it bigger and smaller (size {before:.2f}, then {bigger:.2f}, then {smaller:.2f})')
             await pg.click('#play')
             await pg.wait_for_timeout(3500)
             tick = await pg.evaluate('() => reader.at()')

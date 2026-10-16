@@ -119,12 +119,14 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   right of the music, in the band with the Strings key, so they never cover notes (moved there from
   the strip on 2026-10-16). The band always keeps its room, even with string colors off.
 - What's drawn on the page has no panel: each setting is its own tap-to-change button in the strip,
-  stepping through its choices and showing a toast. Every screen: string colors (All, 1st, Off) and
-  finger numbers (All, 1st, Off). Laptops: where finger numbers go (Inside or Right only, Janelle's choice).
-  Every screen: Counting (on, off). The finger buttons say so in
-  words ("Fingers: All", "Inside the note", "Right of the note"). Phones: letter names in the notes (All, 1st, Off); phones
-  always use one long line with finger numbers to the right. Janelle replaced the "On the page"
-  button and its panel with these (2026-10-16).
+  stepping through its choices and showing a toast, the same buttons on every screen: string colors
+  (All, 1st, Off), letter names inside the notes ("Letters: All", 1st, Off), finger numbers
+  ("Fingers: All", 1st, Off), where finger numbers go ("Inside the note" or "Right of the note"
+  only, Janelle's choice; the notes stay the same size either way) and Counting (on, off). Only one
+  thing fits inside a note head: with letter names on, they go inside and the finger numbers go to
+  the right, and the placement button hides; with letters off it comes back. Phones start with
+  letter names on and laptops with them off (each kept separately). Janelle replaced the "On the
+  page" button and its panel with these, and gave every screen the same buttons (2026-10-16).
 - Parts: a quiet bump-out tab on the right edge of the screen, halfway down the music (a chevron
   and "Parts", read sideways, in soft grey; 34px wide, 136px tall), with swoopy sides: its top and
   bottom curve smoothly into the screen edge (and into the panel's edge when open). It slides a
@@ -182,5 +184,8 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   to the home screen and opens without the address bar. The home page has a one-line tip saying how
   (it also says every piece then plays without the internet), with an "Install the app" button under
   it only where the browser can install in one tap.
+- Pinch to zoom on touch screens: two fingers on the music make it bigger or smaller. The music grows
+  and shrinks under the fingers, then settles on the nearest − / + size. A second finger cancels a tap
+  or a press-and-hold; the browser's own page zoom is kept off the music.
 - Open Strings parts show string colors but no finger numbers.
 - alphaTab's "rendered by alphaTab" line is hidden; alphaTab is credited in the footer.

@@ -212,7 +212,7 @@ hr.div { border: 0; border-top: 1px solid var(--line); margin: 0; }
 .loop-mark.picking { background: rgba(29, 91, 114, 0.16); border-left-style: dashed; border-right-style: dashed; }
 .loop-tag { position: absolute; left: 8px; bottom: -11px; padding: 2px 8px; border-radius: 999px; background: #1D5B72; color: #FFFFFF; font: 700 12px/1.3 var(--font-body); white-space: nowrap; }
 /* Pressing and dragging on the music picks bars instead of selecting text or opening a menu */
-#sheet { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+#sheet { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: pan-x pan-y; }
 #sheet.picking { cursor: col-resize; }
 
 /* Count-in numbers, flashed on each click */
@@ -356,9 +356,8 @@ html.small .lvl-same { margin-top: 0; font-size: 0.58rem; }
 .toggle[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
 .toggle[aria-pressed="true"]::before { content: "● "; color: var(--accent); }
 .toggle.solid { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-/* What's drawn on the page: one tap-to-change button per setting, in the strip. Letter names are drawn only on
-   phones, so their button is phones only; phones always use one long line with finger numbers to the right, so the
-   finger-position and pages buttons are for bigger screens. */
+/* What's drawn on the page: one tap-to-change button per setting, in the strip, the same on every screen. Phones
+   always use one long line, so the pages button is for bigger screens. */
 .fab-btn[hidden] { display: none !important; }
 .small-only { display: none !important; }
 html.small .small-only { display: inline-flex !important; }
@@ -531,9 +530,9 @@ body.following .host-only { display: none !important; }
     <div class="fab-more" id="fabMore" hidden>
     <div class="fab-set" role="group" aria-label="Your part and the page">
     <button class="fab-btn cyc" id="g-colors" type="button"></button>
-    <button class="fab-btn small-only cyc" id="g-ltype" type="button"></button>
+    <button class="fab-btn cyc" id="g-ltype" type="button"></button>
     <button class="fab-btn cyc" id="g-fnum" type="button"></button>
-    <button class="fab-btn big-only cyc" id="g-fpos" type="button"></button>
+    <button class="fab-btn cyc" id="g-fpos" type="button"></button>
     <button class="fab-btn cyc" id="g-count" type="button"></button>
     </div>
     <div class="fab-set" role="group" aria-label="Playback settings">
@@ -656,22 +655,21 @@ body.following .host-only { display: none !important; }
     // The counts under the notes: on unless switched off with the Counting switch beside them.
     countAlong: saved.counts !== 'off',
     layout: saved.layout === 'page' ? 'page' : 'line',
+    // Letter names inside the notes: phones start with them on, bigger screens off (each kept on its own).
     letterMode: MARK_MODES.some(m => m.id === saved.letterMode) ? saved.letterMode : 'all',
+    letterModeBig: MARK_MODES.some(m => m.id === saved.lettersBig) ? saved.lettersBig : 'off',
     // One button steps through: metronome on, metronome on with a count-in, a count-in only, metronome off.
     metro: ['off', 'on', 'count', 'countonly'].includes(saved.metro) ? saved.metro : 'off',
     // Bigger or smaller music (the − and + in the corner): a step on ZOOMS.
     zoom: ZOOMS.includes(saved.zoom) ? saved.zoom : 1,
   };
-  // Phones (upright or on their side): one long line, letter names inside the notes and finger numbers to their right.
+  // Phones (upright or on their side): one long line.
   const smallMQ = window.matchMedia('(max-width: 600px) and (orientation: portrait), (max-height: 500px) and (orientation: landscape)');
   function smallRules() {
-    const was = { layout: state.layout, fingers: state.fingers };
-    if (smallMQ.matches) {
-      state.layout = 'line';
-      state.fingers = 'right';
-    }
+    const was = { layout: state.layout };
+    if (smallMQ.matches) state.layout = 'line';
     document.documentElement.classList.toggle('small', smallMQ.matches);
-    return { layout: was.layout !== state.layout, parts: false, fingers: was.fingers !== state.fingers };
+    return { layout: was.layout !== state.layout, parts: false, fingers: false };
   }
   // Hear is open when it was left open; with settings from before it existed, when they played something other than
   // the parts on the page, so that mix carries on.
@@ -685,8 +683,12 @@ body.following .host-only { display: none !important; }
       else { buildControls(); applyPaged(); }
     });
   } catch {}
-  const lettersOn = () => document.documentElement.classList.contains('small') && state.letterMode !== 'off';
-  const save = () => store.set({ zoom: state.zoom, seen: state.seen, heard: state.heard, hearOpen: state.hearOpen, colorMode: state.colorMode, fingerMode: state.fingerMode, tempo: state.tempo, follow: state.follow, countBy: state.unit, fingers: state.fingers, counts: state.countAlong ? 'on' : 'off', layout: state.layout, letterMode: state.letterMode, metro: state.metro });
+  // Letter names: the setting for this kind of screen. Only one thing fits inside a note head, so with letter names
+  // on, the finger numbers go to the right of the notes; with them off, wherever the finger button says.
+  const letterKey = () => (document.documentElement.classList.contains('small') ? 'letterMode' : 'letterModeBig');
+  const lettersOn = () => state[letterKey()] !== 'off';
+  const fingerSpot = () => (lettersOn() ? 'right' : state.fingers);
+  const save = () => store.set({ zoom: state.zoom, seen: state.seen, heard: state.heard, hearOpen: state.hearOpen, colorMode: state.colorMode, fingerMode: state.fingerMode, tempo: state.tempo, follow: state.follow, countBy: state.unit, fingers: state.fingers, counts: state.countAlong ? 'on' : 'off', layout: state.layout, letterMode: state.letterMode, lettersBig: state.letterModeBig, metro: state.metro });
 
   // ---- Room reverb ----
   // alphaTab plays through Web Audio; route whatever it sends to the speakers through a small reverb bus.
@@ -778,9 +780,9 @@ body.following .host-only { display: none !important; }
     $('g-metro').setAttribute('aria-label', METRO_WORD[state.metro] + '. Tap to change.');
     $('g-colors').innerHTML = dotsIco(state.colorMode !== 'off') + '<span class="cyc-badge">' + MARK_BADGE[state.colorMode] + '</span>';
     $('g-colors').setAttribute('aria-label', 'String colors: ' + MARK_WORD[state.colorMode] + '. Tap to change.');
-    const lOn = state.letterMode !== 'off';
-    $('g-ltype').innerHTML = headIco(lOn, lOn, 'A') + '<span class="cyc-badge">' + MARK_BADGE[state.letterMode] + '</span>';
-    $('g-ltype').setAttribute('aria-label', 'Letter names inside the notes: ' + MARK_WORD[state.letterMode] + '. Tap to change.');
+    const lMode = state[letterKey()], lOn = lMode !== 'off';
+    $('g-ltype').innerHTML = headIco(lOn, lOn, 'A') + '<span class="cyc-badge">Letters: ' + MARK_BADGE[lMode] + '</span>';
+    $('g-ltype').setAttribute('aria-label', 'Letter names inside the notes: ' + MARK_WORD[lMode] + '. Tap to change.');
     $('g-fnum').innerHTML = fingerIco(state.fingerMode !== 'off') + '<span class="cyc-badge">Fingers: ' + MARK_BADGE[state.fingerMode] + '</span>';
     $('g-fnum').setAttribute('aria-label', 'Finger numbers: ' + MARK_WORD[state.fingerMode] + '. Tap to change.');
     $('g-fpos').innerHTML = fposIco(state.fingers) + '<span class="cyc-badge">' + FPOS_BADGE[state.fingers] + '</span>';
@@ -822,7 +824,15 @@ body.following .host-only { display: none !important; }
   });
   $('g-colors').addEventListener('click', () => { setPop(null); state.colorMode = nextOf(STEP_MARKS, state.colorMode); changed({ marks: true, size: true }); toast('String colors: ' + MARK_WORD[state.colorMode]); });
   $('g-fnum').addEventListener('click', () => { setPop(null); state.fingerMode = nextOf(STEP_MARKS, state.fingerMode); changed({ marks: true, size: true }); toast('Finger numbers: ' + MARK_WORD[state.fingerMode]); });
-  $('g-ltype').addEventListener('click', () => { setPop(null); state.letterMode = nextOf(STEP_MARKS, state.letterMode); changed({ marks: true, size: true }); toast('Letter names: ' + MARK_WORD[state.letterMode]); });
+  $('g-ltype').addEventListener('click', () => {
+    setPop(null);
+    const key = letterKey(), was = lettersOn();
+    state[key] = nextOf(STEP_MARKS, state[key]);
+    changed({ marks: true, size: true });
+    // Turning letter names on moves finger numbers that were inside the notes out to the right (and back again).
+    const moved = fingersShown() && state.fingerMode !== 'off' && state.fingers === 'inside' && was !== lettersOn();
+    toast('Letter names: ' + MARK_WORD[state[key]] + (moved ? (lettersOn() ? '. Finger numbers move to the right.' : '. Finger numbers go back inside.') : ''), moved ? 2600 : 1700);
+  });
   $('g-fpos').addEventListener('click', () => { setPop(null); state.fingers = nextOf(FPOS_STEPS, state.fingers); changed({ marks: true, size: true }); toast('Finger numbers: ' + FPOS_WORD[state.fingers]); });
   $('g-layout').addEventListener('click', () => {
     setPop(null);
@@ -955,7 +965,8 @@ body.following .host-only { display: none !important; }
     renderMix();
     // Open Strings parts have no finger numbers, so their buttons go while only those are on the page.
     $('g-fnum').hidden = !fingersShown();
-    $('g-fpos').hidden = state.fingerMode === 'off' || !fingersShown();
+    // Where finger numbers go is a choice only while letter names are off (with them on, the numbers go to the right).
+    $('g-fpos').hidden = state.fingerMode === 'off' || !fingersShown() || lettersOn();
     $('sheet').classList.toggle('line', state.layout === 'line');
     renderKey();
     $('sheet').classList.toggle('show-line', state.follow !== 'pulse');
@@ -1154,11 +1165,11 @@ body.following .host-only { display: none !important; }
             if (state.colorMode === 'all' || !seenColor.has(key)) color = mk.color;
             seenColor.add(key);
           }
-          // Letter names (phones): every note has one; "first time only" names each pitch the first time it appears.
+          // Letter names: every note has one; "first time only" names each pitch the first time it appears.
           let letter = null;
           if (lettersOn()) {
             const name = letterName(mk, note, bi);
-            if (state.letterMode === 'all' || !seenLetter.has(pitch)) letter = name;
+            if (state[letterKey()] === 'all' || !seenLetter.has(pitch)) letter = name;
             seenLetter.add(pitch);
           }
           if (hasFingers(ti) && mk && mk.finger && state.fingerMode !== 'off') {
@@ -1178,7 +1189,7 @@ body.following .host-only { display: none !important; }
           // The score's own words on this note (a section name, "dolce", "rit.") stay, unless a finger goes above it.
           // A tempo word stays even then, in its own row.
           if (!('ownText' in beat)) beat.ownText = beat.text || null;
-          beat.text = finger && state.fingers === 'above' ? (twoRows.has(ti) ? stack(beat.tempoText, finger) : finger) : beat.ownText;
+          beat.text = finger && fingerSpot() === 'above' ? (twoRows.has(ti) ? stack(beat.tempoText, finger) : finger) : beat.ownText;
         });
       });
     });
@@ -1541,6 +1552,38 @@ body.following .host-only { display: none !important; }
     // While picking bars with a finger, the music must not scroll or open a menu.
     sheet.addEventListener('touchmove', (e) => { if (press && press.mode === 'pick') e.preventDefault(); }, { passive: false });
     sheet.addEventListener('contextmenu', (e) => { if (press) e.preventDefault(); });
+    // Two fingers on the music: spread them to make it bigger, pinch to make it smaller. The music grows and shrinks
+    // under the fingers while they move, then settles on the nearest − / + size and is drawn again at that size.
+    // A second finger cancels whatever the first one started (a tap, or holding to pick bars).
+    let pinch = null;
+    const span = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    sheet.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 2 || !api || !score) return;
+      const surf = sheet.querySelector('.at-surface');
+      if (!surf) return;
+      e.preventDefault();
+      if (press) endPress(true);
+      const r = surf.getBoundingClientRect();
+      const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2, my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      pinch = { d0: Math.max(1, span(e.touches)), z0: state.zoom, z: state.zoom, surf };
+      surf.style.transformOrigin = Math.round(mx - r.left) + 'px ' + Math.round(my - r.top) + 'px';
+    }, { passive: false });
+    sheet.addEventListener('touchmove', (e) => {
+      if (!pinch || e.touches.length < 2) return;
+      e.preventDefault();
+      pinch.z = Math.max(ZOOMS[0], Math.min(ZOOMS[ZOOMS.length - 1], pinch.z0 * span(e.touches) / pinch.d0));
+      pinch.surf.style.transform = 'scale(' + (pinch.z / pinch.z0).toFixed(3) + ')';
+    }, { passive: false });
+    function endPinch() {
+      if (!pinch) return;
+      const pn = pinch; pinch = null;
+      pn.surf.style.transform = ''; pn.surf.style.transformOrigin = '';
+      setZoom(ZOOMS.reduce((a, b) => (Math.abs(b - pn.z) < Math.abs(a - pn.z) ? b : a)));
+    }
+    sheet.addEventListener('touchend', (e) => { if (pinch && e.touches.length < 2) endPinch(); });
+    sheet.addEventListener('touchcancel', endPinch);
+    // Safari's own pinch gesture stays off the music too.
+    for (const t of ['gesturestart', 'gesturechange']) sheet.addEventListener(t, (e) => e.preventDefault());
     // A click on the page away from the music also stops a loop.
     document.addEventListener('pointerdown', (e) => {
       if (!loop || conductor.following || !e.target.closest) return;
@@ -2181,7 +2224,7 @@ body.following .host-only { display: none !important; }
 
   // ---- Finger numbers inside the notes ----
   // Finger numbers drawn by the page itself: inside the note head, or just to its left or right.
-  const BIG = () => (state.fingerMode !== 'off' && state.fingers !== 'above') || lettersOn();
+  const BIG = () => (state.fingerMode !== 'off' && fingerSpot() !== 'above') || lettersOn();
   function glyphsIn(svg, from, to) {
     const out = [];
     svg.querySelectorAll('g.at').forEach((g) => {
@@ -2195,7 +2238,7 @@ body.following .host-only { display: none !important; }
   }
   function placeFingers() {
     if (!BIG()) return;
-    const mode = state.fingers;
+    const mode = fingerSpot();
     const sheet = $('sheet');
     const NS = 'http://www.w3.org/2000/svg';
     const accidentals = new Map(); // per SVG: sharps, flats and naturals, to keep a left-hand number clear of them
@@ -2489,11 +2532,14 @@ body.following .host-only { display: none !important; }
     const i = ZOOMS.indexOf(state.zoom);
     $('zoomOut').disabled = i <= 0; $('zoomIn').disabled = i >= ZOOMS.length - 1;
   }
+  function setZoom(z) {
+    if (z === state.zoom) return;
+    state.zoom = z; save(); showZoom();
+    if (api) { zoomRender = true; applySize(); api.render(); }
+  }
   function stepZoom(d) {
     const i = ZOOMS.indexOf(state.zoom), j = Math.max(0, Math.min(ZOOMS.length - 1, i + d));
-    if (i === j) return;
-    state.zoom = ZOOMS[j]; save(); showZoom();
-    if (api) { zoomRender = true; applySize(); api.render(); }
+    if (i !== j) setZoom(ZOOMS[j]);
   }
   $('zoomIn').addEventListener('click', () => stepZoom(1));
   $('zoomOut').addEventListener('click', () => stepZoom(-1));
@@ -2646,10 +2692,11 @@ body.following .host-only { display: none !important; }
     return s * state.zoom;
   }
   function baseScale() {
-    // One size for every layout; "inside the notes" is twice that so the note heads can hold a number.
+    // One size for every layout; with finger numbers showing it is twice that, so the note heads can hold a number.
+    // Inside the notes or to their right, the notes stay the same size (Janelle's choice), so switching never jumps.
     const narrow = window.innerWidth < 560, mid = window.innerWidth < 900;
     const base = narrow ? 1.45 : mid ? 1.75 : 2.05;
-    if (state.fingerMode === 'off' || state.fingers !== 'inside') return base;
+    if (state.fingerMode === 'off' && !lettersOn()) return base;
     if (state.layout === 'line') return base * 2;
     // On pages: twice the size, but never so big that one bar no longer fits across the page (phones).
     const sheetW = ($('sheet') && $('sheet').clientWidth) || window.innerWidth;
@@ -2694,7 +2741,7 @@ body.following .host-only { display: none !important; }
     d.scale = musicScale();
     d.layoutMode = state.layout === 'line' ? alphaTab.LayoutMode.Horizontal : alphaTab.LayoutMode.Page;
     d.padding = document.documentElement.classList.contains('small') ? [10, 2] : [10, 10];
-    d.stretchForce = BIG() && state.fingers !== 'inside' ? 1.35 : 1;
+    d.stretchForce = BIG() && fingerSpot() !== 'inside' ? 1.35 : 1;
     // The count row always keeps its room, so switching the counts off or on never moves the music.
     d.notationStaffPaddingBottom = defaults.notationStaffPaddingBottom + countPad(d.scale);
     d.lastNotationStaffPaddingBottom = defaults.lastNotationStaffPaddingBottom + countPad(d.scale);
@@ -3056,7 +3103,7 @@ body.following .host-only { display: none !important; }
     s.display.staveProfile = alphaTab.StaveProfile.Score;
     s.display.layoutMode = state.layout === 'line' ? alphaTab.LayoutMode.Horizontal : alphaTab.LayoutMode.Page;
     s.display.scale = musicScale();
-    s.display.stretchForce = BIG() && state.fingers !== 'inside' ? 1.35 : 1;
+    s.display.stretchForce = BIG() && fingerSpot() !== 'inside' ? 1.35 : 1;
     s.display.notationStaffPaddingBottom += countPad(s.display.scale); s.display.lastNotationStaffPaddingBottom += countPad(s.display.scale);
     s.display.padding = document.documentElement.classList.contains('small') ? [10, 2] : [10, 10]; // phones: no spare room above and below the line
     const R = s.display.resources;
