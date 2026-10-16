@@ -128,8 +128,8 @@ async def song_checks(browser, base):
             # What's drawn on the page: one tap-to-change button per setting in the strip, no "On the page" panel.
             strip = await pg.evaluate('''() => ['g-colors', 'g-ltype', 'g-fnum', 'g-fpos', 'g-layout', 'g-count', 'g-page', 'countTog']
               .filter(id => { const e = document.getElementById(id); return e && e.offsetParent && e.closest('#fabRow'); })''')
-            # Laptops start with letter names off (so the finger placement button shows), phones with them on.
-            want = ['g-colors', 'g-ltype', 'g-fnum', 'g-fpos', 'g-count'] if label == 'laptop' else ['g-colors', 'g-ltype', 'g-fnum', 'g-count']
+            # The same buttons on every screen, always in the same place (a choice that doesn't apply is greyed out).
+            want = ['g-colors', 'g-ltype', 'g-fnum', 'g-fpos', 'g-count']
             check(strip == want, f'{label}: the page settings are separate buttons in the strip ({strip})')
             # The size of the music, and on bigger screens Line or Pages, sit at the top right of the music.
             top = await pg.evaluate('''() => ['zoomOut', 'zoomIn', 'g-layout'].filter(id => { const e = document.getElementById(id); return e.offsetParent && e.closest('#topTools'); })''')
@@ -137,19 +137,20 @@ async def song_checks(browser, base):
             want_top = ['zoomOut', 'zoomIn', 'g-layout'] if label == 'laptop' else ['zoomOut', 'zoomIn']
             check(top == want_top and above, f'{label}: the size buttons{" and Line/Pages" if label == "laptop" else ""} sit at the top, above the music ({top})')
             letters = (await pg.text_content('#g-ltype .cyc-badge')).strip()
-            check(letters == ('Letters: Off' if label == 'laptop' else 'Letters: All'), f'{label}: letter names start {"off" if label == "laptop" else "on"} ("{letters}")')
-            # Letter names on: they go inside the notes, the finger numbers go to the right, and there is no placement
-            # choice. Off: the placement button is back.
+            check(letters == ('Note Names: Off' if label == 'laptop' else 'Note Names: All'), f'{label}: note names start {"off" if label == "laptop" else "on"} ("{letters}")')
+            # Note names on: they go inside the notes, the finger numbers go to the right, and the placement button is
+            # greyed out in its place. Off: it can be used again.
             taps = 1 if label == 'laptop' else 2  # laptop: Off -> All; phone: All -> 1st -> Off
             for _ in range(taps): await pg.click('#g-ltype')
             await pg.wait_for_timeout(2500)
-            got = await pg.evaluate('''() => ({ letters: [...document.querySelectorAll('#sheet text.fin')].some(t => /^[A-G]/.test(t.textContent)),
-              placement: !!document.getElementById('g-fpos').offsetParent })''')
+            got = await pg.evaluate('''() => { const b = document.getElementById('g-fpos');
+              return { letters: [...document.querySelectorAll('#sheet text.fin')].some(t => /^[A-G]/.test(t.textContent)),
+                       placement: !!b.offsetParent && b.getAttribute('aria-disabled') !== 'true', greyed: !!b.offsetParent && b.getAttribute('aria-disabled') === 'true' }; }''')
             if label == 'laptop':
-                check(got['letters'] and not got['placement'], f'{label}: with letter names on, they are drawn in the notes and the placement button goes ({got})')
+                check(got['letters'] and got['greyed'], f'{label}: with note names on, they are drawn in the notes and the placement button greys out in its place ({got})')
                 for _ in range(2): await pg.click('#g-ltype')  # All -> 1st -> Off
             else:
-                check(not got['letters'] and got['placement'], f'{label}: with letter names off, the placement button appears ({got})')
+                check(not got['letters'] and got['placement'], f'{label}: with note names off, the placement button can be used ({got})')
                 await pg.click('#g-ltype')  # Off -> All
             await pg.wait_for_timeout(1500)
             said = (await pg.text_content('#g-count')).strip()

@@ -262,6 +262,9 @@ body.paged .fab-bar { display: block; }
 .fab-btn, .play { height: 46px; border-radius: 999px; box-shadow: 0 1px 2px rgba(20, 30, 26, 0.10), 0 4px 14px -6px rgba(20, 30, 26, 0.38); }
 .fab-btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 46px; padding: 0 12px; border: 1px solid #CDD5D1; background: rgba(255, 255, 255, 0.96); color: #17201C; font-weight: 700; font-variant-numeric: tabular-nums; }
 .fab-btn:hover { border-color: #1D5B72; }
+/* A choice that doesn't apply right now keeps its place in the strip, greyed out, so nothing moves; a tap says why */
+.fab-btn[aria-disabled="true"] { opacity: 0.42; box-shadow: none; cursor: default; }
+.fab-btn[aria-disabled="true"]:hover { border-color: #CDD5D1; }
 .fab-btn[aria-expanded="true"] { background: #D8E7ED; border-color: #1D5B72; }
 .fab-btn.on { border: 2px solid #1D5B72; color: #1D5B72; }
 .fab-btn svg { width: 21px; height: 21px; fill: currentColor; flex: none; }
@@ -800,12 +803,13 @@ body.following .host-only { display: none !important; }
     $('g-colors').innerHTML = dotsIco(state.colorMode !== 'off') + '<span class="cyc-badge">' + MARK_BADGE[state.colorMode] + '</span>';
     $('g-colors').setAttribute('aria-label', 'String colors: ' + MARK_WORD[state.colorMode] + '. Tap to change.');
     const lMode = state[letterKey()], lOn = lMode !== 'off';
-    $('g-ltype').innerHTML = headIco(lOn, lOn, 'A') + '<span class="cyc-badge">Letters: ' + MARK_BADGE[lMode] + '</span>';
-    $('g-ltype').setAttribute('aria-label', 'Letter names inside the notes: ' + MARK_WORD[lMode] + '. Tap to change.');
+    $('g-ltype').innerHTML = headIco(lOn, lOn, 'A') + '<span class="cyc-badge">Note Names: ' + MARK_BADGE[lMode] + '</span>';
+    $('g-ltype').setAttribute('aria-label', 'Note names inside the notes: ' + MARK_WORD[lMode] + '. Tap to change.');
     $('g-fnum').innerHTML = fingerIco(state.fingerMode !== 'off') + '<span class="cyc-badge">Fingers: ' + MARK_BADGE[state.fingerMode] + '</span>';
     $('g-fnum').setAttribute('aria-label', 'Finger numbers: ' + MARK_WORD[state.fingerMode] + '. Tap to change.');
-    $('g-fpos').innerHTML = fposIco(state.fingers) + '<span class="cyc-badge">' + FPOS_BADGE[state.fingers] + '</span>';
-    $('g-fpos').setAttribute('aria-label', 'Finger numbers go ' + FPOS_WORD[state.fingers] + '. Tap to change.');
+    const spot = fingerSpot();
+    $('g-fpos').innerHTML = fposIco(spot) + '<span class="cyc-badge">' + FPOS_BADGE[spot] + '</span>';
+    $('g-fpos').setAttribute('aria-label', 'Finger numbers go ' + FPOS_WORD[spot] + '. Tap to change.');
     $('g-layout').innerHTML = layoutIco(state.layout) + '<span class="cyc-badge">' + (state.layout === 'line' ? 'Line' : 'Pages') + '</span>';
     $('g-layout').setAttribute('aria-label', 'Music: ' + (state.layout === 'line' ? 'one long line' : 'pages') + '. Tap to change.');
     // Pointing at a button (mouse) says what it does, as the panel used to.
@@ -813,6 +817,19 @@ body.following .host-only { display: none !important; }
     $('g-count').innerHTML = '<span class="cyc-badge">Counting: ' + (cOn ? 'On' : 'Off') + '</span>';
     $('g-count').setAttribute('aria-label', 'Counts under the notes: ' + (cOn ? 'on' : 'off') + '. Tap to change.');
     for (const id of ['g-metro', 'g-colors', 'g-ltype', 'g-fnum', 'g-fpos', 'g-layout', 'g-count']) $(id).title = $(id).getAttribute('aria-label').replace(/\. Tap to change\.$/, '');
+    // Choices that don't apply right now stay in place, greyed out.
+    for (const id of ['g-fnum', 'g-fpos']) {
+      const why = unavailable(id), b = $(id);
+      b.setAttribute('aria-disabled', String(!!why));
+      if (why) { b.title = why; b.setAttribute('aria-label', b.getAttribute('aria-label').replace(/\. Tap to change\.$/, '. ' + why)); }
+    }
+  }
+  // Why a button can't be used right now (nothing when it can).
+  function unavailable(id) {
+    if (!fingersShown()) return 'Open Strings parts have no finger numbers';
+    if (id === 'g-fpos' && state.fingerMode === 'off') return 'Turn finger numbers on to choose where they go';
+    if (id === 'g-fpos' && lettersOn()) return 'Finger numbers go to the right of the note while note names are on';
+    return '';
   }
   function toast(text, ms = 1700) {
     const el = $('toast');
@@ -842,17 +859,17 @@ body.following .host-only { display: none !important; }
     toast(METRO_WORD[state.metro]);
   });
   $('g-colors').addEventListener('click', () => { setPop(null); state.colorMode = nextOf(STEP_MARKS, state.colorMode); changed({ marks: true, size: true }); toast('String colors: ' + MARK_WORD[state.colorMode]); });
-  $('g-fnum').addEventListener('click', () => { setPop(null); state.fingerMode = nextOf(STEP_MARKS, state.fingerMode); changed({ marks: true, size: true }); toast('Finger numbers: ' + MARK_WORD[state.fingerMode]); });
+  $('g-fnum').addEventListener('click', () => { setPop(null); if (unavailable('g-fnum')) return toast(unavailable('g-fnum'), 2400); state.fingerMode = nextOf(STEP_MARKS, state.fingerMode); changed({ marks: true, size: true }); toast('Finger numbers: ' + MARK_WORD[state.fingerMode]); });
   $('g-ltype').addEventListener('click', () => {
     setPop(null);
     const key = letterKey(), was = lettersOn();
     state[key] = nextOf(STEP_MARKS, state[key]);
     changed({ marks: true, size: true });
-    // Turning letter names on moves finger numbers that were inside the notes out to the right (and back again).
+    // Turning note names on moves finger numbers that were inside the notes out to the right (and back again).
     const moved = fingersShown() && state.fingerMode !== 'off' && state.fingers === 'inside' && was !== lettersOn();
-    toast('Letter names: ' + MARK_WORD[state[key]] + (moved ? (lettersOn() ? '. Finger numbers move to the right.' : '. Finger numbers go back inside.') : ''), moved ? 2600 : 1700);
+    toast('Note names: ' + MARK_WORD[state[key]] + (moved ? (lettersOn() ? '. Finger numbers move to the right.' : '. Finger numbers go back inside.') : ''), moved ? 2600 : 1700);
   });
-  $('g-fpos').addEventListener('click', () => { setPop(null); state.fingers = nextOf(FPOS_STEPS, state.fingers); changed({ marks: true, size: true }); toast('Finger numbers: ' + FPOS_WORD[state.fingers]); });
+  $('g-fpos').addEventListener('click', () => { setPop(null); if (unavailable('g-fpos')) return toast(unavailable('g-fpos'), 2400); state.fingers = nextOf(FPOS_STEPS, state.fingers); changed({ marks: true, size: true }); toast('Finger numbers: ' + FPOS_WORD[state.fingers]); });
   $('g-layout').addEventListener('click', () => {
     setPop(null);
     state.layout = state.layout === 'line' ? 'page' : 'line';
@@ -982,10 +999,6 @@ body.following .host-only { display: none !important; }
   function buildControls() {
     renderCycles();
     renderMix();
-    // Open Strings parts have no finger numbers, so their buttons go while only those are on the page.
-    $('g-fnum').hidden = !fingersShown();
-    // Where finger numbers go is a choice only while letter names are off (with them on, the numbers go to the right).
-    $('g-fpos').hidden = state.fingerMode === 'off' || !fingersShown() || lettersOn();
     $('sheet').classList.toggle('line', state.layout === 'line');
     renderKey();
     $('sheet').classList.toggle('show-line', state.follow !== 'pulse');
@@ -3047,7 +3060,8 @@ body.following .host-only { display: none !important; }
   const mainCol = document.querySelector('.main');
   function placeFab() {
     const r = mainCol.getBoundingClientRect(), root = document.documentElement.style;
-    const full = window.innerWidth < 720; // phones: use the whole width so the buttons stay on one row
+    // Phones (narrow, or on their side): the buttons use the whole width, so they stay on one row.
+    const full = window.innerWidth < 720 || document.documentElement.classList.contains('small');
     root.setProperty('--mus-l', (full ? 0 : Math.round(r.left)) + 'px');
     root.setProperty('--mus-w', (full ? window.innerWidth : Math.round(r.width)) + 'px');
     // How far the music reaches past its column, to run a little under the Parts tab (the page's side padding, and on a wide screen

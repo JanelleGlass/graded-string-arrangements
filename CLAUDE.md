@@ -115,17 +115,21 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   top-aligned under the header.
 - Every setting is always visible in a strip at the bottom, on phones too, never covering notes.
   Phone-landscape buttons are compact so the strip fits one row on regular iPhones.
+- Everything stays in the same place so people can orient themselves: a choice that doesn't apply
+  right now is greyed out in its place (a tap says why), never hidden (Janelle, 2026-10-16).
 - The size of the music (− / +, 0.3x to 1.75x) and, on bigger screens, Line or Pages sit at the top
   right of the music, in the band with the Strings key, so they never cover notes (moved there from
   the strip on 2026-10-16). The band always keeps its room, even with string colors off.
 - What's drawn on the page has no panel: each setting is its own tap-to-change button in the strip,
   stepping through its choices and showing a toast, the same buttons on every screen: string colors
-  (All, 1st, Off), letter names inside the notes ("Letters: All", 1st, Off), finger numbers
+  (All, 1st, Off), note names inside the notes ("Note Names: All", 1st, Off), finger numbers
   ("Fingers: All", 1st, Off), where finger numbers go ("Inside the note" or "Right of the note"
   only, Janelle's choice; the notes stay the same size either way) and Counting (on, off). Only one
-  thing fits inside a note head: with letter names on, they go inside and the finger numbers go to
-  the right, and the placement button hides; with letters off it comes back. Phones start with
-  letter names on and laptops with them off (each kept separately). Janelle replaced the "On the
+  thing fits inside a note head: with note names on, they go inside and the finger numbers go to
+  the right, and the placement button greys out showing "Right of the note"; with note names off it
+  works again. It also greys out with finger numbers off, and both finger buttons grey out when only
+  Open Strings parts are on the page. Phones start with note names on and laptops with them off
+  (each kept separately). Janelle replaced the "On the
   page" button and its panel with these, and gave every screen the same buttons (2026-10-16).
 - Parts: a quiet bump-out tab on the right edge of the screen, halfway down the music (a chevron
   and "Parts", read sideways, in soft grey; 34px wide, 136px tall), with swoopy sides: its top and
