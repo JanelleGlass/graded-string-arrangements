@@ -116,6 +116,15 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
 - Every setting is always visible in a strip at the bottom, on phones too, never covering notes.
   Zoom − / + lives in that strip (0.3x to 1.75x). Phone-landscape buttons are compact so the strip
   fits one row on regular iPhones.
+- Parts: one button in the strip (named for the part on the page, or "3 parts") opens instruments on
+  the left and levels on the right, each list scrolling on its own when the screen is short. Every
+  instrument and level has an eye: the page shows each instrument with its eye open at each level
+  with its eye open, in score order (one instrument and one level always stay on). Hearing goes part
+  by part: each level has a speaker for each instrument, so the tune can play on one instrument
+  while Harmony keeps all four (that balance is the point: the tune doubled four times drowns the
+  rest). The speaker beside an instrument quiets it at every level and brings it back where it was.
+  A first visit shows Violin Melody and plays the tune on violin plus all four Harmony parts. A
+  student following the teacher sees only the eyes. Phones show whatever the eyes say, too.
 - Metronome is one button that cycles Off → On → On with count-in → Count-in only.
 - Tap a note to choose where Play starts: a thin, pale ring around the note head until the music
   starts. No flag.

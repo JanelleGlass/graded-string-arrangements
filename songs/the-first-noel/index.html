@@ -127,7 +127,6 @@ h1 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: c
 .chip:hover { border-color: var(--accent); }
 .chip[disabled] { opacity: 0.45; cursor: not-allowed; border-color: var(--line); }
 .chip[aria-pressed="true"], .chip[aria-checked="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.chip.hear[aria-pressed="true"]::before { content: "✓ "; }
 .tier-note { margin: 6px 0 0; color: var(--muted); font-size: 0.88rem; width: 100%; max-width: 70ch; }
 .check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; padding: 5px 0; }
 .check input { width: 17px; height: 17px; accent-color: var(--accent); margin: 0; }
@@ -273,7 +272,7 @@ body.paged .fab-bar { display: block; }
 .fab-btn svg { width: 21px; height: 21px; fill: currentColor; flex: none; }
 .fab-btn .cnt { font-family: var(--font-display); font-size: 1.2rem; letter-spacing: 0.02em; }
 .fab-lbl { font-size: 0.92rem; white-space: nowrap; }
-#g-inst, #g-level { padding: 0 16px; }
+#g-parts { padding: 0 16px 0 13px; }
 .fab-lbl:empty { display: none; }
 #moreIcon { display: contents; }
 .play { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #1D5B72; color: #FFFFFF; border: 0; padding: 0 22px 0 18px; font-weight: 700; min-width: 108px; }
@@ -289,6 +288,26 @@ svg.i { width: 18px; height: 18px; fill: currentColor; }
 .pop-sub { display: grid; gap: 6px; }
 .pop .tier-note { margin: 0; }
 .pop .check { padding: 2px 0; }
+/* Parts: instruments on the left, levels on the right, each list scrolling on its own when the screen is short.
+   Every row has an eye (on the page or not) and speakers (playing or quiet). */
+#pop-parts { width: min(36rem, 100%); display: flex; flex-direction: column; overflow: hidden; }
+#pop-parts > * { flex: none; }
+.mix { flex: 0 1 auto !important; min-height: 0; display: flex; gap: 6px 26px; }
+.mix-list { --tog: 32px; display: grid; grid-template-columns: max-content repeat(2, var(--tog)); gap: 4px 6px; align-items: center; align-content: start; padding-inline-end: 4px; flex: none; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.mix-list.more { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 30px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 30px), transparent); }
+.mix-list.levels { grid-template-columns: max-content var(--tog) 2px repeat(4, var(--tog)); }
+body.following .mix-list, body.following .mix-list.levels { grid-template-columns: max-content var(--tog); }
+.mix-h { position: sticky; top: 0; z-index: 1; background: var(--panel); padding-bottom: 2px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); text-align: center; white-space: nowrap; }
+.mix-h:first-child { text-align: left; }
+/* A heading wider than its column of buttons reaches a little into the gaps either side */
+.mix-h:not(:first-child) { margin-inline: -5px; }
+.mix-name { padding-right: 8px; font-weight: 600; white-space: nowrap; }
+.tog { display: grid; place-items: center; width: var(--tog); height: var(--tog); padding: 0; border-radius: 50%; border: 1px solid var(--line); background: #FFFFFF; color: #9AA5A0; }
+.tog:hover { border-color: var(--accent); }
+.tog svg { width: 18px; height: 18px; fill: currentColor; }
+.tog[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.tog:focus-visible { outline-offset: 1px; }
+#pop-parts .tier-note b { color: var(--ink); font-weight: 600; }
 .tempo-big { font-family: var(--font-display); font-size: 2.1rem; font-weight: 600; line-height: 1; text-align: center; font-variant-numeric: tabular-nums; }
 .qn { width: 0.42em; height: 1em; fill: currentColor; vertical-align: -0.12em; }
 .fab-btn svg.qn { width: 9px; height: 21px; }
@@ -341,7 +360,7 @@ body.following .host-only { display: none !important; }
   .fab-btn, .play,   .fab-btn { min-width: 40px; padding: 0 10px; font-size: 0.9rem; }
   .fab-btn svg { width: 19px; height: 19px; }
   .fab-btn svg.qn { width: 8px; height: 18px; }
-  #g-inst, #g-level { padding: 0 12px; }
+  #g-parts { padding: 0 12px 0 10px; }
   .fab-lbl { font-size: 0.86rem; }
   .fab-btn .cnt { font-size: 1.05rem; }
   .play { min-width: 86px; padding: 0 16px 0 12px; }
@@ -368,13 +387,16 @@ body.following .host-only { display: none !important; }
   .cyc-badge { font-size: 0.7rem; }
   .fab-btn svg { width: 18px; height: 18px; }
   .fab-btn svg.qn { width: 8px; height: 17px; }
-  #g-inst, #g-level { padding: 0 10px; }
+  #g-parts { padding: 0 10px 0 8px; }
   .fab-lbl { font-size: 0.82rem; }
   .fab-btn .cnt { font-size: 0.98rem; }
   .play { min-width: 72px; padding: 0 12px 0 10px; }
   .zoom-pill { height: 38px; }
   .zoom-pill button { width: 32px; font-size: 19px; }
   .pop { padding-block: 8px 12px; gap: 10px; max-height: calc(100dvh - var(--dock-h) - 12px); }
+  .mix-list { --tog: 28px; gap: 3px 5px; }
+  .tog svg { width: 16px; height: 16px; }
+  #pop-parts .tier-note { font-size: 0.82rem; line-height: 1.3; }
   .toggle { padding: 5px 10px; font-size: 0.82rem; }
   .key { left: 6px; top: 4px; gap: 5px; padding: 3px 8px 3px 10px; }
   .sheet.keyed { padding-top: 32px; }
@@ -443,30 +465,19 @@ body.following .host-only { display: none !important; }
 
 <div class="fab-bar" aria-hidden="true"></div>
 <div class="fab" id="fab">
-  <section class="pop" id="pop-inst" aria-labelledby="h-inst" hidden>
-    <div class="pop-head"><h2 id="h-inst">Your instrument</h2><button class="pop-x" type="button" aria-label="Close">×</button></div>
-    <div class="opts" role="radiogroup" aria-labelledby="h-inst" id="instOpts"></div>
-  </section>
-  <section class="pop" id="pop-level" aria-labelledby="h-level" hidden>
-    <div class="pop-head"><h2 id="h-level">Your level</h2><button class="pop-x" type="button" aria-label="Close">×</button></div>
-    <div class="opts" role="radiogroup" aria-labelledby="h-level" id="tierOpts"></div>
+  <section class="pop" id="pop-parts" aria-labelledby="h-parts" hidden>
+    <div class="pop-head"><h2 id="h-parts">Parts</h2><button class="pop-x" type="button" aria-label="Close">×</button></div>
+    <div class="mix">
+      <div class="mix-list" id="mixInst" role="group" aria-label="Instruments"></div>
+      <div class="mix-list levels" id="mixTier" role="group" aria-label="Levels"></div>
+    </div>
     <p class="tier-note" id="tierNote"></p>
-  </section>
-  <section class="pop host-only" id="pop-hear" aria-labelledby="h-hear" hidden>
-    <div class="pop-head"><h2 id="h-hear">Play along with</h2><button class="pop-x" type="button" aria-label="Close">×</button></div>
-    <p class="tier-note">All four instruments in each level you pick.</p>
-    <div class="opts" role="group" aria-labelledby="h-hear" id="hearOpts"></div>
-    <label class="check"><input type="checkbox" id="muteMine"> Leave my part out so I can play it</label>
   </section>
   <section class="pop" id="pop-page" aria-labelledby="h-page" hidden>
     <div class="pop-head"><h2 id="h-page">On the page</h2><button class="pop-x" type="button" aria-label="Close">×</button></div>
     <div class="pop-sub">
       <span class="sub-label" id="lbl-layout">Music</span>
       <div class="opts" role="radiogroup" aria-labelledby="lbl-layout" id="layoutOpts"></div>
-    </div>
-    <div class="pop-sub">
-      <span class="sub-label" id="lbl-show">Parts shown</span>
-      <div class="opts" role="radiogroup" aria-labelledby="lbl-show" id="showOpts"></div>
     </div>
     <div class="pop-sub">
       <span class="sub-label" id="lbl-colors">String colors</span>
@@ -504,9 +515,7 @@ body.following .host-only { display: none !important; }
     </div>
     <div class="fab-more" id="fabMore" hidden>
     <div class="fab-set" role="group" aria-label="Your part and the page">
-    <button class="fab-btn" id="g-inst" type="button" aria-expanded="false" aria-controls="pop-inst" title="Your instrument"><span class="fab-lbl" id="instLbl">Violin</span></button>
-    <button class="fab-btn" id="g-level" type="button" aria-expanded="false" aria-controls="pop-level" title="Your level"><span class="fab-lbl" id="levelLbl">Melody</span></button>
-    <button class="fab-btn host-only" id="g-hear" type="button" aria-expanded="false" aria-controls="pop-hear" aria-label="Play along with" title="Play along with"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0-9 9v7c0 1.1.9 2 2 2h4v-8H5v-1c0-3.87 3.13-7 7-7s7 3.13 7 7v1h-4v8h4c1.1 0 2-.9 2-2v-7a9 9 0 0 0-9-9z"/></svg></button>
+    <button class="fab-btn" id="g-parts" type="button" aria-expanded="false" aria-controls="pop-parts" title="Parts to see and hear"><svg class="host-only" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0-9 9v7c0 1.1.9 2 2 2h4v-8H5v-1c0-3.87 3.13-7 7-7s7 3.13 7 7v1h-4v8h4c1.1 0 2-.9 2-2v-7a9 9 0 0 0-9-9z"/></svg><span class="fab-lbl" id="partsLbl">Violin · Melody</span></button>
     <button class="fab-btn small-only cyc" id="g-colors" type="button"></button>
     <button class="fab-btn small-only cyc" id="g-ltype" type="button"></button>
     <button class="fab-btn small-only cyc" id="g-fnum" type="button"></button>
@@ -549,12 +558,9 @@ body.following .host-only { display: none !important; }
     { name: 'Advanced Melody', note: 'The tune as a variation in eighth notes. Goes into third position. Suzuki Book 3–4 level.' },
     { name: 'Obbligato', note: 'Its own line for each instrument: a descant, a countermelody, broken chords. Suzuki Book 3–4 level.' },
   ];
-  const SHOW = [
-    { id: 'mine', label: 'My part' },
-    { id: 'tune', label: 'My part with the tune above' },
-    { id: 'level', label: 'All four instruments at my level' },
-  ];
-  const MELODY = 2;
+  const MELODY = 2, HARMONY = 3;
+  const SHORT = { Violin: 'Vln.', Viola: 'Vla.', Cello: 'Vc.', Bass: 'Cb.' };
+  const TIER_SHORT = ['Open str.', 'Easy', 'Melody', 'Harmony', 'Adv. melody', 'Obbligato'];
   // String colours and finger numbers can each be on every note, only the first time a note appears, or off.
   const MARK_MODES = [
     { id: 'all', label: 'Every note' },
@@ -593,12 +599,26 @@ body.following .host-only { display: none !important; }
     document.addEventListener('pointerdown', (e) => { if (!pop.hidden && !pop.contains(e.target) && !btn.contains(e.target)) show(false); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !pop.hidden) { show(false); btn.focus(); } });
   })();
+  // Parts on the page: every instrument switched on, at every level switched on. Parts that play: each one on its
+  // own (part number = level × 4 + instrument), so the tune can play on one instrument while the harmony keeps all four.
+  const trackIndex = (tier, inst) => tier * 4 + inst;
+  const indexList = (v, n) => Array.isArray(v) ? [...new Set(v.filter(x => Number.isInteger(x) && x >= 0 && x < n))].sort((a, b) => a - b) : null;
+  const seeInst = indexList(saved.seeInst, 4), seeTier = indexList(saved.seeTier, 6);
+  // Settings saved before there were separate switches: one instrument and level, maybe with the tune above or all
+  // four instruments, and whole levels to play along with.
+  const oldInst = Number.isInteger(saved.inst) && saved.inst < 4 ? saved.inst : 0;
+  const oldTier = Number.isInteger(saved.tier) && saved.tier < 6 ? saved.tier : MELODY;
+  function oldHeard() {
+    if (!Array.isArray(saved.hear)) return [trackIndex(MELODY, 0), ...INSTRUMENTS.map((_, i) => trackIndex(HARMONY, i))];
+    const set = new Set();
+    for (const t of indexList(saved.hear, 6)) INSTRUMENTS.forEach((_, i) => set.add(trackIndex(t, i)));
+    if (saved.muteMine) set.delete(trackIndex(oldTier, oldInst)); else set.add(trackIndex(oldTier, oldInst));
+    return [...set].sort((a, b) => a - b);
+  }
   const state = {
-    inst: Number.isInteger(saved.inst) ? saved.inst : 0,
-    tier: Number.isInteger(saved.tier) ? saved.tier : MELODY,
-    hear: Array.isArray(saved.hear) ? saved.hear : [MELODY, 3],
-    muteMine: !!saved.muteMine,
-    show: SHOW.some(s => s.id === saved.show) ? saved.show : 'mine',
+    seeInst: seeInst && seeInst.length ? seeInst : saved.show === 'level' ? [0, 1, 2, 3] : [oldInst],
+    seeTier: seeTier && seeTier.length ? seeTier : saved.show === 'tune' && oldTier !== MELODY ? [MELODY, oldTier].sort((a, b) => a - b) : [oldTier],
+    heard: indexList(saved.heard, 24) || oldHeard(),
     colorMode: MARK_MODES.some(m => m.id === saved.colorMode) ? saved.colorMode : saved.colors === false ? 'off' : 'all',
     fingerMode: MARK_MODES.some(m => m.id === saved.fingerMode) ? saved.fingerMode : saved.colors === false ? 'off' : 'all',
     tempo: saved.tempo || SPEED_BASE,
@@ -615,16 +635,16 @@ body.following .host-only { display: none !important; }
     // Bigger or smaller music (the − and + in the corner): a step on ZOOMS.
     zoom: ZOOMS.includes(saved.zoom) ? saved.zoom : 1,
   };
-  // Phones (upright or on their side): one long line, your part only, letter names inside the notes and finger numbers to their right.
+  // Phones (upright or on their side): one long line, letter names inside the notes and finger numbers to their right.
   const smallMQ = window.matchMedia('(max-width: 600px) and (orientation: portrait), (max-height: 500px) and (orientation: landscape)');
   function smallRules() {
-    const was = { layout: state.layout, show: state.show, fingers: state.fingers };
+    const was = { layout: state.layout, fingers: state.fingers };
     if (smallMQ.matches) {
-      state.layout = 'line'; state.show = 'mine';
+      state.layout = 'line';
       state.fingers = 'right';
     }
     document.documentElement.classList.toggle('small', smallMQ.matches);
-    return { layout: was.layout !== state.layout, parts: was.show !== state.show, fingers: was.fingers !== state.fingers };
+    return { layout: was.layout !== state.layout, parts: false, fingers: was.fingers !== state.fingers };
   }
   smallRules();
   try {
@@ -636,7 +656,7 @@ body.following .host-only { display: none !important; }
     });
   } catch {}
   const lettersOn = () => document.documentElement.classList.contains('small') && state.letterMode !== 'off';
-  const save = () => store.set({ zoom: state.zoom, inst: state.inst, tier: state.tier, hear: state.hear, muteMine: state.muteMine, show: state.show, colorMode: state.colorMode, fingerMode: state.fingerMode, tempo: state.tempo, follow: state.follow, countBy: state.unit, fingers: state.fingers, counts: state.countAlong ? 'on' : 'off', layout: state.layout, letterMode: state.letterMode, metro: state.metro });
+  const save = () => store.set({ zoom: state.zoom, seeInst: state.seeInst, seeTier: state.seeTier, heard: state.heard, colorMode: state.colorMode, fingerMode: state.fingerMode, tempo: state.tempo, follow: state.follow, countBy: state.unit, fingers: state.fingers, counts: state.countAlong ? 'on' : 'off', layout: state.layout, letterMode: state.letterMode, metro: state.metro });
 
   // ---- Room reverb ----
   // alphaTab plays through Web Audio; route whatever it sends to the speakers through a small reverb bus.
@@ -691,7 +711,8 @@ body.following .host-only { display: none !important; }
   function renderKey() {
     const key = $('legend');
     key.hidden = state.colorMode === 'off';
-    const strings = state.show === 'level' ? ['E', 'A', 'D', 'G', 'C'] : STRINGS_OF[state.inst];
+    const strings = state.seeInst.length === 1 ? STRINGS_OF[state.seeInst[0]]
+      : ['E', 'A', 'D', 'G', 'C'].filter(n => state.seeInst.some(i => STRINGS_OF[i].includes(n)));
     key.replaceChildren();
     const lbl = document.createElement('span');
     lbl.className = 'key-lbl'; lbl.textContent = 'Strings';
@@ -759,40 +780,113 @@ body.following .host-only { display: none !important; }
   $('g-colors').addEventListener('click', () => { setPop(null); state.colorMode = nextOf(STEP_MARKS, state.colorMode); changed({ marks: true, size: true }); toast('String colors: ' + MARK_WORD[state.colorMode]); });
   $('g-fnum').addEventListener('click', () => { setPop(null); state.fingerMode = nextOf(STEP_MARKS, state.fingerMode); changed({ marks: true, size: true }); toast('Finger numbers: ' + MARK_WORD[state.fingerMode]); });
   $('g-ltype').addEventListener('click', () => { setPop(null); state.letterMode = nextOf(STEP_MARKS, state.letterMode); changed({ marks: true, size: true }); toast('Letter names: ' + MARK_WORD[state.letterMode]); });
+  // ---- Parts: what is on the page, and what plays ----
+  // Instruments on the left, levels on the right, each with an eye. The page shows every instrument with its eye
+  // open at every level with its eye open. Each level has a speaker for each instrument; the speaker beside an
+  // instrument turns that instrument on or off at every level at once.
+  const EYE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>';
+  const EYE_OFF = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>';
+  const SPEAKER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>';
+  const SPEAKER_OFF = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>';
+  const INST_ABBR = ['Vln', 'Vla', 'Vc', 'Cb'];
+  let noteTier = null; // the level whose description shows under the lists: the last one touched
+  function mixCell(list, cls, text, host) {
+    const el = document.createElement('span');
+    el.className = cls + (host ? ' host-only' : ''); el.textContent = text;
+    list.append(el);
+    return el;
+  }
+  function mixTog(list, kind, id, label, onClick) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'tog ' + kind + (kind === 'hear' ? ' host-only' : ''); b.id = id;
+    b.setAttribute('aria-label', label); b.title = label;
+    b.addEventListener('click', onClick);
+    list.append(b);
+  }
+  function buildMix() {
+    const inst = $('mixInst'), tier = $('mixTier');
+    mixCell(inst, 'mix-h', 'Instrument'); mixCell(inst, 'mix-h', 'See'); mixCell(inst, 'mix-h', 'Hear', true);
+    INSTRUMENTS.forEach((name, i) => {
+      mixCell(inst, 'mix-name', name);
+      mixTog(inst, 'see', 'see-inst-' + i, 'See ' + name, () => toggleSee('seeInst', i));
+      mixTog(inst, 'hear', 'hear-inst-' + i, 'Hear ' + name + ' at every level', () => hearInstrument(i));
+    });
+    mixCell(tier, 'mix-h', 'Level'); mixCell(tier, 'mix-h', 'See'); mixCell(tier, 'mix-h', '', true);
+    INST_ABBR.forEach((a) => mixCell(tier, 'mix-h', a, true));
+    TIERS.forEach((t, ti) => {
+      mixCell(tier, 'mix-name', t.name).title = t.note;
+      mixTog(tier, 'see', 'see-tier-' + ti, 'See ' + t.name, () => { noteTier = ti; toggleSee('seeTier', ti); });
+      mixCell(tier, 'mix-gap', '', true);
+      INSTRUMENTS.forEach((name, i) => mixTog(tier, 'hear', 'hear-' + ti + '-' + i, 'Hear ' + name + ', ' + t.name, () => { noteTier = ti; hearPart(trackIndex(ti, i)); }));
+    });
+  }
+  function toggleSee(key, i) {
+    const list = state[key];
+    if (list.includes(i)) {
+      if (list.length === 1) { toast(key === 'seeInst' ? 'One instrument stays on the page' : 'One level stays on the page'); return; }
+      state[key] = list.filter(x => x !== i);
+    } else state[key] = [...list, i].sort((a, b) => a - b);
+    changed({ parts: true });
+  }
+  function hearPart(ti) {
+    state.heard = state.heard.includes(ti) ? state.heard.filter(x => x !== ti) : [...state.heard, ti].sort((a, b) => a - b);
+    changed({ audio: true });
+  }
+  const quietedAt = {}; // instrument → the levels it was playing when its own speaker turned it off
+  function hearInstrument(i) {
+    const heard = new Set(state.heard), mine = TIERS.map((_, t) => trackIndex(t, i));
+    if (mine.some(p => heard.has(p))) {
+      quietedAt[i] = TIERS.map((_, t) => t).filter(t => heard.has(trackIndex(t, i)));
+      mine.forEach(p => heard.delete(p));
+      toast(INSTRUMENTS[i] + ' is quiet at every level');
+    } else {
+      // Back on where it was playing before; failing that, at every level something is playing at (or, with
+      // nothing playing, the levels on the page).
+      let levels = quietedAt[i] || TIERS.map((_, t) => t).filter(t => INSTRUMENTS.some((_, k) => heard.has(trackIndex(t, k))));
+      if (!levels.length) levels = state.seeTier;
+      levels.forEach(t => heard.add(trackIndex(t, i)));
+      toast(INSTRUMENTS[i] + ' plays ' + levels.map(t => TIERS[t].name).join(', '));
+    }
+    state.heard = [...heard].sort((a, b) => a - b);
+    changed({ audio: true });
+  }
+  function renderMix() {
+    const heard = new Set(state.heard);
+    const set = (id, on) => {
+      const b = $(id);
+      if (b.getAttribute('aria-pressed') === String(on)) return;
+      b.setAttribute('aria-pressed', String(on));
+      b.innerHTML = b.classList.contains('see') ? (on ? EYE : EYE_OFF) : (on ? SPEAKER : SPEAKER_OFF);
+    };
+    INSTRUMENTS.forEach((_, i) => {
+      set('see-inst-' + i, state.seeInst.includes(i));
+      set('hear-inst-' + i, TIERS.some((_, t) => heard.has(trackIndex(t, i))));
+    });
+    TIERS.forEach((_, t) => {
+      set('see-tier-' + t, state.seeTier.includes(t));
+      INSTRUMENTS.forEach((_, i) => set('hear-' + t + '-' + i, heard.has(trackIndex(t, i))));
+    });
+    const nt = noteTier ?? state.seeTier[0];
+    $('tierNote').innerHTML = '';
+    const b = document.createElement('b'); b.textContent = TIERS[nt].name + ':';
+    $('tierNote').append(b, ' ' + TIERS[nt].note);
+    // The button in the strip names the part on the page, or counts them.
+    const idx = shownIndexes(), small = document.documentElement.classList.contains('small');
+    const one = idx.length === 1 && INSTRUMENTS[idx[0] % 4] + ' · ' + (small ? TIER_SHORT : TIERS.map(t => t.name))[Math.floor(idx[0] / 4)];
+    $('partsLbl').textContent = one || idx.length + ' parts';
+    $('g-parts').setAttribute('aria-label', 'Parts to see and hear: ' + (one || idx.length + ' parts on the page'));
+  }
+  buildMix();
+  // On a short screen a list that goes on below fades out at its bottom edge, so it's clear there's more to scroll to.
+  function markMore() {
+    for (const l of [$('mixInst'), $('mixTier')]) l.classList.toggle('more', l.scrollTop + l.clientHeight < l.scrollHeight - 2);
+  }
+  for (const l of [$('mixInst'), $('mixTier')]) l.addEventListener('scroll', markMore, { passive: true });
+  window.addEventListener('resize', () => { if (openPop === 'parts') markMore(); });
+
   function buildControls() {
     renderCycles();
-    const inst = $('instOpts'); inst.replaceChildren();
-    INSTRUMENTS.forEach((name, i) => {
-      const b = chip(name, { role: 'radio', 'aria-checked': String(i === state.inst), id: 'inst-' + i });
-      b.addEventListener('click', () => { state.inst = i; setPop(null); changed({ parts: true }); });
-      inst.append(b);
-    });
-    const tier = $('tierOpts'); tier.replaceChildren();
-    TIERS.forEach((t, i) => {
-      const b = chip(t.name, { role: 'radio', 'aria-checked': String(i === state.tier), id: 'tier-' + i });
-      b.addEventListener('click', () => { state.tier = i; setPop(null); changed({ parts: true }); });
-      tier.append(b);
-    });
-    $('tierNote').textContent = TIERS[state.tier].note;
-    const hear = $('hearOpts'); hear.replaceChildren();
-    TIERS.forEach((t, i) => {
-      const on = state.hear.includes(i);
-      const b = chip(t.name, { 'aria-pressed': String(on), id: 'hear-' + i });
-      b.classList.add('hear');
-      b.addEventListener('click', () => {
-        state.hear = on ? state.hear.filter(x => x !== i) : [...state.hear, i].sort();
-        changed({ audio: true });
-      });
-      hear.append(b);
-    });
-    const show = $('showOpts'); show.replaceChildren();
-    SHOW.forEach((s) => {
-      const off = s.id === 'tune' && state.tier === MELODY;
-      const b = chip(s.label, { role: 'radio', 'aria-checked': String(s.id === state.show && !off), id: 'show-' + s.id });
-      if (off) { b.disabled = true; b.title = 'Your part is the tune'; }
-      b.addEventListener('click', () => { state.show = s.id; changed({ parts: true }); });
-      show.append(b);
-    });
+    renderMix();
     const fing = $('fingerOpts'); fing.replaceChildren();
     [{ id: 'inside', label: 'Inside the notes' }, { id: 'left', label: 'Left of the notes' }, { id: 'right', label: 'Right of the notes' }, { id: 'above', label: 'Above the notes' }].forEach((f) => {
       const b = chip(f.label, { role: 'radio', 'aria-checked': String(f.id === state.fingers), id: 'finger-' + f.id });
@@ -819,11 +913,6 @@ body.following .host-only { display: none !important; }
     }
     renderKey();
     $('sheet').classList.toggle('show-line', state.follow !== 'pulse');
-    $('instLbl').textContent = INSTRUMENTS[state.inst];
-    $('levelLbl').textContent = TIERS[state.tier].name;
-    $('g-inst').setAttribute('aria-label', 'Your instrument: ' + INSTRUMENTS[state.inst]);
-    $('g-level').setAttribute('aria-label', 'Your level: ' + TIERS[state.tier].name);
-    $('muteMine').checked = state.muteMine;
     showTempo();
   }
   function showTempo() {
@@ -832,7 +921,6 @@ body.following .host-only { display: none !important; }
     $('tempoChip').textContent = TEMPO_PERCENT ? state.tempo + '%' : state.tempo;
     $('g-tempo').setAttribute('aria-label', 'Tempo, ' + state.tempo + (TEMPO_PERCENT ? ' percent' : ''));
   }
-  $('muteMine').addEventListener('change', (e) => { state.muteMine = e.target.checked; changed({ audio: true }); });
   // The slider moves in steps of 5, but the written tempo is always reachable even when it isn't a multiple of 5,
   // and the range stretches to include it.
   const TEMPO_MIN = Math.min(40, SPEED_BASE), TEMPO_MAX = Math.max(130, SPEED_BASE);
@@ -859,7 +947,7 @@ body.following .host-only { display: none !important; }
     if (r.height) document.documentElement.style.setProperty('--dock-h', Math.round(window.innerHeight - r.top + 10) + 'px');
   }
   // One round button per group; each opens its own small panel above the buttons. Only one is open at a time.
-  const GROUPS = ['inst', 'level', 'hear', 'page', 'tempo'];
+  const GROUPS = ['parts', 'page', 'tempo'];
   let openPop = null;
   function setPop(name) {
     openPop = name;
@@ -867,6 +955,7 @@ body.following .host-only { display: none !important; }
       $('pop-' + g).hidden = g !== name;
       $('g-' + g).setAttribute('aria-expanded', String(g === name));
     }
+    if (name === 'parts') markMore();
   }
   GROUPS.forEach((g) => $('g-' + g).addEventListener('click', () => setPop(openPop === g ? null : g)));
   document.querySelectorAll('.pop-x').forEach((b) => b.addEventListener('click', () => { const g = openPop; setPop(null); if (g) $('g-' + g).focus(); }));
@@ -913,20 +1002,9 @@ body.following .host-only { display: none !important; }
   }
 
   // ---- Score helpers ----
-  const trackIndex = (tier, inst) => tier * 4 + inst;
-  const myIndex = () => trackIndex(state.tier, state.inst);
-  function shownIndexes() {
-    if (state.show === 'tune' && state.tier !== MELODY) return [trackIndex(MELODY, state.inst), myIndex()];
-    if (state.show === 'level') return INSTRUMENTS.map((_, i) => trackIndex(state.tier, i));
-    return [myIndex()];
-  }
-  function audibleIndexes() {
-    const set = new Set();
-    for (const t of state.hear) for (let i = 0; i < 4; i++) set.add(trackIndex(t, i));
-    set.add(myIndex());
-    if (state.muteMine) set.delete(myIndex());
-    return set;
-  }
+  // The parts on the page in score order: level by level, violin to bass within each level.
+  const shownIndexes = () => state.seeTier.flatMap(t => state.seeInst.map(i => trackIndex(t, i)));
+  const audibleIndexes = () => new Set(state.heard);
 
   // Read string colors and finger numbers (including the low/high arrows) straight from the MusicXML.
   function readMarks(doc) {
@@ -1135,13 +1213,12 @@ body.following .host-only { display: none !important; }
     if (on.length) api.changeTrackMute(on, false);
   }
 
-  const SHORT = { Violin: 'Vln.', Viola: 'Vla.', Cello: 'Vc.', Bass: 'Cb.' };
-  const TIER_SHORT = ['Open str.', 'Easy', 'Melody', 'Harmony', 'Adv. melody', 'Obbligato'];
   function labelStaves(idx) {
-    // Label each staff with whatever tells the shown staves apart: the level in "tune" view, the instrument otherwise.
+    // Label each staff with whatever tells the shown staves apart: the instrument, the level, or both.
+    const insts = new Set(idx.map(i => i % 4)), tiers = new Set(idx.map(i => Math.floor(i / 4)));
     score.tracks.forEach((t, i) => {
-      const inst = INSTRUMENTS[i % 4], tier = Math.floor(i / 4);
-      const name = state.show === 'tune' && idx.length > 1 ? (tier === MELODY ? 'Tune' : TIER_SHORT[tier]) : SHORT[inst];
+      const inst = SHORT[INSTRUMENTS[i % 4]], tier = TIER_SHORT[Math.floor(i / 4)];
+      const name = tiers.size > 1 && insts.size > 1 ? inst + ' ' + tier : tiers.size > 1 ? tier : inst;
       t.shortName = name; t.name = name;
     });
   }
