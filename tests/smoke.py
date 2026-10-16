@@ -180,6 +180,8 @@ async def parts_checks(browser, base):
     # A violin at Open Strings reading along with a cello at Advanced Melody: those two parts and no others.
     await pg.click('#see-4-2'); await pg.click('#see-0-0'); await pg.click('#see-2-0'); await pg.wait_for_timeout(1500)
     check(await pg.evaluate(SHOWN_JS) == [0, 18], 'eyes on Violin Open Strings and Cello Advanced Melody show just those two, in score order')
+    names = await pg.evaluate('() => reader.api.tracks.map(t => t.name)')
+    check(names == ['Vln Open str.', 'C Adv. melody'], f'the staves are labelled with the same short names as the table ({names})')
     check(await pg.evaluate(PLAYING_JS) == [0, 18], 'ticked, the parts on the page are the parts that play')
     check(await pg.evaluate("() => document.querySelectorAll('#mixParts .tog.see').length") == 24, 'one eye for every part')
     label = await pg.get_attribute('#g-parts', 'title')

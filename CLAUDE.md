@@ -126,7 +126,7 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   panel). Pointing at the tab names the part on the page, or "3 parts". Phones show short
   level names ("Adv. melody") to keep the panel narrow. The panel holds one table: a
   level on each row and an eye for each instrument (See), headed Vln, Vla, C, B (Janelle's
-  choice: C and B, not Vc and Cb; the staff labels keep Vc. and Cb.). Every part is on the page or not on its
+  choice: C and B, not Vc and Cb; the staff labels use the same: "Vln", "Vla", "C", "B"). Every part is on the page or not on its
   own, so a violin at Open Strings can read with a cello at Advanced Melody. Parts show in score
   order; one part always stays on the page. The table scrolls, fading at the bottom, when the
   screen is short.

@@ -3,11 +3,11 @@
 // one visit, in the browser or as an app on the home screen.
 //
 // Written by tools/build_site.py from tools/sw_template.js. Do not edit by hand.
-const VERSION = '6b8e90d9fc';
+const VERSION = '705943ea5f';
 // Every file kept offline, with a fingerprint of its contents. When a fingerprint changes (a new song, a
 // fixed note, a reader change) only that file is fetched again; the rest stay, so adding a song doesn't
 // make every student download the 4 MB of string sounds again.
-const FILES = {"./": "fff572708d", "app/app.js": "3a19f0d83d", "assets/apple-touch-icon.png": "77db2738c9", "assets/font/Bravura.woff2?v=181e0e7c48": "181e0e7c48", "assets/icon-192.png": "f5d3d0f1da", "assets/icon-512.png": "4c288bcc63", "assets/icon-maskable-512.png": "9e90ad9613", "assets/icon.svg": "071a925436", "assets/soundfont/strings-generaluser-sf2.b64.txt?v=bcdca70e5f": "bcdca70e5f", "https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/alphaTab.min.js": "1.8.4", "manifest.webmanifest": "c2642a3839", "songs/the-first-noel/": "dae2938662", "songs/the-first-noel/the-first-noel.xml?v=0c94bf8fea": "0c94bf8fea", "songs/what-child-is-this-epic/": "4cdf701072", "songs/what-child-is-this-epic/what-child-is-this-epic.xml?v=cd68be468c": "cd68be468c"};
+const FILES = {"./": "fff572708d", "app/app.js": "3a19f0d83d", "assets/apple-touch-icon.png": "77db2738c9", "assets/font/Bravura.woff2?v=181e0e7c48": "181e0e7c48", "assets/icon-192.png": "f5d3d0f1da", "assets/icon-512.png": "4c288bcc63", "assets/icon-maskable-512.png": "9e90ad9613", "assets/icon.svg": "071a925436", "assets/soundfont/strings-generaluser-sf2.b64.txt?v=bcdca70e5f": "bcdca70e5f", "https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/alphaTab.min.js": "1.8.4", "manifest.webmanifest": "c2642a3839", "songs/the-first-noel/": "57512c1b5a", "songs/the-first-noel/the-first-noel.xml?v=0c94bf8fea": "0c94bf8fea", "songs/what-child-is-this-epic/": "21b491bd05", "songs/what-child-is-this-epic/what-child-is-this-epic.xml?v=cd68be468c": "cd68be468c"};
 // The page lettering from Google Fonts. Kept as well (Latin letters only), but the site still works
 // without it: the pages fall back to the device's own fonts.
 const FONT_CSS = ["https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,500;0,600;1,500&family=Figtree:wght@400;500;600;700&display=swap"];
