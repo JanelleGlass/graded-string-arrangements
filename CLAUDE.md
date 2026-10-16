@@ -127,8 +127,10 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   label saying what's on the notes: "Fingers inside" → "Fingers to the right" → "Note names and
   fingers" (names inside, numbers to the right, since only one thing fits inside a note head) →
   "Note names" → "Plain notes". Finger numbers and note names show on every note (no "first time
-  only"). The notes stay the same size with finger numbers inside or to the right. Phones start on
+  only"). The music stays the same size for all five looks, Plain notes too. Phones start on
   "Note names and fingers", laptops on "Fingers inside" (note names kept separately for each).
+  Each look's little note head and words sit together in the middle of the button (black head for
+  Plain notes, blue otherwise).
   History (2026-10-16): the "On the page" panel became separate buttons, then Note Names, Fingers
   and placement buttons on every screen, which Janelle folded into this one sequence.
 - Parts: a quiet bump-out tab on the right edge of the screen, halfway down the music (a chevron

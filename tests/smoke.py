@@ -138,7 +138,8 @@ async def song_checks(browser, base):
             # On the note: one button steps through five looks. Laptops start on finger numbers inside the notes, phones
             # on note names with finger numbers to the right. Each look draws what it says, at the same size.
             look_js = '''() => { const fin = [...document.querySelectorAll('#sheet text.fin')].map(t => t.textContent);
-              return { look: document.querySelector('#g-look .now').textContent, names: fin.some(x => /^[A-G]/.test(x)),
+              return { look: document.querySelector('#g-look .now .word').textContent, head: document.querySelector('#g-look .now ellipse').getAttribute('fill'),
+                       off: (r => (r.left + r.right) / 2)(document.querySelector('#g-look .now').getBoundingClientRect()) - (r => (r.left + r.right) / 2)(document.getElementById('g-look').getBoundingClientRect()), names: fin.some(x => /^[A-G]/.test(x)),
                        fingers: fin.some(x => /^[0-4]/.test(x)), size: reader.api.settings.display.scale }; }'''
             seen = [await pg.evaluate(look_js)]
             for _ in range(5):
@@ -151,8 +152,12 @@ async def song_checks(browser, base):
             drawn = {x['look']: (x['names'], x['fingers']) for x in seen}
             check(drawn == {'Fingers inside': (False, True), 'Fingers to the right': (False, True), 'Note names and fingers': (True, True),
                             'Note names': (True, False), 'Plain notes': (False, False)}, f'{label}: each look draws what it says ({drawn})')
+            heads = {x['look']: x['head'] for x in seen}
+            check(all(h == ('#17201C' if k == 'Plain notes' else '#1D4ED8') for k, h in heads.items()), f'{label}: the note head on the button is black for Plain notes, blue otherwise ({heads})')
+            offs = {x['look']: round(x['off'], 1) for x in seen}
+            check(all(abs(o) <= 1 for o in offs.values()), f'{label}: each look sits in the middle of the On the note button ({offs})')
             sizes = {x['look']: x['size'] for x in seen}
-            check(sizes['Fingers inside'] == sizes['Fingers to the right'], f'{label}: the notes stay the same size with finger numbers inside or to the right ({sizes})')
+            check(len(set(sizes.values())) == 1, f'{label}: the music stays the same size for all five looks ({sizes})')
             if label != 'laptop':
                 for _ in range(3): await pg.click('#g-look')  # back to where a phone starts
                 await pg.wait_for_timeout(1500)

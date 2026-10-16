@@ -388,6 +388,9 @@ html.small .small-only[hidden], html.small .big-only { display: none !important;
 .cyc-badge.stack { display: inline-grid; justify-items: start; }
 .cyc-badge.stack > span { grid-area: 1 / 1; }
 .cyc-badge.stack > span:not(.now) { visibility: hidden; }
+/* On the note: each look's note head travels with its words, and the pair sits in the middle of the button. */
+.cyc-badge.stack.looks { justify-items: center; }
+.cyc-badge.looks > span { display: inline-flex; align-items: center; gap: 6px; }
 .toast { padding: 7px 14px; border-radius: 999px; background: #17201C; color: #FFFFFF; font-size: 0.88rem; font-weight: 600; box-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.5); }
 .toast[hidden] { display: none; }
 /* A device following the conductor shows only what it can use */
@@ -437,6 +440,7 @@ body.following .host-only { display: none !important; }
   /* Every setting on one compact row along the bottom */
   .fab-row { gap: 5px 6px; }
   .fab-btn.cyc { gap: 4px; padding: 0 7px; }
+  .cyc-badge.looks > span { gap: 4px; }
   html.small #g-together:not(.on):not(.offer) .fab-lbl { display: none; }
   .fab-set { gap: 5px; }
   .fab-btn, .play { height: 38px; }
@@ -801,12 +805,16 @@ body.following .host-only { display: none !important; }
     state.fingerMode = l.fingers ? 'all' : 'off';
     if (l.spot) state.fingers = l.spot;
   }
-  // A note head showing the look: a "1" inside it or to its right, an "A" inside it, both, or neither.
+  // A note head showing the look: a "1" inside it or to its right, an "A" inside it, both, or neither (then black, like
+  // a plain note).
   const lookIco = (l) => {
     const t = (x, ch, fill, size) => `<text x="${x}" y="15.2" text-anchor="middle" font-size="${size}" font-weight="800" fill="${fill}" font-family="Figtree, Arial, sans-serif">${ch}</text>`;
     const inside = l.names ? 'A' : l.fingers && l.spot === 'inside' ? '1' : '';
     const right = l.fingers && (l.names || l.spot === 'right');
-    return `<svg class="cyc-ico" viewBox="0 0 30 20" style="width:28px;height:19px" aria-hidden="true"><ellipse cx="13" cy="12" rx="7.6" ry="5.4" transform="rotate(-20 13 12)" fill="#1D4ED8"/>` +
+    const head = l.names || l.fingers ? '#1D4ED8' : '#17201C';
+    // The picture is cut close around what it shows, so the words sit the same distance from it in every look.
+    const w = right ? 25 : 17;
+    return `<svg class="cyc-ico" viewBox="4 0 ${w} 20" style="width:${w * 0.95}px;height:19px" aria-hidden="true"><ellipse cx="13" cy="12" rx="7.6" ry="5.4" transform="rotate(-20 13 12)" fill="${head}"/>` +
       (inside ? t(13, inside, '#fff', 8.5) : '') + (right ? t(25, '1', '#17201C', 9.5) : '') + '</svg>';
   };
   // One long line (a staff running off to the right) or pages (lines of music stacked on a page).
@@ -821,7 +829,7 @@ body.following .host-only { display: none !important; }
     $('g-colors').innerHTML = dotsIco(state.colorMode !== 'off') + stackBadge(Object.values(MARK_BADGE), MARK_BADGE[state.colorMode]);
     $('g-colors').setAttribute('aria-label', 'String colors: ' + MARK_WORD[state.colorMode] + '. Tap to change.');
     const look = lookNow();
-    $('g-look').innerHTML = lookIco(look) + stackBadge(LOOKS.map(l => l.word), look.word);
+    $('g-look').innerHTML = '<span class="cyc-badge stack looks">' + LOOKS.map(l => '<span' + (l === look ? ' class="now"' : '') + '>' + lookIco(l) + '<span class="word">' + l.word + '</span></span>').join('') + '</span>';
     $('g-look').setAttribute('aria-label', 'On the notes: ' + look.say + '. Tap to change.');
     $('g-layout').innerHTML = layoutIco(state.layout) + stackBadge(['Line', 'Pages'], state.layout === 'line' ? 'Line' : 'Pages');
     $('g-layout').setAttribute('aria-label', 'Music: ' + (state.layout === 'line' ? 'one long line' : 'pages') + '. Tap to change.');
@@ -2710,9 +2718,8 @@ body.following .host-only { display: none !important; }
   }
 
   // ---- Music size ----
-  // Finger numbers inside the notes need bigger notes; counting along needs room under each staff.
+  // Note heads big enough to hold a finger number or note name; counting along needs room under each staff.
   const defaults = typeof alphaTab !== 'undefined' ? new alphaTab.Settings().display : { notationStaffPaddingBottom: 0, lastNotationStaffPaddingBottom: 0 };
-  // Big notes when the page draws the finger numbers; the regular size when they sit above the staff.
   const shortLand = window.matchMedia('(max-height: 500px) and (orientation: landscape)');
   let fitScale = null, fitTries = 0, fitPending = false;
   function musicScale() {
@@ -2720,11 +2727,10 @@ body.following .host-only { display: none !important; }
     return s * state.zoom;
   }
   function baseScale() {
-    // One size for every layout; with finger numbers showing it is twice that, so the note heads can hold a number.
-    // Inside the notes or to their right, the notes stay the same size (Janelle's choice), so switching never jumps.
+    // Twice the regular size, so a note head can hold a finger number or note name. The music stays this size for
+    // every look on the On the note button, Plain notes too (Janelle's choice), so stepping through never jumps.
     const narrow = window.innerWidth < 560, mid = window.innerWidth < 900;
     const base = narrow ? 1.45 : mid ? 1.75 : 2.05;
-    if (state.fingerMode === 'off' && !lettersOn()) return base;
     if (state.layout === 'line') return base * 2;
     // On pages: twice the size, but never so big that one bar no longer fits across the page (phones).
     const sheetW = ($('sheet') && $('sheet').clientWidth) || window.innerWidth;
