@@ -42,6 +42,7 @@ TEMPLATE = {
     'score': 'scores/the-first-noel.xml',
     'storage': 'first-noel-reader',
     'tempo': 'const BASE_TEMPO = 100; // Andante, from bar 1 of the score',
+    'tempo_percent': 'const TEMPO_PERCENT = false;',
 }
 
 MAJOR = {-7: 'C-flat', -6: 'G-flat', -5: 'D-flat', -4: 'A-flat', -3: 'E-flat', -2: 'B-flat', -1: 'F',
@@ -68,27 +69,40 @@ def fail(msg):
 
 
 def read_score(path):
-    """Key, time signature and bar count as the reader's About box shows them."""
+    """Key, time signature and bar count as the reader's About box shows them.
+
+    A score that changes key or time partway through lists each one once, in the order it first
+    appears ("E minor, A minor"; "4/4, 6/8, 3/4")."""
     root = ET.parse(path).getroot()
     part = root.find('part')
     if part is None:
         fail(f'{path} has no parts')
     measures = part.findall('measure')
     first = measures[0]
-    fifths = first.findtext('attributes/key/fifths')
-    mode = (first.findtext('attributes/key/mode') or 'major').strip()
-    beats = first.findtext('attributes/time/beats')
-    beat_type = first.findtext('attributes/time/beat-type')
-    if fifths is None or beats is None:
+    if first.findtext('attributes/key/fifths') is None or first.findtext('attributes/time/beats') is None:
         fail(f'{path}: no key or time signature in the first bar')
-    names = MINOR if mode == 'minor' else MAJOR
-    key = f"{names[int(fifths)]} {'minor' if mode == 'minor' else 'major'}"
+    keys, times, mode = [], [], 'major'
+    for m in measures:
+        fifths = m.findtext('attributes/key/fifths')
+        if fifths is not None:
+            mode = (m.findtext('attributes/key/mode') or mode).strip()
+            names = MINOR if mode == 'minor' else MAJOR
+            k = f"{names[int(fifths)]} {'minor' if mode == 'minor' else 'major'}"
+            if k not in keys:
+                keys.append(k)
+        beats = m.findtext('attributes/time/beats')
+        if beats is not None:
+            t = f"{beats}/{m.findtext('attributes/time/beat-type')}"
+            if t not in times:
+                times.append(t)
+    key = ', '.join(keys)
     # Written tempo (quarter notes per minute) from the first tempo mark; alphaTab plays 120 when there is none.
-    sound = next((x for x in root.iter('sound') if x.get('tempo')), None)
-    tempo = round(float(sound.get('tempo'))) if sound is not None else 120
+    marks = [round(float(x.get('tempo'))) for x in part.iter('sound') if x.get('tempo')]
+    tempo = marks[0] if marks else 120
     names_found = [sp.findtext('part-name') or '' for sp in root.find('part-list').findall('score-part')]
-    return {'key': key, 'time': f'{beats}/{beat_type}', 'bars': len(measures), 'tempo': tempo,
-            'tempo_marked': sound is not None, 'parts': len(root.findall('part')), 'part_names': names_found}
+    return {'key': key, 'time': ', '.join(times), 'bars': len(measures), 'tempo': tempo,
+            'tempo_marked': bool(marks), 'tempos': marks, 'parts': len(root.findall('part')),
+            'part_names': names_found}
 
 
 # The reader picks parts by position: level by level (in this order), and within each level
@@ -135,6 +149,8 @@ def song_page(reader, song, facts):
     b = replace(b, f"<dt>Length</dt><dd>{t['bars']}</dd>", f"<dt>Length</dt><dd>{facts['bars']} bars</dd>")
     slug = song['slug']
     b = replace(b, t['tempo'], f"const BASE_TEMPO = {facts['tempo']}; // written tempo, from bar 1 of the score")
+    # A score that changes tempo: the tempo control reads as a percentage of the written tempos.
+    b = replace(b, t['tempo_percent'], f"const TEMPO_PERCENT = {'true' if len(set(facts['tempos'])) > 1 else 'false'};")
     b = replace(b, f"const SCORE_URL = '{t['score']}';", f"const SCORE_URL = '{slug}.xml';")
     b = replace(b, "const FONT_URL = 'font/Bravura.woff2';", "const FONT_URL = '../../assets/font/Bravura.woff2';")
     b = replace(b, "const SOUNDFONT_URL = 'soundfont/strings-generaluser-sf2.b64.txt';",
@@ -198,6 +214,8 @@ def main():
               f"quarter = {got['tempo']}, {got['parts']} parts{', Buy link' if s.get('pdf_url') else ''}")
         if not got['tempo_marked']:
             print(f'  note: {slug} has no tempo mark in the score, so it plays at quarter = 120')
+        if len(set(got['tempos'])) > 1:
+            print(f"  tempo changes: {' -> '.join(map(str, got['tempos']))} (tempo control shows a percentage)")
 
     home = (ROOT / 'index.html').read_text(encoding='utf-8')
     a, z = '<!-- songs:start', '      <!-- songs:end -->'

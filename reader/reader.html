@@ -511,6 +511,10 @@ body.following .host-only { display: none !important; }
   const SOUNDFONT_URL = 'soundfont/strings-generaluser-sf2.b64.txt';
   const PDF_URL = ''; // Paste the Payhip product link here when it exists.
   const BASE_TEMPO = 100; // Andante, from bar 1 of the score
+  // A score that changes tempo partway through: the tempo control reads as a percentage of the written tempos,
+  // since a single "♩ =" number would only be right for the first section.
+  const TEMPO_PERCENT = false;
+  const SPEED_BASE = TEMPO_PERCENT ? 100 : BASE_TEMPO; // the tempo control's value at the written tempo
 
   const INSTRUMENTS = ['Violin', 'Viola', 'Cello', 'Bass'];
   const TIERS = [
@@ -573,7 +577,7 @@ body.following .host-only { display: none !important; }
     show: SHOW.some(s => s.id === saved.show) ? saved.show : 'mine',
     colorMode: MARK_MODES.some(m => m.id === saved.colorMode) ? saved.colorMode : saved.colors === false ? 'off' : 'all',
     fingerMode: MARK_MODES.some(m => m.id === saved.fingerMode) ? saved.fingerMode : saved.colors === false ? 'off' : 'all',
-    tempo: saved.tempo || BASE_TEMPO,
+    tempo: saved.tempo || SPEED_BASE,
     // The beat is always shown the same way: pulsing notes, with the counts under the notes matching the notes.
     follow: 'pulse',
     unit: 0,
@@ -800,29 +804,30 @@ body.following .host-only { display: none !important; }
   }
   function showTempo() {
     $('tempo').value = state.tempo;
-    $('tempoOut').innerHTML = QN + ' = ' + state.tempo;
-    $('tempoChip').textContent = state.tempo;
-    $('g-tempo').setAttribute('aria-label', 'Tempo, ' + state.tempo);
+    $('tempoOut').innerHTML = TEMPO_PERCENT ? state.tempo + '%' : QN + ' = ' + state.tempo;
+    $('tempoChip').textContent = TEMPO_PERCENT ? state.tempo + '%' : state.tempo;
+    $('g-tempo').setAttribute('aria-label', 'Tempo, ' + state.tempo + (TEMPO_PERCENT ? ' percent' : ''));
   }
   $('muteMine').addEventListener('change', (e) => { state.muteMine = e.target.checked; changed({ audio: true }); });
   // The slider moves in steps of 5, but the written tempo is always reachable even when it isn't a multiple of 5,
   // and the range stretches to include it.
-  const TEMPO_MIN = Math.min(40, BASE_TEMPO), TEMPO_MAX = Math.max(130, BASE_TEMPO);
+  const TEMPO_MIN = Math.min(40, SPEED_BASE), TEMPO_MAX = Math.max(130, SPEED_BASE);
   $('tempo').min = TEMPO_MIN; $('tempo').max = TEMPO_MAX;
-  if (BASE_TEMPO % 5) $('tempo').step = 1; // so the slider can sit exactly on the written tempo
+  if (SPEED_BASE % 5) $('tempo').step = 1; // so the slider can sit exactly on the written tempo
   function setTempo(v) {
-    const r = v === BASE_TEMPO ? v : Math.round(v / 5) * 5;
+    const r = v === SPEED_BASE ? v : Math.round(v / 5) * 5;
     state.tempo = Math.min(TEMPO_MAX, Math.max(TEMPO_MIN, r));
     showTempo();
-    if (api) api.playbackSpeed = state.tempo / BASE_TEMPO;
+    if (api) api.playbackSpeed = state.tempo / SPEED_BASE;
     save();
-    if (conductor.hosting) conductSend({ type: 'tempo', speed: state.tempo / BASE_TEMPO });
+    if (conductor.hosting) conductSend({ type: 'tempo', speed: state.tempo / SPEED_BASE });
   }
   $('tempo').addEventListener('input', (e) => setTempo(Number(e.target.value)));
   $('slower').addEventListener('click', () => setTempo(state.tempo - 5));
   $('faster').addEventListener('click', () => setTempo(state.tempo + 5));
-  $('tempoReset').addEventListener('click', () => setTempo(BASE_TEMPO));
-  $('tempoReset').textContent = 'Back to the written tempo (' + BASE_TEMPO + ')';
+  $('tempoReset').addEventListener('click', () => setTempo(SPEED_BASE));
+  $('tempoReset').textContent = TEMPO_PERCENT ? 'Back to the written tempos (100%)' : 'Back to the written tempo (' + BASE_TEMPO + ')';
+  if (TEMPO_PERCENT) $('tempo').setAttribute('aria-label', 'Tempo, percent of the written tempos');
 
   // ---- Floating controls ----
   function setDockH() {
@@ -972,7 +977,9 @@ body.following .host-only { display: none !important; }
           } else note.style = undefined;
           note.finger = finger;
           note.letter = letter;
-          beat.text = finger && state.fingers === 'above' ? finger : null;
+          // The score's own words on this note (a section name, "dolce", "rit.") stay, unless a finger goes above it.
+          if (!('ownText' in beat)) beat.ownText = beat.text || null;
+          beat.text = finger && state.fingers === 'above' ? finger : beat.ownText;
         });
       });
     });
@@ -1096,7 +1103,7 @@ body.following .host-only { display: none !important; }
     const mb = score.masterBars[loop ? loop.from : 0];
     const compound = mb.timeSignatureDenominator === 8 && mb.timeSignatureNumerator % 3 === 0;
     const beatTicks = compound ? 1440 : 3840 / mb.timeSignatureDenominator;
-    return Math.max(LOOP_LEAD_MS, beatTicks / ticksPerMs(api.playbackSpeed || 1));
+    return Math.max(LOOP_LEAD_MS, beatTicks / ticksPerMs(api.playbackSpeed || 1, mb.start));
   }
   // The end of a pass: glide back to the loop's first note, rest, then go round (when conducting, on every device
   // at once, like Play does). Play/Pause during that moment stops the loop there.
@@ -1311,7 +1318,19 @@ body.following .host-only { display: none !important; }
   const conductor = { room: null, me: null, hosting: false, following: false, hostPeer: null, offset: 0, bestRtt: Infinity, pongs: 0, synced: false,
     pings: new Map(), last: null, seq: 0, timers: [], posTimer: 0, pingTimer: 0, followers: 0, volume: 1, errs: [], startedAt: 0, lastFix: 0 };
   const clock = () => performance.now();
-  const ticksPerMs = (speed) => 0.016 * BASE_TEMPO * speed;
+  // The written tempo (quarter notes a minute) at a tick: the last tempo mark at or before it.
+  function tempoAtTick(tick) {
+    let bpm = BASE_TEMPO;
+    if (!score) return bpm;
+    for (const mb of score.masterBars) {
+      if (mb.start > tick) break;
+      for (const a of mb.tempoAutomations || []) if (mb.start + (a.ratioPosition || 0) * mb.calculateDuration() <= tick) bpm = a.value;
+    }
+    return bpm;
+  }
+  const ticksPerMs = (speed, tick = 0) => 0.016 * tempoAtTick(tick) * speed;
+  // One count-in click at a bar: a beat of its time signature (an eighth in 6/8), at the tempo written there.
+  const clickMs = (bi, speed) => (3840 / score.masterBars[bi].timeSignatureDenominator) / ticksPerMs(speed, score.masterBars[bi].start);
   function conductSend(cmd) {
     if (!conductor.room || !conductor.hosting) return;
     cmd.seq = ++conductor.seq;
@@ -1369,7 +1388,7 @@ body.following .host-only { display: none !important; }
     if (cmd.type !== 'pos') { clearTimers(); conductor.errs = []; conductor.startedAt = clock(); conductor.lastFix = 0; }
     if (cmd.type === 'tempo' || cmd.type === 'play') {
       api.playbackSpeed = cmd.speed;
-      state.tempo = Math.round(cmd.speed * BASE_TEMPO);
+      state.tempo = Math.round(cmd.speed * SPEED_BASE);
       showTempo();
     }
     if (cmd.type === 'play' || (cmd.type === 'seek' && 'countIn' in cmd)) conductor.countIn = !!cmd.countIn;
@@ -1379,7 +1398,7 @@ body.following .host-only { display: none !important; }
       api.tickPosition = cmd.tick; markTick = cmd.tick; drawStartMark();
       const localStart = cmd.startAt - conductor.offset;
       glideToTick(cmd.tick, Math.max(0, Math.min(LOOP_GLIDE_MS, localStart - clock() - 80))); revealSheet(true, true);
-      const countMs = cmd.countIn ? countInBeats(cmd.tick) * 60000 / (BASE_TEMPO * cmd.speed) : 0;
+      const countMs = cmd.countIn ? countInBeats(cmd.tick) * clickMs(barAtTick(cmd.tick), cmd.speed) : 0;
       const wait = localStart - clock();
       if (wait > 0) {
         // In time: count in and start exactly with the host.
@@ -1393,12 +1412,12 @@ body.following .host-only { display: none !important; }
         const into = clock() - (localStart + countMs);
         api.countInVolume = 0;
         if (into < 0) conductor.timers.push(setTimeout(() => api.play(), -into));
-        else { api.tickPosition = cmd.tick + into * ticksPerMs(cmd.speed); api.play(); }
+        else { api.tickPosition = cmd.tick + into * ticksPerMs(cmd.speed, cmd.tick); api.play(); }
       }
     } else if (cmd.type === 'seek') {
       if (cmd.range) setLoop(cmd.range[0] - 1, cmd.range[1] - 1); else if (loop) setLoop(null);
       if (cmd.playing && playing) {
-        api.tickPosition = cmd.tick + (clock() - (cmd.h - conductor.offset)) * ticksPerMs(api.playbackSpeed);
+        api.tickPosition = cmd.tick + (clock() - (cmd.h - conductor.offset)) * ticksPerMs(api.playbackSpeed, cmd.tick);
       } else {
         if (playing) api.pause();
         api.tickPosition = cmd.tick; markTick = cmd.tick; drawStartMark();
@@ -1413,7 +1432,7 @@ body.following .host-only { display: none !important; }
     } else if (cmd.type === 'pos' && playing && !counting) {
       // Where was I when the host was at cmd.tick? Nudge if we have drifted apart.
       const localAt = cmd.h - conductor.offset;
-      const rate = ticksPerMs(api.playbackSpeed);
+      const rate = ticksPerMs(api.playbackSpeed, cmd.tick);
       const mine = pos.tick + (localAt - pos.at) * rate;
       const errMs = (mine - cmd.tick) / rate;
       conductor.lastErr = errMs;
@@ -1799,7 +1818,7 @@ body.following .host-only { display: none !important; }
     const mb = score.masterBars[bi];
     const perBar = mb.timeSignatureNumerator;
     const left = bi === 0 && pickupExtra ? perBar + pickupExtra : perBar;
-    counting = { left, perBar, timer: 0 };
+    counting = { left, perBar, timer: 0, beatMs: clickMs(bi, api.playbackSpeed || 1) };
   }
   function flashCount(index) {
     const el = $('count'), num = $('countNum');
@@ -1810,7 +1829,7 @@ body.following .host-only { display: none !important; }
     num.animate([{ transform: 'scale(1.25)', opacity: 1 }, { transform: 'scale(1)', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'forwards' });
     clearTimeout(counting.timer);
     counting.left--;
-    const beatMs = 60000 / (BASE_TEMPO * (api.playbackSpeed || 1));
+    const beatMs = counting.beatMs;
     const done = counting.left <= 0;
     counting.timer = setTimeout(endCountIn, done ? beatMs * 0.9 : beatMs * 1.6);
     if (done) {
@@ -2780,12 +2799,23 @@ body.following .host-only { display: none !important; }
     api.activeBeatsChanged.on((e) => { activeBeats = e.activeBeats || []; trackNotes(); });
     api.playerPositionChanged.on((e) => { pos = { tick: e.currentTick, at: performance.now(), bpm: e.modifiedTempo || BASE_TEMPO * api.playbackSpeed }; });
     api.midiLoad.on((midi) => {
-      if (!pickupExtra) return;
-      const ts = midi.events.find(e => e.type === alphaTab.midi.MidiEventType.TimeSignature && e.tick === 0);
-      if (!ts) return;
-      const original = ts.numerator;
-      ts.numerator = original + pickupExtra;
-      midi.addEvent(new alphaTab.midi.TimeSignatureEvent(ts.track, score.masterBars[1].start, original, ts.denominatorIndex, ts.midiClocksPerMetronomeClick, ts.thirtySecondNodesInQuarter));
+      const T = alphaTab.midi.MidiEventType;
+      const ts = pickupExtra && midi.events.find(e => e.type === T.TimeSignature && e.tick === 0);
+      if (ts) {
+        const original = ts.numerator;
+        ts.numerator = original + pickupExtra;
+        midi.addEvent(new alphaTab.midi.TimeSignatureEvent(ts.track, score.masterBars[1].start, original, ts.denominatorIndex, ts.midiClocksPerMetronomeClick, ts.thirtySecondNodesInQuarter));
+      }
+      // The count-in takes the tempo and time signature the player has reached at the starting spot, and getting
+      // there it skips whatever falls in the last ~2 ms, so a change written on that very downbeat (a new section, or
+      // bar 2 after a pickup) is left out. Moving every change 20 ticks (1/48 of a beat, 10-25 ms: too little to hear,
+      // and less than any metronome click) earlier means a count-in from that bar counts in its own tempo and time.
+      const EARLY = 20;
+      for (const tr of midi.tracks) {
+        let moved = false;
+        for (const e of tr.events) if ((e.type === T.TempoChange || e.type === T.TimeSignature) && e.tick >= EARLY) { e.tick -= EARLY; moved = true; }
+        if (moved) tr.events.sort((a, b) => a.tick - b.tick);
+      }
     });
     api.midiEventsPlayed.on((e) => {
       if (!counting || counting.finishing) return;
@@ -2795,7 +2825,7 @@ body.following .host-only { display: none !important; }
     api.playerReady.on(() => {
       soundReady = true;
       $('play').disabled = false; setPlaying(false);
-      api.playbackSpeed = state.tempo / BASE_TEMPO;
+      api.playbackSpeed = state.tempo / SPEED_BASE;
       applyMetro();
       api.midiEventsPlayedFilter = [alphaTab.midi.MidiEventType.AlphaTabMetronome];
       applyLoopMode();

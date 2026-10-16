@@ -62,7 +62,7 @@ Only after Janelle has checked the finished arrangement in the Music Arrangement
 4. Push when Janelle says go.
 
 If a reader change touches one of the song-specific strings the build swaps out (title, About box
-facts, `SCORE_URL`, `BASE_TEMPO`, the storage key, the Buy-note line, the title wrapper), update
+facts, `SCORE_URL`, `BASE_TEMPO`, `TEMPO_PERCENT`, the storage key, the Buy-note line, the title wrapper), update
 `TEMPLATE` and `song_page()` in `tools/build_site.py` too. The build stops with a clear message if
 one goes missing.
 
