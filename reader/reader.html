@@ -129,7 +129,8 @@ h1 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: c
 hr.div { border: 0; border-top: 1px solid var(--line); margin: 0; }
 
 /* Sheet */
-.sheet-wrap { position: relative; min-width: 0; isolation: isolate; }
+/* The music runs to the right edge of the screen, a little under the Parts tab */
+.sheet-wrap { position: relative; min-width: 0; isolation: isolate; margin-right: calc(-1 * var(--to-tab, 0px)); }
 .sheet { width: 100%; background: var(--paper); color: var(--paper-ink); border-radius: 4px; box-shadow: var(--shadow); padding: 18px 12px 26px; min-height: 360px; overflow: hidden; }
 /* One long line: the music scrolls sideways inside the sheet */
 .sheet.line { min-height: 0; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; padding-bottom: 14px; display: flex; align-items: flex-start; }
@@ -274,8 +275,8 @@ svg.i { width: 18px; height: 18px; fill: currentColor; }
 .pop .check { padding: 2px 0; }
 /* Parts: one table, a level on each row, scrolling when the screen is short. Each level has an eye (on the page or
    not) and a speaker (playing or quiet) for each instrument.
-   It slides in from the right edge, from the top of the screen down to the buttons, and the music moves over to
-   make room for it, so every line of music stays in view while parts are switched on and off. */
+   It slides in from the right edge, from the top of the screen down to the buttons, over the music: the music stays
+   where it is and runs on behind it. */
 .pop.drawer { position: fixed; z-index: 28; top: 0; right: 0; bottom: var(--dock-h); width: max-content; max-width: calc(100vw - 120px); max-height: none;
   border-radius: 0; border-width: 0 0 0 1px; padding: calc(10px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px)) 14px 16px;
   box-shadow: -10px 0 30px -18px rgba(20, 30, 26, 0.45); display: flex; flex-direction: column; overflow: hidden;
@@ -283,20 +284,31 @@ svg.i { width: 18px; height: 18px; fill: currentColor; }
 .pop.drawer.open { transform: none; visibility: visible; transition: transform 0.22s ease; }
 .pop.drawer > * { flex: none; }
 #pop-parts .tier-note { max-width: 0; min-width: 100%; }
-/* The tab that pulls the panel out: a little bump on the right edge of the screen, halfway down the music. It rides
-   along the panel's edge when the panel is open. The music keeps a strip of room for it, so it never covers notes. */
+/* The tab that pulls the panel out: a quiet bump on the right edge of the screen, halfway down the music, sitting a
+   little over the music's edge. Its top and bottom swoop smoothly into the edge. It rides along the panel's edge when
+   the panel is open, the swoops then flowing into the panel. */
+:root { --tab-w: 34px; --tab-room: 14px; } /* the tab's width, and how much of it is clear of the music */
 .parts-tab { position: fixed; z-index: 29; top: calc((100vh - var(--dock-h)) / 2); top: calc((100dvh - var(--dock-h)) / 2); right: env(safe-area-inset-right, 0px);
-  transform: translateY(-50%); width: 34px; padding: 12px 0 14px; display: flex; flex-direction: column; align-items: center; gap: 6px;
-  border: 1px solid #CDD5D1; border-right: 0; border-radius: 12px 0 0 12px; background: #FFFFFF; color: #17201C;
-  box-shadow: -3px 2px 12px -5px rgba(20, 30, 26, 0.4); font-weight: 700; transition: right 0.22s ease; }
-.parts-tab:hover { border-color: #1D5B72; color: #1D5B72; }
-.parts-tab svg { width: 20px; height: 20px; fill: currentColor; transition: transform 0.22s ease; }
-.pt-lbl { writing-mode: vertical-rl; font-size: 0.88rem; letter-spacing: 0.05em; line-height: 1; }
-body { padding-right: 34px; }
-body.parts-open { padding-right: calc(var(--drawer-w, 0px) + 34px); }
-body.parts-open .count { right: calc(var(--drawer-w, 0px) + 34px); }
-body.parts-open .parts-tab { right: var(--drawer-w, 0px); background: var(--panel); border-color: var(--line); }
-body.parts-open .parts-tab svg { transform: rotate(180deg); }
+  transform: translateY(-50%); width: var(--tab-w); height: 136px; padding: 0 0 0 1px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  border: 0; background: none; color: #55615B; font-weight: 600; transition: right 0.22s ease; }
+.parts-tab .pt-shape { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(-1px 1px 3px rgba(20, 30, 26, 0.14)); }
+.pt-fill { fill: rgba(255, 255, 255, 0.95); }
+.pt-line { fill: none; stroke: #D5DCD9; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.parts-tab .pt-chev, .pt-lbl { position: relative; }
+/* A finger-sized target, reaching a little further over the music than the drawn tab */
+.parts-tab::after { content: ""; position: absolute; inset: 14px 0 14px -10px; }
+.parts-tab:hover, .parts-tab:focus-visible { color: #1D5B72; }
+.parts-tab:hover .pt-line { stroke: #1D5B72; }
+.parts-tab:focus-visible { outline: none; }
+.parts-tab:focus-visible .pt-line { stroke: #1D5B72; stroke-width: 2; }
+.parts-tab .pt-chev { width: 18px; height: 18px; fill: currentColor; transition: transform 0.22s ease; }
+.pt-lbl { writing-mode: vertical-rl; font-size: 0.8rem; letter-spacing: 0.06em; line-height: 1; }
+body { padding-right: calc(var(--tab-room) + env(safe-area-inset-right, 0px)); }
+body.parts-open .count { right: calc(var(--drawer-w, 0px) + var(--tab-w)); }
+body.parts-open .parts-tab { right: var(--drawer-w, 0px); }
+body.parts-open .pt-fill { fill: var(--panel); }
+body.parts-open .pt-line { stroke: var(--line); }
+body.parts-open .parts-tab .pt-chev { transform: rotate(180deg); }
 /* Phones: the short level names, so the panel takes less of the screen */
 .lvl-short { display: none; }
 html.small .lvl-short { display: inline; }
@@ -484,7 +496,7 @@ body.following .host-only { display: none !important; }
   <label class="check hear-same host-only"><input type="checkbox" id="hearSame" checked> Hear the parts I see</label>
   <p class="tier-note" id="tierNote"></p>
 </section>
-<button class="parts-tab" id="g-parts" type="button" aria-expanded="false" aria-controls="pop-parts" title="Parts to see and hear"><svg class="pt-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg><span class="pt-lbl">Parts</span></button>
+<button class="parts-tab" id="g-parts" type="button" aria-expanded="false" aria-controls="pop-parts" title="Parts to see and hear"><svg class="pt-shape" viewBox="0 0 34 136" aria-hidden="true"><path class="pt-fill" d="M34 0C34 14 1 12 1 28L1 108C1 124 34 122 34 136Z"/><path class="pt-line" d="M34 0C34 14 1 12 1 28L1 108C1 124 34 122 34 136"/></svg><svg class="pt-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg><span class="pt-lbl">Parts</span></button>
 <div class="fab" id="fab">
   <section class="pop" id="pop-page" aria-labelledby="h-page" hidden>
     <div class="pop-head"><h2 id="h-page">On the page</h2><button class="pop-x" type="button" aria-label="Close">×</button></div>
@@ -2972,10 +2984,13 @@ body.following .host-only { display: none !important; }
   const mainCol = document.querySelector('.main');
   function placeFab() {
     const r = mainCol.getBoundingClientRect(), root = document.documentElement.style;
-    // Phones, and whenever Parts is open beside the music: the buttons use the whole width, so they stay on one row.
-    const full = window.innerWidth < 720 || partsOpen;
+    const full = window.innerWidth < 720; // phones: use the whole width so the buttons stay on one row
     root.setProperty('--mus-l', (full ? 0 : Math.round(r.left)) + 'px');
     root.setProperty('--mus-w', (full ? window.innerWidth : Math.round(r.width)) + 'px');
+    // How far the music reaches past its column, to run a little under the Parts tab (the page's side padding, and on a wide screen
+    // the space beside the centred page).
+    const b = document.body, edge = b.getBoundingClientRect().right - parseFloat(getComputedStyle(b).paddingRight);
+    root.setProperty('--to-tab', Math.max(0, Math.round(edge - r.right)) + 'px');
     setDockH();
   }
   try { new ResizeObserver(placeFab).observe(mainCol); new ResizeObserver(setDockH).observe($('fabMain')); } catch {}

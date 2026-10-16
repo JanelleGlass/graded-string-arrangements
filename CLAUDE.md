@@ -116,12 +116,14 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
 - Every setting is always visible in a strip at the bottom, on phones too, never covering notes.
   Zoom − / + lives in that strip (0.3x to 1.75x). Phone-landscape buttons are compact so the strip
   fits one row on regular iPhones.
-- Parts: a little bump-out tab on the right edge of the screen, halfway down the music (a chevron
-  and "Parts", read sideways), slides a panel in from the right, from the top of the screen down to
-  the strip. There is no Parts button in the strip. The tab rides along the panel's edge while it's
-  open and closes it again (so does ×). The music keeps a strip of room for the tab and moves over
-  beside the panel (never under either) so every line of music stays in view, and the strip keeps
-  the whole width. Pointing at the tab names the part on the page, or "3 parts". Phones show short
+- Parts: a quiet bump-out tab on the right edge of the screen, halfway down the music (a chevron
+  and "Parts", read sideways, in soft grey; 34px wide, 136px tall), with swoopy sides: its top and
+  bottom curve smoothly into the screen edge (and into the panel's edge when open). It slides a
+  panel in from the right, from the top of the screen down to the strip. There is no Parts button in the strip. The tab rides along the panel's edge while it's
+  open and closes it again (so does ×). Closed, the music runs a little under the tab (it
+  overlaps the music by about half its width), on a wide screen too, past the centred page. Open, the panel slides over the music, which stays where it
+  is and runs on behind it (Janelle's choice: an earlier version moved the music over beside the
+  panel). Pointing at the tab names the part on the page, or "3 parts". Phones show short
   level names ("Adv. melody") to keep the panel narrow. The panel holds one table: a
   level on each row and an eye for each instrument (See), headed Vln, Vla, C, B (Janelle's
   choice: C and B, not Vc and Cb; the staff labels keep Vc. and Cb.). Every part is on the page or not on its

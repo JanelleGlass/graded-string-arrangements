@@ -13,7 +13,7 @@ What it checks
      notes are drawn, Play moves the music forward, nothing scrolls sideways, no script errors.
      Laptop: the Full screen button goes in and out of full screen. Phone (acting like an iPhone,
      which doesn't allow it): no Full screen button.
-     The Parts panel: a tab at the right edge pulls it out with the music moved over beside it, each part's eye
+     The Parts panel: the music runs a little under a tab at the right edge, which pulls the panel out over it, each part's eye
      puts it on the page, the parts on the page play until "Hear the parts I see" is unticked and a
      speaker for each part chooses, and choices survive a reload.
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
@@ -166,12 +166,15 @@ async def parts_checks(browser, base):
     speakers = "() => [...document.querySelectorAll('#mixParts .tog.hear')].filter(b => b.offsetParent).length"
     # Parts are numbered level by level (Open Strings 0-3, Easy 4-7, Melody 8-11, Harmony 12-15...), violin to bass.
     check(await pg.is_visible('#g-parts') and not await pg.is_visible('#fabRow #g-parts'), 'Parts is a tab at the right edge, not a button in the strip')
+    music_right = "() => Math.round(document.getElementById('sheet').getBoundingClientRect().right)"
+    closed_right = await pg.evaluate(music_right)
+    tab_left, tab_right = await pg.evaluate("() => { const t = document.getElementById('g-parts').getBoundingClientRect(); return [Math.round(t.left), Math.round(t.right)]; }")
+    check(tab_left < closed_right < tab_right, f'the music runs a little under the Parts tab (music ends at {closed_right}, tab {tab_left} to {tab_right})')
     await pg.click('#g-parts')
     check(await pg.is_visible('#pop-parts'), 'the Parts tab opens the panel')
     await pg.wait_for_timeout(600)
-    clear = await pg.evaluate('''() => document.getElementById('sheet').getBoundingClientRect().right
-      <= Math.min(document.getElementById('pop-parts').getBoundingClientRect().left, document.getElementById('g-parts').getBoundingClientRect().left) + 1''')
-    check(clear, 'the panel and its tab open at the right edge, with the music moved over beside them, uncovered')
+    over = await pg.evaluate("() => document.getElementById('pop-parts').getBoundingClientRect().left < document.getElementById('sheet').getBoundingClientRect().right")
+    check(over and await pg.evaluate(music_right) == closed_right, 'the panel opens over the music, which stays where it is')
     check(await pg.evaluate(SHOWN_JS) == [8], 'a first visit shows Violin, Melody')
     check(await pg.evaluate(speakers) == 0 and await pg.is_checked('#hearSame'), '"Hear the parts I see" starts ticked: eyes only')
     # A violin at Open Strings reading along with a cello at Advanced Melody: those two parts and no others.
@@ -198,8 +201,7 @@ async def parts_checks(browser, base):
     label = await pg.get_attribute('#g-parts', 'title')
     check(label == 'Parts: Cello · Advanced Melody', f'the Parts tab names a single part ("{label}")')
     await pg.click('#partsX'); await pg.wait_for_timeout(600)
-    wide = await pg.evaluate("() => document.getElementById('sheet').getBoundingClientRect().right > innerWidth - 60")
-    check(wide and not await pg.is_visible('#pop-parts'), 'closing the panel gives the music the whole width again')
+    check(not await pg.is_visible('#pop-parts') and await pg.evaluate(music_right) == closed_right, 'closing the panel leaves the music where it was')
     check(await pg.evaluate(PLAYING_JS) == [8, 18], "and the speakers' mix keeps playing with the panel closed")
     await pg.reload()
     await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
