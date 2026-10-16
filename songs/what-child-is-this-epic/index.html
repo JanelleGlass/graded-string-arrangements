@@ -203,6 +203,8 @@ hr.div { border: 0; border-top: 1px solid var(--line); margin: 0; }
 /* The count being played right now */
 .beat-count.now { color: #1D5B72; font-weight: 700; }
 .beat-count { z-index: 1; }
+/* A count left out under a long note in a narrow bar: no number, only the line running through */
+.beat-count.skip { visibility: hidden; }
 /* A held note (half note, dotted quarter…): a line joins the counts it lasts through, and lights up as the note is held */
 .count-link { position: absolute; z-index: 0; border-radius: 999px; background: #CDD4D1; transition: background 0.12s; }
 .count-link.now { background: #1D5B72; }
@@ -926,8 +928,7 @@ body.following .host-only { display: none !important; }
   }
 
   // Read string colors and finger numbers (including the low/high arrows) straight from the MusicXML.
-  function readMarks(xmlText) {
-    const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+  function readMarks(doc) {
     return [...doc.querySelectorAll('part')].map(part =>
       [...part.querySelectorAll(':scope > measure')].map(m =>
         [...m.querySelectorAll(':scope > note')]
@@ -941,8 +942,40 @@ body.following .host-only { display: none !important; }
       )
     );
   }
+  // The score's words (a tempo word, a section name, "dolce", "rit."), per part, by bar and where in the bar they
+  // fall. The music reader keeps only the last words before a note, so a tempo word followed by a section name
+  // would lose the tempo word; reading them here keeps both. A tempo word is one written with a tempo change.
+  function readWords(doc) {
+    return [...doc.querySelectorAll('part')].map(part => {
+      const bars = [];
+      let divisions = 1, carry = []; // words written after the last note of a bar go with the next bar's first note
+      [...part.querySelectorAll(':scope > measure')].forEach((m, bi) => {
+        const found = carry.map(w => ({ ...w, tick: 0 }));
+        carry = [];
+        let pos = 0;
+        for (const el of m.children) {
+          if (el.tagName === 'attributes') divisions = Number(el.querySelector('divisions')?.textContent) || divisions;
+          else if (el.tagName === 'backup') pos -= Number(el.querySelector('duration')?.textContent) || 0;
+          else if (el.tagName === 'forward') pos += Number(el.querySelector('duration')?.textContent) || 0;
+          else if (el.tagName === 'note' && !el.querySelector('chord') && !el.querySelector('grace')) pos += Number(el.querySelector(':scope > duration')?.textContent) || 0;
+          else if (el.tagName === 'direction') {
+            const tempo = !!el.querySelector('sound[tempo]');
+            const at = pos + (Number(el.querySelector(':scope > offset')?.textContent) || 0);
+            for (const w of el.querySelectorAll('direction-type > words')) {
+              const text = w.textContent.trim();
+              if (text) found.push({ text, tempo, italic: w.getAttribute('font-style') === 'italic', tick: Math.round(at * 960 / divisions) });
+            }
+          }
+        }
+        const end = Math.round(pos * 960 / divisions);
+        bars[bi] = found.filter(w => !end || w.tick < end);
+        carry = end ? found.filter(w => w.tick >= end) : [];
+      });
+      return bars;
+    });
+  }
 
-  let api = null, score = null, marks = null, soundReady = false, pickupExtra = 0;
+  let api = null, score = null, marks = null, words = null, soundReady = false, pickupExtra = 0;
   const M = () => alphaTab.model;
 
   function eachPlayedNote(track, fn) {
@@ -999,8 +1032,9 @@ body.following .host-only { display: none !important; }
           note.finger = finger;
           note.letter = letter;
           // The score's own words on this note (a section name, "dolce", "rit.") stay, unless a finger goes above it.
+          // A tempo word stays even then, in its own row.
           if (!('ownText' in beat)) beat.ownText = beat.text || null;
-          beat.text = finger && state.fingers === 'above' ? finger : beat.ownText;
+          beat.text = finger && state.fingers === 'above' ? (twoRows.has(ti) ? stack(beat.tempoText, finger) : finger) : beat.ownText;
         });
       });
     });
@@ -1015,6 +1049,57 @@ body.following .host-only { display: none !important; }
     const v = note.realValue ?? note.octave * 12 + note.tone;
     return names[((v % 12) + 12) % 12];
   }
+
+  // The words over each note. A part whose tempo words share a note with other words ("Misterioso" with the
+  // section name "Cinematic") gets two rows: tempo words on top, and everything else (section names, "dolce",
+  // "rit.", finger numbers above the notes) in the row next to the staff, where it always is. Every top row
+  // ends in a zero-width space, which the music reader sizes a little taller than any letter, so the rows
+  // line up the same all along the music.
+  const ZW = '\u200b';
+  const stack = (top, low) => (top || '') + ZW + (low ? '\n' + low : '');
+  const twoRows = new Set(); // parts drawn with a tempo row
+  let italicWords = new Set(); // lines the score writes in italics
+  function placeWords() {
+    italicWords = new Set();
+    score.tracks.forEach((track, ti) => {
+      const byBeat = new Map();
+      (words[ti] || []).forEach((list, bi) => {
+        const beats = track.staves[0].bars[bi]?.voices[0].beats || [];
+        for (const w of list) {
+          const beat = beats.find(b => b.playbackStart >= w.tick - 2) || beats[beats.length - 1];
+          if (!beat) continue;
+          if (!byBeat.has(beat)) byBeat.set(beat, { tempo: [], other: [], italic: true });
+          const g = byBeat.get(beat);
+          if (w.tempo) g.tempo.push(w.text);
+          else { g.other.push(w.text); g.italic = g.italic && w.italic; }
+        }
+      });
+      const two = [...byBeat.values()].some(g => g.tempo.length && g.other.length);
+      if (two) twoRows.add(ti); else twoRows.delete(ti);
+      for (const [beat, g] of byBeat) {
+        const top = g.tempo.join(' '), low = g.other.join(' · ');
+        beat.tempoText = top;
+        beat.text = two ? stack(top, low) : top || low;
+        if (low && g.italic) italicWords.add(low);
+      }
+      // Any other words the music reader found go in the lower row too.
+      if (two) for (const bar of track.staves[0].bars) for (const beat of bar.voices[0].beats) {
+        if (beat.text && !byBeat.has(beat)) beat.text = stack('', beat.text);
+      }
+    });
+  }
+  // Words the score writes in italics (section names, "dolce", "rit.") are drawn in italics, so they read apart
+  // from the bold tempo words and finger numbers.
+  function styleWords() {
+    if (!italicWords.size) return;
+    for (const t of $('sheet').querySelectorAll('.at-surface svg text')) {
+      if (t.dataset.italic || !italicWords.has(t.textContent)) continue;
+      const px = parseFloat(t.style.fontSize) || 12;
+      t.style.font = `italic 500 ${(px * 1.12).toFixed(1)}px "EB Garamond", Georgia, serif`;
+      t.dataset.italic = '1';
+    }
+  }
+
   function prepareScore() {
     // The pickup bar is one beat long.
     const first = score.masterBars[0];
@@ -1036,6 +1121,7 @@ body.following .host-only { display: none !important; }
       t.playbackInfo.secondaryChannel = ch;
       ch++;
     }
+    placeWords();
     applyMarks();
   }
 
@@ -2090,6 +2176,15 @@ body.following .host-only { display: none !important; }
     const frac = (q % beatTicks) / beatTicks;
     return frac === 0 ? String(Math.floor(q / beatTicks) % perBar + 1) : frac === 0.5 ? '&' : frac === 0.25 ? 'e' : frac === 0.75 ? 'a' : '';
   };
+  // The counts of a bar from the finest to the strongest: quarters and halves of a beat, each beat, each group of
+  // three (6/8, 9/8, 12/8) or half the bar (4/4), then the whole bar.
+  function countLevels(perBar, beatTicks) {
+    const lv = [beatTicks / 4, beatTicks / 2, beatTicks];
+    if (perBar % 3 === 0 && perBar > 3) { lv.push(3 * beatTicks); if (perBar % 6 === 0 && perBar > 6) lv.push(perBar / 2 * beatTicks); }
+    else if (perBar % 2 === 0 && perBar > 2) lv.push(perBar / 2 * beatTicks);
+    lv.push(perBar * beatTicks);
+    return lv;
+  }
   // Write every count under each staff at once; playback lights up the current one.
   function buildCounts() {
     clearCounts();
@@ -2103,8 +2198,10 @@ body.following .host-only { display: none !important; }
     const rowOf = new Map(); // one level row of counts per staff in each line of music
     ink = null;
     const th = Math.max(2, sz * 0.06);
+    const room = sz * 0.6; // the least space between two counts whose numbers still read apart
     for (const ti of shownIndexes()) {
       const map = new Map();
+      const every = new Map(); // per long note: 0 if all its counts fit, else how far apart the ones written are
       let prev = null; // the count before this one in this part
       score.masterBars.forEach((mb, bi) => {
         const beatTicks = 3840 / mb.timeSignatureDenominator, fullBar = mb.timeSignatureNumerator * beatTicks;
@@ -2125,6 +2222,18 @@ body.following .host-only { display: none !important; }
           const bar = bb.barBounds.visualBounds;
           const x0 = bb.onNotesX, x1 = nb ? nb.onNotesX : bar.x + bar.w - sz * 0.4;
           const x = x0 + (beat.playbackDuration ? (at - beat.playbackStart) / beat.playbackDuration : 0) * (x1 - x0);
+          // A long note in a narrow bar (a dotted half in 6/8 can get less room than its six counts) writes only the
+          // counts that fit, the strong ones (1 and 4 in 6/8, 1 and 3 in 4/4); its line still runs under the others.
+          let skip = false;
+          if (at > beat.playbackStart) {
+            if (!every.has(beat)) {
+              const px = (x1 - x0) / beat.playbackDuration, base = state.unit || beatTicks;
+              every.set(beat, base * px >= room ? 0 : countLevels(mb.timeSignatureNumerator, beatTicks).find(l => l > base && l % base === 0 && l * px >= room) || Infinity);
+            }
+            const u = every.get(beat);
+            skip = u > 0 && !(q % u === 0 && x - x0 >= room && x1 - x >= room);
+            if (skip && beat.isRest) continue; // a rest's left-out count: the last one written stays lit
+          }
           // Every count in a line sits in the same row; a dynamic in the way moves down instead (moveDynamics).
           const y = staffBottom(bb.barBounds, ti) + sz * 0.3;
           const sys = bb.barBounds.masterBarBounds.staffSystemBounds;
@@ -2139,8 +2248,8 @@ body.following .host-only { display: none !important; }
           if (x < row.first) row.first = x; // where the row's first count is
           const el = document.createElement('div');
           const num = /^[0-9]+$/.test(label);
-          el.className = 'beat-count' + (num ? '' : ' off');
-          el.textContent = label;
+          el.className = 'beat-count' + (num ? '' : ' off') + (skip ? ' skip' : '');
+          el.textContent = skip ? '' : label;
           Object.assign(el.style, { left: x + 'px', top: y + 'px', width: sz + 'px', height: sz + 'px', marginLeft: -sz / 2 + 'px', fontSize: (sz * (num ? 0.64 : 0.56)).toFixed(1) + 'px' });
           map.set(bi + ':' + at, el);
           frag.appendChild(el);
@@ -2149,16 +2258,20 @@ body.following .host-only { display: none !important; }
           const tied = !beat.isRest && beat.notes.length > 0 && beat.notes.every(n => n.isTieDestination);
           const held = !beat.isRest && (at > beat.playbackStart || tied);
           if (held && prev && Math.abs(prev.y - y) < 1 && prev.x < x && (prev.beat === beat || (tied && prev.beat === beat.previousBeat))) {
-            const a = prev.x + sz * 0.3, b = x - sz * 0.3;
-            if (b - a > sz * 0.15) {
+            // Counts close together leave less room around each number, so a short line still fits between them.
+            // Where a count is left out the line runs straight through (the pieces overlap so it reads as one), and
+            // lights up there all the same.
+            const pad = Math.max(sz * 0.2, Math.min(sz * 0.3, (x - prev.x - sz * 0.15) / 2));
+            const a = prev.x + (prev.skip ? -th / 2 : pad), b = x + (skip ? th / 2 : -pad);
+            if (b - a > sz * 0.1 || skip || prev.skip) {
               const ln = document.createElement('div');
               ln.className = 'count-link';
-              Object.assign(ln.style, { left: a + 'px', top: (y + sz / 2 - th / 2) + 'px', width: (b - a) + 'px', height: th + 'px' });
+              Object.assign(ln.style, { left: a + 'px', top: (y + sz / 2 - th / 2) + 'px', width: Math.max(0, b - a) + 'px', height: th + 'px' });
               frag.appendChild(ln);
               el._link = ln;
             }
           }
-          prev = { x, y, beat };
+          prev = { x, y, beat, skip };
         }
       });
       countIndex.set(ti, map);
@@ -2805,7 +2918,9 @@ body.following .host-only { display: none !important; }
       fontUrl = await toDataUrl(new Blob([await fr.arrayBuffer()], { type: 'font/woff2' }));
     } catch { return fail('The score did not load. Reload the page to try again.'); }
 
-    marks = readMarks(new TextDecoder().decode(xmlBuf));
+    const xmlDoc = new DOMParser().parseFromString(new TextDecoder().decode(xmlBuf), 'application/xml');
+    marks = readMarks(xmlDoc);
+    words = readWords(xmlDoc);
 
     const s = new alphaTab.Settings();
     s.core.useWorkers = false;
@@ -2843,7 +2958,7 @@ body.following .host-only { display: none !important; }
     window.reader = { api, score, conductor, xmap: () => xmap, line: () => lineState, at: () => playedTick(performance.now()) };
     api.error.on(() => fail('Something went wrong drawing the music. Reload the page to try again.'));
     api.renderStarted.on(() => { if (!fitPending) fitTries = 0; });
-    api.renderFinished.on(() => { $('loading').hidden = true; ink = null; fitSurface(); placeFingers(); trackNotes(true); buildCounts(); placeTimeSigButtons(); drawLoop(); drawStartMark(); xmap = null; if (!playing && state.layout === 'line') { setHalf(); centerOnTick(api.tickPosition || 0, false); }
+    api.renderFinished.on(() => { $('loading').hidden = true; ink = null; styleWords(); fitSurface(); placeFingers(); trackNotes(true); buildCounts(); placeTimeSigButtons(); drawLoop(); drawStartMark(); xmap = null; if (!playing && state.layout === 'line') { setHalf(); centerOnTick(api.tickPosition || 0, false); }
       // A phone on its side: size the line to the screen, then bring it into view.
       fitPending = false;
       if (!fitToHeight() && shortLand.matches && state.layout === 'line' && !playing) revealSheet(false, true); });
