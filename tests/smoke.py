@@ -13,8 +13,9 @@ What it checks
      notes are drawn, Play moves the music forward, nothing scrolls sideways, no script errors.
      Laptop: the Full screen button goes in and out of full screen. Phone (acting like an iPhone,
      which doesn't allow it): no Full screen button.
-     The Parts panel: the eyes choose what is on the page, each speaker plays one part, and choices
-     survive a reload.
+     The Parts panel: a tab at the right edge pulls it out with the music moved over beside it, each part's eye
+     puts it on the page, the parts on the page play until "Hear the parts I see" is unticked and a
+     speaker for each part chooses, and choices survive a reload.
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
      the teacher conducts, a student follows, and the student's music keeps up with the teacher's.
   4. The app layer: the browser can install the site, every file is saved after one visit, every song
@@ -154,7 +155,7 @@ SHOWN_JS = '() => reader.api.tracks.map(t => t.index)'
 
 
 async def parts_checks(browser, base):
-    """The Parts panel: instruments and levels to see, and each part to hear on its own."""
+    """The Parts panel: each part on the page or not, and playing or not, on its own."""
     slug = SONGS[0]['slug']
     print(f'Parts panel: {slug}')
     ctx = await browser.new_context(device_scale_factor=1)
@@ -162,33 +163,60 @@ async def parts_checks(browser, base):
     errors = []
     pg = await open_reader(ctx, f'{base}/songs/{slug}/', errors, 'parts')
     await pg.evaluate(SPY_JS)
+    speakers = "() => [...document.querySelectorAll('#mixParts .tog.hear')].filter(b => b.offsetParent).length"
     # Parts are numbered level by level (Open Strings 0-3, Easy 4-7, Melody 8-11, Harmony 12-15...), violin to bass.
+    check(await pg.is_visible('#g-parts') and not await pg.is_visible('#fabRow #g-parts'), 'Parts is a tab at the right edge, not a button in the strip')
     await pg.click('#g-parts')
-    check(await pg.is_visible('#pop-parts'), 'the Parts button opens the panel')
+    check(await pg.is_visible('#pop-parts'), 'the Parts tab opens the panel')
+    await pg.wait_for_timeout(600)
+    clear = await pg.evaluate('''() => document.getElementById('sheet').getBoundingClientRect().right
+      <= Math.min(document.getElementById('pop-parts').getBoundingClientRect().left, document.getElementById('g-parts').getBoundingClientRect().left) + 1''')
+    check(clear, 'the panel and its tab open at the right edge, with the music moved over beside them, uncovered')
     check(await pg.evaluate(SHOWN_JS) == [8], 'a first visit shows Violin, Melody')
-    await pg.click('#hear-2-1'); await pg.click('#hear-2-1')
-    check(await pg.evaluate(PLAYING_JS) == [8, 12, 13, 14, 15], 'a first visit plays the tune on violin only, and all four Harmony parts')
-    await pg.click('#see-inst-2'); await pg.click('#see-tier-3'); await pg.wait_for_timeout(1500)
-    check(await pg.evaluate(SHOWN_JS) == [8, 10, 12, 14], 'eyes on Cello and Harmony: violin and cello, Melody and Harmony, in score order')
-    await pg.click('#hear-2-1')
-    check(await pg.evaluate(PLAYING_JS) == [8, 9, 12, 13, 14, 15], 'the Viola speaker on Melody adds viola on the tune and nothing else')
-    await pg.click('#hear-3-3')
-    check(await pg.evaluate(PLAYING_JS) == [8, 9, 12, 13, 14], 'the Bass speaker on Harmony quiets the bass harmony and nothing else')
-    await pg.click('#hear-3-3')
-    check(await pg.evaluate(PLAYING_JS) == [8, 9, 12, 13, 14, 15], 'and brings it back')
-    check(await pg.evaluate("() => document.querySelectorAll('#mixInst .tog.hear').length") == 0, 'the instrument list has eyes only, no speakers')
-    await pg.click('#see-inst-0'); await pg.click('#see-inst-2'); await pg.wait_for_timeout(1500)
-    check(await pg.evaluate(SHOWN_JS) == [10, 14], 'the last instrument on the page stays on')
-    label = await pg.text_content('#partsLbl')
-    check(label == '2 parts', f'the button counts the parts on the page ("{label}")')
+    check(await pg.evaluate(speakers) == 0 and await pg.is_checked('#hearSame'), '"Hear the parts I see" starts ticked: eyes only')
+    # A violin at Open Strings reading along with a cello at Advanced Melody: those two parts and no others.
+    await pg.click('#see-4-2'); await pg.click('#see-0-0'); await pg.click('#see-2-0'); await pg.wait_for_timeout(1500)
+    check(await pg.evaluate(SHOWN_JS) == [0, 18], 'eyes on Violin Open Strings and Cello Advanced Melody show just those two, in score order')
+    check(await pg.evaluate(PLAYING_JS) == [0, 18], 'ticked, the parts on the page are the parts that play')
+    check(await pg.evaluate("() => document.querySelectorAll('#mixParts .tog.see').length") == 24, 'one eye for every part')
+    label = await pg.get_attribute('#g-parts', 'title')
+    check(label == 'Parts: 2 parts', f'the Parts tab counts the parts on the page ("{label}")')
+    await pg.click('#hearSame')
+    check(await pg.evaluate(speakers) == 24, 'unticking it shows a Hear speaker for every part')
+    check(await pg.evaluate(PLAYING_JS) == [0, 18], 'the speakers start from what was playing')
+    await pg.click('#hear-2-0'); await pg.click('#hear-0-0')
+    check(await pg.evaluate(PLAYING_JS) == [8, 18], 'its speakers choose what plays: the tune on violin, my own part left out')
+    await pg.click('#see-3-1'); await pg.wait_for_timeout(1500)
+    check(await pg.evaluate(PLAYING_JS) == [8, 18], 'unticked, a new part on the page stays quiet until its speaker is on')
+    await pg.click('#see-3-1'); await pg.wait_for_timeout(1500)
+    await pg.click('#hearSame')
+    check(await pg.evaluate(PLAYING_JS) == [0, 18] and await pg.evaluate(speakers) == 0, 'ticking it again plays the parts on the page, and the speakers fold away')
+    await pg.click('#hearSame')
+    check(await pg.evaluate(PLAYING_JS) == [8, 18], "unticking it again brings back the speakers' mix")
+    await pg.click('#see-0-0'); await pg.click('#see-4-2'); await pg.wait_for_timeout(1500)
+    check(await pg.evaluate(SHOWN_JS) == [18], 'the last part on the page stays on')
+    label = await pg.get_attribute('#g-parts', 'title')
+    check(label == 'Parts: Cello · Advanced Melody', f'the Parts tab names a single part ("{label}")')
+    await pg.click('#partsX'); await pg.wait_for_timeout(600)
+    wide = await pg.evaluate("() => document.getElementById('sheet').getBoundingClientRect().right > innerWidth - 60")
+    check(wide and not await pg.is_visible('#pop-parts'), 'closing the panel gives the music the whole width again')
+    check(await pg.evaluate(PLAYING_JS) == [8, 18], "and the speakers' mix keeps playing with the panel closed")
     await pg.reload()
     await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
     await pg.evaluate(SPY_JS)
     await pg.click('#g-parts'); await pg.click('#hear-0-0'); await pg.click('#hear-0-0')
-    check(await pg.evaluate(SHOWN_JS) == [10, 14] and await pg.evaluate(PLAYING_JS) == [8, 9, 12, 13, 14, 15], 'the choices are still there after a reload')
+    check(await pg.evaluate(SHOWN_JS) == [18] and await pg.evaluate(PLAYING_JS) == [8, 18] and await pg.evaluate(speakers) == 24,
+          'the choices, and the box unticked, are still there after a reload')
+    key = f'{slug}-reader'
+    # Settings saved when the eyes went by instrument and by level: violin and cello, Melody and Harmony.
+    await pg.evaluate(f"localStorage.setItem('{key}', JSON.stringify({{ seeInst: [0, 2], seeTier: [2, 3], heard: [8, 12] }}))")
+    await pg.reload()
+    await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
+    await pg.evaluate(SPY_JS)
+    await pg.click('#g-parts'); await pg.click('#hear-0-0'); await pg.click('#hear-0-0')
+    check(await pg.evaluate(SHOWN_JS) == [8, 10, 12, 14] and await pg.evaluate(PLAYING_JS) == [8, 12], 'settings from the instrument and level eyes carry over, with their mix')
     # Settings saved by the reader before the Parts panel: cello, Harmony, with the tune above; play along with
     # Melody, leaving my part out.
-    key = f'{slug}-reader'
     await pg.evaluate(f"localStorage.setItem('{key}', JSON.stringify({{ inst: 2, tier: 3, show: 'tune', hear: [2], muteMine: true }}))")
     await pg.reload()
     await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)

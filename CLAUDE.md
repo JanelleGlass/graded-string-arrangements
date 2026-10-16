@@ -116,15 +116,33 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
 - Every setting is always visible in a strip at the bottom, on phones too, never covering notes.
   Zoom − / + lives in that strip (0.3x to 1.75x). Phone-landscape buttons are compact so the strip
   fits one row on regular iPhones.
-- Parts: one button in the strip (named for the part on the page, or "3 parts") opens instruments on
-  the left and levels on the right, each list scrolling on its own when the screen is short. Every
-  instrument and level has an eye: the page shows each instrument with its eye open at each level
-  with its eye open, in score order (one instrument and one level always stay on). Hearing goes part
-  by part: each level has a speaker for each instrument, so the tune can play on one instrument
-  while Harmony keeps all four (that balance is the point: the tune doubled four times drowns the
-  rest). The instrument list has eyes only: Janelle had a speaker there too (on or off at every level
-  at once), then dropped it as redundant with the level speakers (2026-10-16). A first visit shows Violin Melody and plays the tune on violin plus all four Harmony parts. A
-  student following the teacher sees only the eyes. Phones show whatever the eyes say, too.
+- Parts: a little bump-out tab on the right edge of the screen, halfway down the music (a chevron
+  and "Parts", read sideways), slides a panel in from the right, from the top of the screen down to
+  the strip. There is no Parts button in the strip. The tab rides along the panel's edge while it's
+  open and closes it again (so does ×). The music keeps a strip of room for the tab and moves over
+  beside the panel (never under either) so every line of music stays in view, and the strip keeps
+  the whole width. Pointing at the tab names the part on the page, or "3 parts". Phones show short
+  level names ("Adv. melody") to keep the panel narrow. The panel holds one table: a
+  level on each row and an eye for each instrument (See), headed Vln, Vla, C, B (Janelle's
+  choice: C and B, not Vc and Cb; the staff labels keep Vc. and Cb.). Every part is on the page or not on its
+  own, so a violin at Open Strings can read with a cello at Advanced Melody. Parts show in score
+  order; one part always stays on the page. The table scrolls, fading at the bottom, when the
+  screen is short.
+- Hear: a "Hear the parts I see" checkbox under the table, ticked by default, works like "billing
+  address same as shipping". Ticked, the parts on the page are the parts that play. Unticked, a
+  Hear speaker for each part appears beside the eyes (headed "Hear") and chooses what plays, so the
+  tune can play on one instrument while Harmony keeps all four (that balance is the point: the tune
+  doubled four times drowns the rest) or a student can leave their own part out. Unticking it the
+  first time starts the speakers from what's playing; ticking it plays the parts on the page again;
+  unticking it again brings back the speakers' mix, which also keeps playing with the panel closed.
+  The heading over the eyes is always "See". A first visit shows and plays Violin Melody. A student
+  following the teacher sees only the eyes. Phones show whatever the eyes say.
+- History of Parts (2026-10-16): it began as an instrument list and a level list, each with an eye,
+  plus a speaker per instrument; Janelle dropped the instrument speakers as redundant, then the
+  instrument list, because separate eyes forced every chosen instrument at every chosen level; then
+  folded the speakers away so students see only the eyes unless they want a mix. A sideways Hear
+  tab with a "See & Hear" heading came first; she replaced it with the checkbox because eyes under
+  "See & Hear" didn't say they play sound and the tab didn't say what it did.
 - Metronome is one button that cycles Off → On → On with count-in → Count-in only.
 - Tap a note to choose where Play starts: a thin, pale ring around the note head until the music
   starts. No flag.
