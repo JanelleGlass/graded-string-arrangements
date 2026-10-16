@@ -19,8 +19,11 @@ the reader. The home-screen app file is manifest.webmanifest, with its icons in 
 
 Key, time signature, bar count and the written tempo are read from the score (key, time and
 bars can be given in songs.json too; if one disagrees with the score, the build stops so a bad
-scan or a stale entry gets noticed). The build also stops if the score doesn't have the 24 parts
-in the order the reader expects: level by level, violin-viola-cello-bass within each level.
+scan or a stale entry gets noticed). The build also stops if the score's parts aren't one of the two
+layouts the reader knows, in BUILD-SPEC order, and says which one it read:
+  six tiers, 24 parts (songs built before 2026-10-16): level by level, violin-viola-cello-bass in each
+  levels and voices, 34 parts: level by level; Melody, Inner, Bass Line in each; then violin-viola-cello-bass
+  (Inner on violin and viola only)
 
 songs.json fields
   slug        folder and file name, lowercase-with-dashes ("holy-holy-holy")
@@ -53,6 +56,7 @@ TEMPLATE = {
     'collection': 'Christmas Collection',
     'source': 'Traditional English carol',
     'key': 'D major', 'time': '3/4', 'bars': '25 bars',
+    'lede': 'Six levels for violin, viola, cello and bass.',  # About box; a 34-part song says what it has instead
     'score': 'scores/the-first-noel.xml',
     'storage': 'first-noel-reader',
     'tempo': 'const BASE_TEMPO = 100; // Andante, from bar 1 of the score',
@@ -138,21 +142,36 @@ def read_score(path):
             'part_names': names_found}
 
 
-# The reader picks parts by position: level by level (in this order), and within each level
-# violin, viola, cello, bass. A score built to BUILD-SPEC comes out this way.
-LEVELS = ['Open Strings', 'Easy', 'Melody', 'Harmony', 'Advanced Melody', 'Obbligato']
+# The reader picks parts by position, so a score's parts must be in one of its two layouts (BUILD-SPEC section 3),
+# each part named "<instrument> — <level or level and voice>". A score built to BUILD-SPEC comes out this way.
 INSTRUMENTS = ['Violin', 'Viola', 'Cello', 'Bass']
+TIERS = ['Open Strings', 'Easy', 'Melody', 'Harmony', 'Advanced Melody', 'Obbligato']
+VOICES = [(inst, 'Open Strings') for inst in INSTRUMENTS]
+for level in ['Easy ', '', 'Advanced ']:  # the Intermediate level has no word in the part names
+    VOICES += [(inst, level + 'Melody') for inst in INSTRUMENTS]
+    VOICES += [(inst, level + 'Inner') for inst in INSTRUMENTS[:2]]  # cello and bass take the bass line instead
+    VOICES += [(inst, level + 'Bass Line') for inst in INSTRUMENTS]
+LAYOUTS = {
+    'six tiers': [(inst, tier) for tier in TIERS for inst in INSTRUMENTS],  # songs built before 2026-10-16
+    'levels and voices': VOICES,
+}
+PART_NAME = re.compile(r'(Violin|Viola|Cello|Bass)\s*[—–-]\s*(.*?)(?:\s*\(pizz\.\))?$')
 
 
-def check_part_order(slug, names):
-    if len(names) != 24:
-        fail(f'{slug}: {len(names)} parts; the reader needs 24 (6 levels x 4 instruments)')
-    for i, name in enumerate(names):
-        inst, level = INSTRUMENTS[i % 4], LEVELS[i // 4]
-        if not name.startswith(inst) or level not in name:
-            fail(f'{slug}: part {i + 1} is named {name!r}; the reader expects {inst}, {level} there')
-        if level == 'Melody' and 'Advanced' in name:
-            fail(f'{slug}: part {i + 1} is named {name!r}; the reader expects {inst}, Melody there')
+def part_layout(slug, names):
+    """Which of the reader's layouts the score's parts are in. Stops the build if they're in neither."""
+    for layout, want in LAYOUTS.items():
+        if len(names) == len(want):
+            break
+    else:
+        fail(f'{slug}: {len(names)} parts; the reader needs 24 (six tiers, songs built before 2026-10-16) '
+             'or 34 (levels and voices)')
+    for i, (name, (inst, label)) in enumerate(zip(names, want)):
+        m = PART_NAME.match(name.strip())
+        if not m or m.groups() != (inst, label):
+            fail(f'{slug}: part {i + 1} is named {name!r}; the reader expects {inst} — {label} there '
+                 f'({len(want)} parts: {layout})')
+    return layout
 
 
 def replace(text, old, new, count=1):
@@ -169,10 +188,13 @@ def song_page(reader, song, facts, app, revs):
     head, body = reader[:cut], reader[cut:]
     t = TEMPLATE
     head = replace(head, f"<title>{t['title']}</title>", f"<title>{e(song['title'])}</title>")
-    head = replace(head, f"play along with {t['title']} in six levels", f"play along with {e(song['title'])} in six levels")
+    levels = 'six levels' if facts['layout'] == 'six tiers' else 'four levels'
+    head = replace(head, f"play along with {t['title']} in six levels", f"play along with {e(song['title'])} in {levels}")
     head = replace(head, '</style>', HOME_LINK_CSS + '</style>')
 
     b = body
+    b = replace(b, t['lede'], t['lede'] if facts['layout'] == 'six tiers' else
+                'Four levels for violin, viola, cello and bass, each with a melody, an inner part and a bass line.')
     b = replace(b, f">{t['title']}<span class=\"info-i\"", f">{e(song['title'])}<span class=\"info-i\"")
     b = replace(b, f"<p class=\"info-title\">{t['title']}</p>", f"<p class=\"info-title\">{e(song['title'])}</p>")
     b = replace(b, f"<p class=\"eyebrow\">{t['collection']}</p>", f"<p class=\"eyebrow\">{e(song.get('collection', ''))}</p>")
@@ -252,7 +274,7 @@ def main():
         if not score.exists():
             fail(f'{slug}: score not found at {score.relative_to(ROOT)}')
         got = read_score(score)
-        check_part_order(slug, got['part_names'])
+        got['layout'] = part_layout(slug, got['part_names'])
         for k in ('key', 'time', 'bars'):
             if k in s and str(s[k]) != str(got[k]):
                 fail(f'{slug}: songs.json says {k} = {s[k]!r} but the score says {got[k]!r}')
@@ -263,7 +285,7 @@ def main():
         offline[f'songs/{slug}/'] = fingerprint(page)
         offline[f'songs/{slug}/{slug}.xml?v={score_rev}'] = score_rev
         print(f"  {slug}: {facts[slug]['key']}, {facts[slug]['time']}, {facts[slug]['bars']} bars, "
-              f"quarter = {got['tempo']}, {got['parts']} parts{', Buy link' if s.get('pdf_url') else ''}")
+              f"quarter = {got['tempo']}, {got['parts']} parts ({got['layout']}){', Buy link' if s.get('pdf_url') else ''}")
         if not got['tempo_marked']:
             print(f'  note: {slug} has no tempo mark in the score, so it plays at quarter = 120')
         if len(set(got['tempos'])) > 1:

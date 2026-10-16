@@ -341,6 +341,15 @@ html.small #tierNote { display: none; }
 .lvl-same:empty { display: none; }
 html.small .mix-name { line-height: 1.1; }
 html.small .lvl-same { margin-top: 0; font-size: 0.58rem; }
+/* Levels and voices (34 parts): the group rule in one quiet line at the top of the table (it wraps to the table's
+   width rather than widening it, and scrolls away under the headings), a hairline between levels, and the cello and
+   bass Inner cells greyed out in their places (a tap says why) */
+.group-rule { grid-column: 1 / -1; contain: inline-size; padding-bottom: 4px; font-size: 0.78rem; line-height: 1.3; color: var(--muted); }
+html.small .group-rule { padding-bottom: 2px; font-size: 0.7rem; }
+.mix-div { grid-column: 1 / -1; height: 1px; background: var(--line); }
+.mix-list.voices .mix-h { box-shadow: 6px 0 0 var(--panel); } /* the headings cover the gaps between them, which the hairlines and the rule scroll under */
+.tog.none { opacity: 0.42; border-style: dashed; cursor: default; }
+.tog.none:hover { border-color: var(--line); }
 .tempo-big { font-family: var(--font-display); font-size: 2.1rem; font-weight: 600; line-height: 1; text-align: center; font-variant-numeric: tabular-nums; }
 .qn { width: 0.42em; height: 1em; fill: currentColor; vertical-align: -0.12em; }
 .fab-btn svg.qn { width: 9px; height: 21px; }
@@ -574,18 +583,48 @@ body.following .host-only { display: none !important; }
   const SPEED_BASE = TEMPO_PERCENT ? 100 : BASE_TEMPO; // the tempo control's value at the written tempo
 
   const INSTRUMENTS = ['Violin', 'Viola', 'Cello', 'Bass'];
+  // The rows of the Parts table, in score order. Each row has a part for each of its instruments (insts), and the
+  // score's parts go row by row, violin to bass within a row. Which layout a song has is read from its part names.
+  // Songs built before 2026-10-16 have six levels, each on all four instruments (24 parts):
   const TIERS = [
-    { name: 'Open Strings', note: 'Plucked open strings, one on each new chord. No fingers needed.' },
-    { name: 'Easy', note: 'The tune with the quick notes folded in, so it moves in quarter notes and longer.' },
-    { name: 'Melody', note: 'The tune as written. Cello and bass play it lower.' },
-    { name: 'Harmony', note: 'Chord tones under the tune, a different line for each instrument. Cello and bass carry the bass line.' },
-    { name: 'Advanced Melody', note: 'The tune as a variation in eighth notes. Goes into third position. Suzuki Book 3–4 level.' },
-    { name: 'Obbligato', note: 'Its own line for each instrument: a descant, a countermelody, broken chords. Suzuki Book 3–4 level.' },
+    { name: 'Open Strings', short: 'Open str.', note: 'Plucked open strings, one on each new chord. No fingers needed.' },
+    { name: 'Easy', short: 'Easy', note: 'The tune with the quick notes folded in, so it moves in quarter notes and longer.' },
+    { name: 'Melody', short: 'Melody', note: 'The tune as written. Cello and bass play it lower.' },
+    { name: 'Harmony', short: 'Harmony', note: 'Chord tones under the tune, a different line for each instrument. Cello and bass carry the bass line.' },
+    { name: 'Advanced Melody', short: 'Adv. melody', note: 'The tune as a variation in eighth notes. Goes into third position. Suzuki Book 3–4 level.' },
+    { name: 'Obbligato', short: 'Obbligato', note: 'Its own line for each instrument: a descant, a countermelody, broken chords. Suzuki Book 3–4 level.' },
   ];
+  // Newer songs have levels and voices (34 parts), so any duet or trio has a bass: one player on a Melody, the lowest
+  // on a Bass Line, any other violins and violas on Inner. Cello and bass have no Inner part. A row that starts a
+  // level has a hairline above it. old: the row of the six levels that a part here was in before (a choice saved with
+  // the six levels carries over, and back).
+  const B1 = 'Twinkle to Andantino notes (Suzuki Book 1).', B34 = 'Suzuki Book 3–4 level.';
+  const VOICES = [
+    { name: 'Open Strings', short: 'Open str.', old: 0, note: 'Plucked open strings, one on each new chord. No fingers needed. Works as the bass in any group.' },
+    { name: 'Easy Melody', short: 'Easy melody', old: 1, level: true, note: 'The tune with the quick notes folded in. ' + B1 },
+    { name: 'Easy Inner', short: 'Easy inner', old: 1, insts: [0, 1], note: 'Long chord tones between the tune and the bass, changing with the chord. ' + B1 },
+    { name: 'Easy Bass Line', short: 'Easy bass line', old: 1, note: 'The hymn’s bass notes, long and low. ' + B1 },
+    { name: 'Melody', short: 'Melody', old: 2, level: true, note: 'The tune as written. Cello and bass play it lower.' },
+    { name: 'Inner', short: 'Inner', old: 3, insts: [0, 1], note: 'Chord tones between the tune and the bass line, filling in the chord.' },
+    { name: 'Bass Line', short: 'Bass line', old: 3, note: 'The hymn’s bass line. Violin and viola play it in their own range.' },
+    { name: 'Advanced Melody', short: 'Adv. melody', old: 4, level: true, note: 'The tune as a variation in eighth notes. Goes into third position. ' + B34 },
+    { name: 'Advanced Inner', short: 'Adv. inner', old: 5, insts: [0, 1], note: 'A descant on violin, a countermelody on viola. ' + B34 },
+    { name: 'Advanced Bass Line', short: 'Adv. bass line', old: 5, note: 'The hymn’s bass on every beat, with broken chords and runs. ' + B34 },
+  ];
+  const LAYOUTS = { tiers: TIERS, voices: VOICES };
+  let layout, ROWS, PARTS; // the song's layout, its rows, and for each part (by number) its row and instrument
+  function useLayout(id) {
+    layout = id; ROWS = LAYOUTS[id]; PARTS = [];
+    for (const [r, row] of ROWS.entries()) row.cells = INSTRUMENTS.map((_, i) => (row.insts || [0, 1, 2, 3]).includes(i) ? PARTS.push({ row: r, inst: i }) - 1 : null);
+  }
+  // The layout whose part names ("Viola — Easy Inner") the score has, in order; the six levels if neither.
+  const layoutOf = (names) => Object.keys(LAYOUTS).find(id => {
+    const want = LAYOUTS[id].flatMap(row => (row.insts || [0, 1, 2, 3]).map(i => INSTRUMENTS[i] + ' — ' + row.name));
+    return want.length === names.length && want.every((w, k) => names[k].replace(/\s*\(pizz\.\)\s*$/, '').replace(/\s*[—–-]\s*/, ' — ').trim() === w);
+  }) || 'tiers';
   const MELODY = 2;
   // Short instrument names, on the staff labels and over the Parts table alike (Janelle's choice: C and B).
   const SHORT = { Violin: 'Vln', Viola: 'Vla', Cello: 'C', Bass: 'B' };
-  const TIER_SHORT = ['Open str.', 'Easy', 'Melody', 'Harmony', 'Adv. melody', 'Obbligato'];
   // String colours and finger numbers can each be on every note, only the first time a note appears, or off.
   const MARK_MODES = [
     { id: 'all', label: 'Every note' },
@@ -624,10 +663,15 @@ body.following .host-only { display: none !important; }
     document.addEventListener('pointerdown', (e) => { if (!pop.hidden && !pop.contains(e.target) && !btn.contains(e.target)) show(false); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !pop.hidden) { show(false); btn.focus(); } });
   })();
-  // Parts on the page and parts that play: each one on its own (part number = level × 4 + instrument), so a violin at
-  // Open Strings can read along with a cello at Advanced Melody, and the tune can play on one instrument while the
-  // harmony keeps all four.
-  const trackIndex = (tier, inst) => tier * 4 + inst;
+  // Parts on the page and parts that play: each one on its own (numbered in score order), so a violin at Open Strings
+  // can read along with a cello at Advanced Melody, and the tune can play on one instrument while the harmony keeps
+  // all four. Saved choices are numbered in the layout they were made in (saved.parts: the six levels for anything
+  // saved before there were two); once the score says which layout the song has, they move over (switchLayout).
+  useLayout(saved.parts === 'voices' ? 'voices' : 'tiers');
+  const trackIndex = (row, inst) => ROWS[row].cells[inst];
+  const rowOf = (ti) => PARTS[ti]?.row ?? -1;
+  const instOf = (ti) => PARTS[ti]?.inst ?? 0;
+  const firstVisit = () => [trackIndex(ROWS.findIndex(r => r.name === 'Melody'), 0)]; // Violin, Melody
   const indexList = (v, n) => Array.isArray(v) ? [...new Set(v.filter(x => Number.isInteger(x) && x >= 0 && x < n))].sort((a, b) => a - b) : null;
   // Settings saved before every part had its own eye: an eye per instrument and per level (every instrument chosen
   // at every level chosen); before that, one instrument and level, maybe with the tune above or all four
@@ -642,7 +686,7 @@ body.following .host-only { display: none !important; }
     }
     return tiers.flatMap(t => insts.map(i => trackIndex(t, i)));
   }
-  const seen = indexList(saved.seen, 24);
+  const seen = indexList(saved.seen, PARTS.length);
   function oldHeard() {
     if (!Array.isArray(saved.hear)) return null;
     const set = new Set();
@@ -651,9 +695,9 @@ body.following .host-only { display: none !important; }
     return [...set].sort((a, b) => a - b);
   }
   const state = {
-    seen: seen && seen.length ? seen : oldSeen(),
+    seen: seen && seen.length ? seen : layout === 'tiers' ? oldSeen() : firstVisit(),
     // What plays when Hear is open: the mix chosen there, kept while Hear is closed (none until it's first opened).
-    heard: indexList(saved.heard, 24) || oldHeard(),
+    heard: indexList(saved.heard, PARTS.length) || (layout === 'tiers' ? oldHeard() : null),
     colorMode: MARK_MODES.some(m => m.id === saved.colorMode) ? saved.colorMode : saved.colors === false ? 'off' : 'all',
     // Finger numbers and note names are on (every note) or off; "first time only", saved before, counts as on.
     fingerMode: saved.fingerMode === 'off' || (!saved.fingerMode && saved.colors === false) ? 'off' : 'all',
@@ -699,7 +743,7 @@ body.following .host-only { display: none !important; }
   const letterKey = () => (document.documentElement.classList.contains('small') ? 'letterMode' : 'letterModeBig');
   const lettersOn = () => state[letterKey()] !== 'off';
   const fingerSpot = () => (lettersOn() ? 'right' : state.fingers);
-  const save = () => store.set({ zoom: state.zoom, seen: state.seen, heard: state.heard, hearOpen: state.hearOpen, colorMode: state.colorMode, fingerMode: state.fingerMode, tempo: state.tempo, follow: state.follow, countBy: state.unit, fingers: state.fingers, counts: state.countAlong ? 'on' : 'off', layout: state.layout, letterMode: state.letterMode, lettersBig: state.letterModeBig, metro: state.metro });
+  const save = () => store.set({ zoom: state.zoom, parts: layout, seen: state.seen, heard: state.heard, hearOpen: state.hearOpen, colorMode: state.colorMode, fingerMode: state.fingerMode, tempo: state.tempo, follow: state.follow, countBy: state.unit, fingers: state.fingers, counts: state.countAlong ? 'on' : 'off', layout: state.layout, letterMode: state.letterMode, lettersBig: state.letterModeBig, metro: state.metro });
 
   // ---- Room reverb ----
   // alphaTab plays through Web Audio; route whatever it sends to the speakers through a small reverb bus.
@@ -748,7 +792,7 @@ body.following .host-only { display: none !important; }
   function renderKey() {
     const key = $('legend');
     key.hidden = state.colorMode === 'off';
-    const insts = [...new Set(state.seen.map(ti => ti % 4))];
+    const insts = [...new Set(state.seen.map(instOf))];
     const strings = insts.length === 1 ? STRINGS_OF[insts[0]] : ['E', 'A', 'D', 'G', 'C'].filter(n => insts.some(i => STRINGS_OF[i].includes(n)));
     key.replaceChildren();
     const lbl = document.createElement('span');
@@ -862,14 +906,14 @@ body.following .host-only { display: none !important; }
     toast(state.layout === 'line' ? 'Music: one long line' : 'Music: pages');
   });
   // ---- Parts: what is on the page, and what plays ----
-  // A level on each row, with an eye and a speaker for each instrument: every part is on the page or not, and plays
-  // or not, on its own.
+  // A level (or a level and voice) on each row, with an eye and a speaker for each instrument: every part is on the
+  // page or not, and plays or not, on its own.
   const EYE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>';
   const EYE_OFF = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>';
   const SPEAKER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>';
   const SPEAKER_OFF = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>';
   const INST_ABBR = INSTRUMENTS.map(n => SHORT[n]);
-  let noteTier = null; // the level whose description shows under the table: the last one touched
+  let noteTier = null; // the row whose description shows under the table: the last one touched
   function mixCell(list, cls, text, host) {
     const el = document.createElement('span');
     el.className = cls + (host ? ' host-only' : ''); el.textContent = text;
@@ -882,24 +926,53 @@ body.following .host-only { display: none !important; }
     b.setAttribute('aria-label', label); b.title = label;
     b.addEventListener('click', onClick);
     list.append(b);
+    return b;
+  }
+  // A part the song doesn't have (cello and bass have no Inner part): greyed out in its place, and a tap says why.
+  function mixNone(list, kind, r, i) {
+    const why = 'No ' + ROWS[r].name + ' part for ' + INSTRUMENTS[i].toLowerCase() + ': cellos and basses play a Bass Line or a Melody';
+    const b = mixTog(list, kind, kind + '-' + r + '-' + i, why, () => toast(why, 2600));
+    b.classList.add('none'); b.setAttribute('aria-disabled', 'true');
+    b.innerHTML = kind === 'see' ? EYE_OFF : SPEAKER_OFF;
   }
   function buildMix() {
     const list = $('mixParts');
-    mixCell(list, 'mix-h lvl', 'Level'); mixCell(list, 'mix-h grp', 'See');
+    list.replaceChildren();
+    list.classList.toggle('voices', layout === 'voices');
+    // Levels and voices: the group rule over the table. It scrolls away with the rows, so a short screen gets the room back.
+    if (layout === 'voices') mixCell(list, 'group-rule', 'One player on Melody, the lowest player on Bass Line, everyone else on Inner');
+    mixCell(list, 'mix-h lvl', layout === 'tiers' ? 'Level' : 'Level & voice'); mixCell(list, 'mix-h grp', 'See');
     mixCell(list, 'mix-h hcol', '', true); mixCell(list, 'mix-h grp hcol', 'Hear', true);
     INST_ABBR.forEach((a) => mixCell(list, 'mix-h ab', a));
     mixCell(list, 'mix-h ab hcol', '', true);
     INST_ABBR.forEach((a) => mixCell(list, 'mix-h ab hcol', a, true));
-    TIERS.forEach((t, ti) => {
+    ROWS.forEach((row, r) => {
+      if (row.level && r) mixCell(list, 'mix-div', '').setAttribute('aria-hidden', 'true'); // a hairline between levels
       const name = mixCell(list, 'mix-name', '');
-      name.title = t.note;
+      name.title = row.note;
       name.innerHTML = '<span class="lvl-long"></span><span class="lvl-short"></span><span class="lvl-same"></span>';
-      name.children[0].textContent = t.name; name.children[1].textContent = TIER_SHORT[ti];
-      name.children[2].id = 'same-' + ti;
-      INSTRUMENTS.forEach((name, i) => mixTog(list, 'see', 'see-' + ti + '-' + i, 'See ' + name + ', ' + t.name, () => { noteTier = ti; toggleSee(trackIndex(ti, i)); }));
+      name.children[0].textContent = row.name; name.children[1].textContent = row.short;
+      name.children[2].id = 'same-' + r;
+      row.cells.forEach((ti, i) => ti == null ? mixNone(list, 'see', r, i)
+        : mixTog(list, 'see', 'see-' + r + '-' + i, 'See ' + INSTRUMENTS[i] + ', ' + row.name, () => { noteTier = r; toggleSee(ti); }));
       mixCell(list, 'mix-gap hcol', '', true);
-      INSTRUMENTS.forEach((name, i) => mixTog(list, 'hear', 'hear-' + ti + '-' + i, 'Hear ' + name + ', ' + t.name, () => { noteTier = ti; hearPart(trackIndex(ti, i)); }));
+      row.cells.forEach((ti, i) => ti == null ? mixNone(list, 'hear', r, i)
+        : mixTog(list, 'hear', 'hear-' + r + '-' + i, 'Hear ' + INSTRUMENTS[i] + ', ' + row.name, () => { noteTier = r; hearPart(ti); }));
     });
+  }
+  // The score's parts are in the other layout than the saved choices: each choice moves to its match (Harmony to Inner
+  // on violin and viola and to Bass Line on cello and bass, Obbligato to the Advanced ones, Easy to Easy Melody; and
+  // back again).
+  function switchLayout(id) {
+    const was = PARTS.map(p => ({ inst: p.inst, old: layout === 'voices' ? VOICES[p.row].old : p.row }));
+    useLayout(id);
+    const match = ({ inst, old }) => id === 'tiers' ? trackIndex(old, inst) : PARTS.findIndex(p => p.inst === inst && ROWS[p.row].old === old);
+    const move = (list) => list && [...new Set(list.map(ti => match(was[ti])))].filter(ti => ti >= 0).sort((a, b) => a - b);
+    state.seen = move(state.seen);
+    if (!state.seen.length) state.seen = firstVisit();
+    state.heard = move(state.heard);
+    noteTier = null;
+    buildMix();
   }
   // Which parts at each level play the same notes, from the score: the same rhythm and the same note names (so the
   // tune an octave lower counts). A line under the level's name says so, and pointing at a part names its match.
@@ -908,10 +981,10 @@ body.following .host-only { display: none !important; }
     const tune = (track) => track.staves[0].bars.flatMap((bar, bi) => bar.voices[0].beats.filter(b => !b.isRest)
       .map(b => (score.masterBars[bi].start + b.playbackStart) + ':' + b.playbackDuration + ':'
         + b.notes.map(n => ((n.realValue % 12) + 12) % 12).sort((x, y) => x - y).join('.'))).join(',');
-    TIERS.forEach((_, t) => {
+    ROWS.forEach((row, t) => {
       const groups = new Map();
-      INSTRUMENTS.forEach((_, i) => {
-        const k = tune(score.tracks[trackIndex(t, i)]);
+      row.cells.forEach((ti, i) => {
+        const k = ti != null && score.tracks[ti] && tune(score.tracks[ti]);
         if (k) { if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); }
       });
       const same = [...groups.values()].filter(g => g.length > 1);
@@ -957,17 +1030,18 @@ body.following .host-only { display: none !important; }
       b.innerHTML = b.classList.contains('see') ? (on ? EYE : EYE_OFF) : (on ? SPEAKER : SPEAKER_OFF);
     };
     const seen = new Set(state.seen);
-    TIERS.forEach((_, t) => INSTRUMENTS.forEach((_, i) => {
-      set('see-' + t + '-' + i, seen.has(trackIndex(t, i)));
-      set('hear-' + t + '-' + i, heard.has(trackIndex(t, i)));
+    ROWS.forEach((row, t) => row.cells.forEach((ti, i) => {
+      if (ti == null) return;
+      set('see-' + t + '-' + i, seen.has(ti));
+      set('hear-' + t + '-' + i, heard.has(ti));
     }));
-    const nt = noteTier ?? Math.floor(state.seen[0] / 4);
+    const nt = noteTier ?? rowOf(state.seen[0]);
     $('tierNote').innerHTML = '';
-    const b = document.createElement('b'); b.textContent = TIERS[nt].name + ':';
-    $('tierNote').append(b, ' ' + TIERS[nt].note);
+    const b = document.createElement('b'); b.textContent = ROWS[nt].name + ':';
+    $('tierNote').append(b, ' ' + ROWS[nt].note);
     // The tab's name (read out, and shown on pointing at it) says the part on the page, or counts them.
     const idx = shownIndexes();
-    const on = idx.length === 1 ? INSTRUMENTS[idx[0] % 4] + ' · ' + TIERS[Math.floor(idx[0] / 4)].name : idx.length + ' parts';
+    const on = idx.length === 1 ? INSTRUMENTS[instOf(idx[0])] + ' · ' + ROWS[rowOf(idx[0])].name : idx.length + ' parts';
     $('g-parts').setAttribute('aria-label', 'Parts to see and hear: ' + on + ' on the page');
     $('g-parts').title = 'Parts: ' + on;
   }
@@ -1162,7 +1236,7 @@ body.following .host-only { display: none !important; }
   }
 
   // Open Strings (pizzicato) parts are all open strings, so they show no finger numbers.
-  const hasFingers = (ti) => Math.floor(ti / 4) !== 0;
+  const hasFingers = (ti) => rowOf(ti) !== 0;
   const fingersShown = () => shownIndexes().some(hasFingers);
   function applyMarks() {
     score.tracks.forEach((track, ti) => {
@@ -1308,9 +1382,9 @@ body.following .host-only { display: none !important; }
 
   function labelStaves(idx) {
     // Label each staff with whatever tells the shown staves apart: the instrument, the level, or both.
-    const insts = new Set(idx.map(i => i % 4)), tiers = new Set(idx.map(i => Math.floor(i / 4)));
+    const insts = new Set(idx.map(instOf)), tiers = new Set(idx.map(rowOf));
     score.tracks.forEach((t, i) => {
-      const inst = SHORT[INSTRUMENTS[i % 4]], tier = TIER_SHORT[Math.floor(i / 4)];
+      const inst = SHORT[INSTRUMENTS[instOf(i)]], tier = ROWS[rowOf(i)]?.short ?? '';
       const name = tiers.size > 1 && insts.size > 1 ? inst + ' ' + tier : tiers.size > 1 ? tier : inst;
       t.shortName = name; t.name = name;
     });
@@ -1968,7 +2042,7 @@ body.following .host-only { display: none !important; }
   function fillClef(tip, kind, ti) {
     const [name, sub, text] = CLEFS[kind] || ['Clef', '', 'It tells you which line is which note.'];
     tip.append(tipHead({ treble: '𝄞', alto: '𝄡', tenor: '𝄡', bass: '𝄢' }[kind] || '𝄞', name, sub), para(text));
-    if (kind === 'bass' && ti != null && ti % 4 === 3) tip.append(para('The double bass sounds an octave lower than it is written.', 'sym-note'));
+    if (kind === 'bass' && ti != null && instOf(ti) === 3) tip.append(para('The double bass sounds an octave lower than it is written.', 'sym-note'));
   }
   const MAJOR = { '-7': 'C♭', '-6': 'G♭', '-5': 'D♭', '-4': 'A♭', '-3': 'E♭', '-2': 'B♭', '-1': 'F', 0: 'C', 1: 'G', 2: 'D', 3: 'A', 4: 'E', 5: 'B', 6: 'F♯', 7: 'C♯' };
   const MINOR = { '-7': 'A♭', '-6': 'E♭', '-5': 'B♭', '-4': 'F', '-3': 'C', '-2': 'G', '-1': 'D', 0: 'A', 1: 'E', 2: 'B', 3: 'F♯', 4: 'C♯', 5: 'G♯', 6: 'D♯', 7: 'A♯' };
@@ -3109,6 +3183,9 @@ body.following .host-only { display: none !important; }
     const xmlDoc = new DOMParser().parseFromString(new TextDecoder().decode(xmlBuf), 'application/xml');
     marks = readMarks(xmlDoc);
     words = readWords(xmlDoc);
+    // The six levels (24 parts) or levels and voices (34), from the part names; the Parts table follows.
+    const found = layoutOf([...xmlDoc.querySelectorAll('part-list > score-part')].map(p => p.querySelector('part-name')?.textContent.trim() || ''));
+    if (found !== layout) { switchLayout(found); buildControls(); }
 
     const s = new alphaTab.Settings();
     s.core.useWorkers = false;

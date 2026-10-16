@@ -18,6 +18,11 @@ What it checks
      The Parts panel: the music runs a little under a tab at the right edge, which pulls the panel out over it, each part's eye
      puts it on the page, the parts on the page play until "Hear the parts I see" is unticked and a
      speaker for each part chooses, and choices survive a reload.
+     Songs in levels and voices (34 parts): a row for each level and voice, the cello and bass Inner
+     cells greyed out in place (a tap says why), the group rule over the table, and choices saved with
+     the six levels moving to their match. Run on the first 34-part song in songs.json; until there is
+     one, give a 34-part score to try it on in place of the first song's:
+         VOICES_SCORE="../Christmas Collection/The First Noel/The-First-Noel.xml" python tests/smoke.py
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
      the teacher conducts, a student follows, and the student's music keeps up with the teacher's.
   4. The app layer: the browser can install the site, every file is saved after one visit, every song
@@ -36,6 +41,7 @@ from playwright.async_api import async_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
 SONGS = json.loads((ROOT / 'songs.json').read_text(encoding='utf-8'))
+PARTS = {s['slug']: (ROOT / 'songs' / s['slug'] / f"{s['slug']}.xml").read_text(encoding='utf-8').count('<score-part ') for s in SONGS}
 PREVIEW_HEAD = ('<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1">'
                 '<style>body{margin:0;padding:0}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>'
                 '</head><body>\n')
@@ -223,19 +229,22 @@ async def song_checks(browser, base):
             await ctx.close()
 
 
-# Listen in on what the reader tells the player to mute. Every change sends all 24 parts, muted or not.
+# Listen in on what the reader tells the player to mute. Every change sends all the parts, muted or not.
 SPY_JS = '''() => {
   window.__muted = new Set();
   const api = reader.api, orig = api.changeTrackMute.bind(api);
   api.changeTrackMute = (tracks, m) => { tracks.forEach(t => m ? __muted.add(t.index) : __muted.delete(t.index)); return orig(tracks, m); };
 }'''
-PLAYING_JS = '() => [...Array(24).keys()].filter(i => !__muted.has(i))'
+PLAYING_JS = '() => [...Array(reader.api.score.tracks.length).keys()].filter(i => !__muted.has(i))'
 SHOWN_JS = '() => reader.api.tracks.map(t => t.index)'
 
 
 async def parts_checks(browser, base):
-    """The Parts panel: each part on the page or not, and playing or not, on its own."""
-    slug = SONGS[0]['slug']
+    """The Parts panel: each part on the page or not, and playing or not, on its own (a song in the six levels)."""
+    slug = next((s['slug'] for s in SONGS if PARTS[s['slug']] == 24), None)
+    if not slug:
+        print('Parts panel: no 24-part song, skipped')
+        return
     print(f'Parts panel: {slug}')
     ctx = await browser.new_context(device_scale_factor=1)
     await setup(ctx)
@@ -265,12 +274,15 @@ async def parts_checks(browser, base):
     check(await pg.evaluate("() => document.querySelectorAll('#mixParts .tog.see').length") == 24, 'one eye for every part')
     # In The First Noel: Open Strings has violin with bass and viola with cello; Easy, Melody and Advanced Melody
     # have all four on the tune; Harmony and Obbligato give each instrument its own line.
-    same = await pg.evaluate("() => [0, 1, 2, 3, 4, 5].map(t => document.getElementById('same-' + t).textContent)")
-    check(same == ['violin & bass have the same notes\nviola & cello have the same notes', 'all parts have the same notes',
-                   'all parts have the same notes', '', 'all parts have the same notes', ''],
-          f'a line under each level name says which parts play the same notes ({same})')
-    said = await pg.get_attribute('#see-0-0', 'title')
-    check(said.endswith('(same notes as Bass)'), f'pointing at a part names its match ("{said}")')
+    if slug == 'the-first-noel':
+        same = await pg.evaluate("() => [0, 1, 2, 3, 4, 5].map(t => document.getElementById('same-' + t).textContent)")
+        check(same == ['violin & bass have the same notes\nviola & cello have the same notes', 'all parts have the same notes',
+                       'all parts have the same notes', '', 'all parts have the same notes', ''],
+              f'a line under each level name says which parts play the same notes ({same})')
+        said = await pg.get_attribute('#see-0-0', 'title')
+        check(said.endswith('(same notes as Bass)'), f'pointing at a part names its match ("{said}")')
+    check(not await pg.is_visible('#mixParts .group-rule') and await pg.evaluate("() => document.querySelectorAll('#mixParts .tog.none, #mixParts .mix-div').length") == 0,
+          'the six levels: no group rule, no greyed-out cells, no lines between levels')
     label = await pg.get_attribute('#g-parts', 'title')
     check(label == 'Parts: 2 parts', f'the Parts tab counts the parts on the page ("{label}")')
     await pg.click('#hearSame')
@@ -316,6 +328,76 @@ async def parts_checks(browser, base):
     check(await pg.evaluate(SHOWN_JS) == [10, 14] and await pg.evaluate(PLAYING_JS) == [8, 9, 10, 11], 'older saved settings carry over')
     check(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
     await ctx.close()
+
+
+VOICE_ROWS = ['Open Strings', 'Easy Melody', 'Easy Inner', 'Easy Bass Line', 'Melody', 'Inner', 'Bass Line',
+              'Advanced Melody', 'Advanced Inner', 'Advanced Bass Line']
+
+
+async def voices_checks(browser, base):
+    """The Parts panel for a song in levels and voices (34 parts)."""
+    slug = next((s['slug'] for s in SONGS if PARTS[s['slug']] == 34), None)
+    stand_in = os.environ.get('VOICES_SCORE')
+    if not slug and not stand_in:
+        print('Parts panel, levels and voices: no 34-part song, skipped (VOICES_SCORE=<34-part xml> tries one)')
+        return
+    if not slug:
+        slug = SONGS[0]['slug']
+        print(f'Parts panel, levels and voices: {Path(stand_in).name} in place of {slug}')
+    else:
+        print(f'Parts panel, levels and voices: {slug}')
+    key = f'{slug}-reader'
+    for label, w, h in [('laptop', 1366, 860), ('phone landscape', 844, 390)]:
+        # No offline copy here, so a stand-in score can't be answered from it.
+        ctx = await browser.new_context(device_scale_factor=1, service_workers='block')
+        await setup(ctx)
+        if stand_in and PARTS[slug] != 34:
+            await ctx.route(f'**/songs/{slug}/{slug}.xml*', lambda r: r.fulfill(path=stand_in, content_type='application/xml'))
+        errors = []
+        pg = await open_reader(ctx, f'{base}/songs/{slug}/', errors, 'voices', w, h)
+        await pg.evaluate(SPY_JS)
+        await pg.click('#g-parts'); await pg.wait_for_timeout(600)
+        names = await pg.evaluate("() => [...document.querySelectorAll('#mixParts .mix-name')].map(n => [...n.children].find(c => c.offsetParent && !c.classList.contains('lvl-same')).textContent)")
+        if label == 'laptop':
+            check(names == VOICE_ROWS, f'{label}: a row for each level and voice ({names})')
+        else:
+            check(len(names) == 10 and names[0] == 'Open str.' and names[-1] == 'Adv. bass line', f'{label}: short names on a phone ({names})')
+        greyed = await pg.evaluate("() => [...document.querySelectorAll('#mixParts .tog.see.none')].filter(b => b.offsetParent && b.getAttribute('aria-disabled') === 'true').map(b => b.id)")
+        check(greyed == ['see-2-2', 'see-2-3', 'see-5-2', 'see-5-3', 'see-8-2', 'see-8-3'], f'{label}: cello and bass Inner cells greyed out in their places ({greyed})')
+        check(await pg.evaluate("() => document.querySelectorAll('#mixParts .tog.see:not(.none)').length") == 34, f'{label}: one eye for every part')
+        rule = (await pg.text_content('#mixParts .group-rule') or '').strip()
+        check(await pg.is_visible('#mixParts .group-rule') and rule.startswith('One player on Melody'), f'{label}: the group rule shows over the table ("{rule}")')
+        wide = await pg.evaluate('() => document.documentElement.scrollWidth - window.innerWidth')
+        check(wide <= 1, f'{label}: no sideways scrolling ({wide}px extra)')
+        if label != 'laptop':
+            check(not errors, f'{label}: no script errors' + (f': {errors[:3]}' if errors else ''))
+            await ctx.close()
+            continue
+        check(await pg.evaluate(SHOWN_JS) == [14] and await pg.get_attribute('#g-parts', 'title') == 'Parts: Violin · Melody', 'a first visit shows Violin, Melody')
+        await pg.click('#see-5-2', force=True); await pg.wait_for_timeout(300)
+        said = await pg.text_content('#toast')
+        check(said.startswith('No Inner part for cello') and await pg.evaluate(SHOWN_JS) == [14], f'a tap on a greyed-out cell says why and changes nothing ("{said}")')
+        # An Easy trio: the tune on violin, viola inside, cello on the bass.
+        await pg.click('#see-1-0'); await pg.click('#see-2-1'); await pg.click('#see-3-2'); await pg.click('#see-4-0'); await pg.wait_for_timeout(1500)
+        check(await pg.evaluate(SHOWN_JS) == [4, 9, 12] and await pg.evaluate(PLAYING_JS) == [4, 9, 12], 'eyes on Violin Easy Melody, Viola Easy Inner and Cello Easy Bass Line show and play those three')
+        staves = await pg.evaluate('() => reader.api.tracks.map(t => t.name)')
+        check(staves == ['Vln Easy melody', 'Vla Easy inner', 'C Easy bass line'], f'the staves are labelled with the short names ({staves})')
+        await pg.click('#hearSame')
+        speakers = await pg.evaluate("() => [...document.querySelectorAll('#mixParts .tog.hear')].filter(b => b.offsetParent).map(b => b.classList.contains('none'))")
+        check(speakers.count(False) == 34 and speakers.count(True) == 6, 'unticking "Hear the parts I see" shows a speaker for every part, greyed out where there is no part')
+        await pg.reload()
+        await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
+        check(await pg.evaluate(SHOWN_JS) == [4, 9, 12], 'the choices are still there after a reload')
+        # Saved with the six levels: violin Melody and cello Harmony on the page, violin Melody and Harmony playing.
+        await pg.evaluate(f"localStorage.setItem('{key}', JSON.stringify({{ seen: [8, 14], heard: [8, 12], hearOpen: true }}))")
+        await pg.reload()
+        await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
+        await pg.evaluate(SPY_JS)
+        await pg.click('#g-parts'); await pg.click('#hear-0-0'); await pg.click('#hear-0-0')
+        check(await pg.evaluate(SHOWN_JS) == [14, 22] and await pg.evaluate(PLAYING_JS) == [14, 18],
+              'choices saved with the six levels move over (cello Harmony to Bass Line, violin Harmony to Inner)')
+        check(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
+        await ctx.close()
 
 
 async def home_checks(browser, base):
@@ -488,6 +570,7 @@ async def main():
         await home_checks(browser, base)
         await song_checks(browser, base)
         await parts_checks(browser, base)
+        await voices_checks(browser, base)
         await preview_checks(browser, base)
         await app_checks(browser)
         await browser.close()
