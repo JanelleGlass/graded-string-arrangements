@@ -122,8 +122,8 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   with its eye open, in score order (one instrument and one level always stay on). Hearing goes part
   by part: each level has a speaker for each instrument, so the tune can play on one instrument
   while Harmony keeps all four (that balance is the point: the tune doubled four times drowns the
-  rest). The speaker beside an instrument quiets it at every level and brings it back where it was.
-  A first visit shows Violin Melody and plays the tune on violin plus all four Harmony parts. A
+  rest). The instrument list has eyes only: Janelle had a speaker there too (on or off at every level
+  at once), then dropped it as redundant with the level speakers (2026-10-16). A first visit shows Violin Melody and plays the tune on violin plus all four Harmony parts. A
   student following the teacher sees only the eyes. Phones show whatever the eyes say, too.
 - Metronome is one button that cycles Off → On → On with count-in → Count-in only.
 - Tap a note to choose where Play starts: a thin, pale ring around the note head until the music

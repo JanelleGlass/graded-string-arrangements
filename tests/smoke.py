@@ -13,8 +13,8 @@ What it checks
      notes are drawn, Play moves the music forward, nothing scrolls sideways, no script errors.
      Laptop: the Full screen button goes in and out of full screen. Phone (acting like an iPhone,
      which doesn't allow it): no Full screen button.
-     The Parts panel: the eyes choose what is on the page, each speaker plays one part, an instrument's
-     own speaker quiets it everywhere and brings it back, and choices survive a reload.
+     The Parts panel: the eyes choose what is on the page, each speaker plays one part, and choices
+     survive a reload.
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
      the teacher conducts, a student follows, and the student's music keeps up with the teacher's.
   4. The app layer: the browser can install the site, every file is saved after one visit, every song
@@ -172,10 +172,11 @@ async def parts_checks(browser, base):
     check(await pg.evaluate(SHOWN_JS) == [8, 10, 12, 14], 'eyes on Cello and Harmony: violin and cello, Melody and Harmony, in score order')
     await pg.click('#hear-2-1')
     check(await pg.evaluate(PLAYING_JS) == [8, 9, 12, 13, 14, 15], 'the Viola speaker on Melody adds viola on the tune and nothing else')
-    await pg.click('#hear-inst-3')
-    check(await pg.evaluate(PLAYING_JS) == [8, 9, 12, 13, 14], "Bass's own speaker quiets bass at every level")
-    await pg.click('#hear-inst-3')
-    check(await pg.evaluate(PLAYING_JS) == [8, 9, 12, 13, 14, 15], 'and brings it back only where it was playing')
+    await pg.click('#hear-3-3')
+    check(await pg.evaluate(PLAYING_JS) == [8, 9, 12, 13, 14], 'the Bass speaker on Harmony quiets the bass harmony and nothing else')
+    await pg.click('#hear-3-3')
+    check(await pg.evaluate(PLAYING_JS) == [8, 9, 12, 13, 14, 15], 'and brings it back')
+    check(await pg.evaluate("() => document.querySelectorAll('#mixInst .tog.hear').length") == 0, 'the instrument list has eyes only, no speakers')
     await pg.click('#see-inst-0'); await pg.click('#see-inst-2'); await pg.wait_for_timeout(1500)
     check(await pg.evaluate(SHOWN_JS) == [10, 14], 'the last instrument on the page stays on')
     label = await pg.text_content('#partsLbl')

@@ -289,14 +289,14 @@ svg.i { width: 18px; height: 18px; fill: currentColor; }
 .pop .tier-note { margin: 0; }
 .pop .check { padding: 2px 0; }
 /* Parts: instruments on the left, levels on the right, each list scrolling on its own when the screen is short.
-   Every row has an eye (on the page or not) and speakers (playing or quiet). */
+   Every instrument and level has an eye (on the page or not); each level has a speaker for each instrument. */
 #pop-parts { width: min(36rem, 100%); display: flex; flex-direction: column; overflow: hidden; }
 #pop-parts > * { flex: none; }
 .mix { flex: 0 1 auto !important; min-height: 0; display: flex; gap: 6px 26px; }
-.mix-list { --tog: 32px; display: grid; grid-template-columns: max-content repeat(2, var(--tog)); gap: 4px 6px; align-items: center; align-content: start; padding-inline-end: 4px; flex: none; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.mix-list { --tog: 32px; display: grid; grid-template-columns: max-content var(--tog); gap: 4px 6px; align-items: center; align-content: start; padding-inline-end: 4px; flex: none; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
 .mix-list.more { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 30px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 30px), transparent); }
 .mix-list.levels { grid-template-columns: max-content var(--tog) 2px repeat(4, var(--tog)); }
-body.following .mix-list, body.following .mix-list.levels { grid-template-columns: max-content var(--tog); }
+body.following .mix-list.levels { grid-template-columns: max-content var(--tog); }
 .mix-h { position: sticky; top: 0; z-index: 1; background: var(--panel); padding-bottom: 2px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); text-align: center; white-space: nowrap; }
 .mix-h:first-child { text-align: left; }
 /* A heading wider than its column of buttons reaches a little into the gaps either side */
@@ -782,8 +782,8 @@ body.following .host-only { display: none !important; }
   $('g-ltype').addEventListener('click', () => { setPop(null); state.letterMode = nextOf(STEP_MARKS, state.letterMode); changed({ marks: true, size: true }); toast('Letter names: ' + MARK_WORD[state.letterMode]); });
   // ---- Parts: what is on the page, and what plays ----
   // Instruments on the left, levels on the right, each with an eye. The page shows every instrument with its eye
-  // open at every level with its eye open. Each level has a speaker for each instrument; the speaker beside an
-  // instrument turns that instrument on or off at every level at once.
+  // open at every level with its eye open. Each level has a speaker for each instrument, so every part plays or not
+  // on its own.
   const EYE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>';
   const EYE_OFF = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>';
   const SPEAKER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>';
@@ -805,11 +805,10 @@ body.following .host-only { display: none !important; }
   }
   function buildMix() {
     const inst = $('mixInst'), tier = $('mixTier');
-    mixCell(inst, 'mix-h', 'Instrument'); mixCell(inst, 'mix-h', 'See'); mixCell(inst, 'mix-h', 'Hear', true);
+    mixCell(inst, 'mix-h', 'Instrument'); mixCell(inst, 'mix-h', 'See');
     INSTRUMENTS.forEach((name, i) => {
       mixCell(inst, 'mix-name', name);
       mixTog(inst, 'see', 'see-inst-' + i, 'See ' + name, () => toggleSee('seeInst', i));
-      mixTog(inst, 'hear', 'hear-inst-' + i, 'Hear ' + name + ' at every level', () => hearInstrument(i));
     });
     mixCell(tier, 'mix-h', 'Level'); mixCell(tier, 'mix-h', 'See'); mixCell(tier, 'mix-h', '', true);
     INST_ABBR.forEach((a) => mixCell(tier, 'mix-h', a, true));
@@ -832,24 +831,6 @@ body.following .host-only { display: none !important; }
     state.heard = state.heard.includes(ti) ? state.heard.filter(x => x !== ti) : [...state.heard, ti].sort((a, b) => a - b);
     changed({ audio: true });
   }
-  const quietedAt = {}; // instrument → the levels it was playing when its own speaker turned it off
-  function hearInstrument(i) {
-    const heard = new Set(state.heard), mine = TIERS.map((_, t) => trackIndex(t, i));
-    if (mine.some(p => heard.has(p))) {
-      quietedAt[i] = TIERS.map((_, t) => t).filter(t => heard.has(trackIndex(t, i)));
-      mine.forEach(p => heard.delete(p));
-      toast(INSTRUMENTS[i] + ' is quiet at every level');
-    } else {
-      // Back on where it was playing before; failing that, at every level something is playing at (or, with
-      // nothing playing, the levels on the page).
-      let levels = quietedAt[i] || TIERS.map((_, t) => t).filter(t => INSTRUMENTS.some((_, k) => heard.has(trackIndex(t, k))));
-      if (!levels.length) levels = state.seeTier;
-      levels.forEach(t => heard.add(trackIndex(t, i)));
-      toast(INSTRUMENTS[i] + ' plays ' + levels.map(t => TIERS[t].name).join(', '));
-    }
-    state.heard = [...heard].sort((a, b) => a - b);
-    changed({ audio: true });
-  }
   function renderMix() {
     const heard = new Set(state.heard);
     const set = (id, on) => {
@@ -858,10 +839,7 @@ body.following .host-only { display: none !important; }
       b.setAttribute('aria-pressed', String(on));
       b.innerHTML = b.classList.contains('see') ? (on ? EYE : EYE_OFF) : (on ? SPEAKER : SPEAKER_OFF);
     };
-    INSTRUMENTS.forEach((_, i) => {
-      set('see-inst-' + i, state.seeInst.includes(i));
-      set('hear-inst-' + i, TIERS.some((_, t) => heard.has(trackIndex(t, i))));
-    });
+    INSTRUMENTS.forEach((_, i) => set('see-inst-' + i, state.seeInst.includes(i)));
     TIERS.forEach((_, t) => {
       set('see-tier-' + t, state.seeTier.includes(t));
       INSTRUMENTS.forEach((_, i) => set('hear-' + t + '-' + i, heard.has(trackIndex(t, i))));
