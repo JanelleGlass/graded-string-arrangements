@@ -135,6 +135,8 @@ async def song_checks(browser, base):
             above = await pg.evaluate("() => document.getElementById('topTools').getBoundingClientRect().bottom <= document.querySelector('#sheet .at-surface').getBoundingClientRect().top + 1")
             want_top = ['zoomOut', 'zoomIn', 'g-layout'] if label == 'laptop' else ['zoomOut', 'zoomIn']
             check(top == want_top and above, f'{label}: the size buttons{" and Line/Pages" if label == "laptop" else ""} sit at the top, above the music ({top})')
+            said = (await pg.text_content('#g-count')).strip()
+            check(said == 'Counting: On', f'{label}: the Counting button says so in words ("{said}")')
             await pg.click('#g-count')
             off = await pg.evaluate("() => document.getElementById('sheet').classList.contains('counts-off')")
             await pg.click('#g-count')

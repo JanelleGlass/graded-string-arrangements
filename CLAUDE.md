@@ -172,7 +172,7 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
 - Counting: one straight row of counts under the staff, soft grey, "&" the same as the numbers,
   the current count in teal bold, no circles or pops. Held notes join their counts with a line
   (ties too, rests not). Dynamics sit below the count row. The counts are switched on and off by a
-  Counting button in the strip ("Counting: On"; on phones a "1 &" mark and On/Off), moved there from
+  Counting button in the strip ("Counting: On" or "Counting: Off", words only, no symbol), moved there from
   beside the first count on 2026-10-16; switched off, the row keeps its room. The count-in overlay
   is the same size, lighter.
 - Hover (mouse) or tap (touch) explains the clef, each sharp or flat in the key signature, the time

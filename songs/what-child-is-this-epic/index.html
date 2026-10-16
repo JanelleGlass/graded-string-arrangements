@@ -375,8 +375,6 @@ html.small .lvl-same { margin-top: 0; font-size: 0.58rem; }
    phones, so their button is phones only; phones always use one long line with finger numbers to the right, so the
    finger-position and pages buttons are for bigger screens. */
 .fab-btn[hidden] { display: none !important; }
-/* Words a button shows on bigger screens only, so the phone strip stays one row */
-html.small .wide-only { display: none; }
 .small-only { display: none !important; }
 html.small .small-only { display: inline-flex !important; }
 html.small .small-only[hidden], html.small .big-only { display: none !important; }
@@ -790,9 +788,6 @@ body.following .host-only { display: none !important; }
   const fposIco = (at) => { const [x, y, c] = FPOS_AT[at];
     return `<svg class="cyc-ico" viewBox="0 0 30 20" style="width:28px;height:19px" aria-hidden="true"><ellipse cx="15" cy="12" rx="7.4" ry="5.3" transform="rotate(-20 15 12)" fill="#1D4ED8"/>` +
       `<text x="${x}" y="${y}" text-anchor="middle" font-size="${at === 'inside' ? 8.5 : 9.5}" font-weight="800" fill="${c}" font-family="Figtree, Arial, sans-serif">1</text></svg>`; };
-  // The counts under the notes: "1 &", as they are counted.
-  const countIco = (on) => `<svg class="cyc-ico" viewBox="0 0 26 18" style="width:24px;height:17px" aria-hidden="true">` +
-    `<text x="13" y="14.5" text-anchor="middle" font-size="15" font-weight="600" fill="${on ? '#1D5B72' : GREY}" font-family="'EB Garamond', Georgia, serif">1 &amp;</text></svg>`;
   // One long line (a staff running off to the right) or pages (lines of music stacked on a page).
   const layoutIco = (layout) => `<svg class="cyc-ico" viewBox="0 0 28 18" style="width:26px;height:17px" aria-hidden="true">` + (layout === 'line'
     ? '<path d="M1 6h21M1 9h21M1 12h21" stroke="#1D5B72" stroke-width="1.5" fill="none"/><path d="M22.5 5l4.5 4-4.5 4z" fill="#1D5B72"/>'
@@ -813,7 +808,7 @@ body.following .host-only { display: none !important; }
     $('g-layout').setAttribute('aria-label', 'Music: ' + (state.layout === 'line' ? 'one long line' : 'pages') + '. Tap to change.');
     // Pointing at a button (mouse) says what it does, as the panel used to.
     const cOn = state.countAlong;
-    $('g-count').innerHTML = countIco(cOn) + '<span class="cyc-badge"><span class="wide-only">Counting: </span>' + (cOn ? 'On' : 'Off') + '</span>';
+    $('g-count').innerHTML = '<span class="cyc-badge">Counting: ' + (cOn ? 'On' : 'Off') + '</span>';
     $('g-count').setAttribute('aria-label', 'Counts under the notes: ' + (cOn ? 'on' : 'off') + '. Tap to change.');
     for (const id of ['g-metro', 'g-colors', 'g-ltype', 'g-fnum', 'g-fpos', 'g-layout', 'g-count']) $(id).title = $(id).getAttribute('aria-label').replace(/\. Tap to change\.$/, '');
   }
