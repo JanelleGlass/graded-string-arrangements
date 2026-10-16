@@ -2167,7 +2167,7 @@ body.following .host-only { display: none !important; }
     if (key === soundKey) return [];
     soundKey = key;
     const sheet = $('sheet'), next = [];
-    for (const beat of beats) sheet.querySelectorAll('g.b' + beat.id).forEach(el => { prepGroup(el); next.push(el); });
+    for (const beat of beats) sheet.querySelectorAll('g.b' + beat.id).forEach(el => { prepGroup(el); el._part = beat.voice.bar.staff.track.index; next.push(el); });
     const fresh = next.filter(el => !pulsing.includes(el));
     pulsing = next;
     return fresh;
@@ -2608,13 +2608,13 @@ body.following .host-only { display: none !important; }
     const frac = (q % beatTicks) / beatTicks;
     const label = frac === 0 ? String(Math.floor(q / beatTicks) % mb.timeSignatureNumerator + 1)
       : frac === 0.5 ? '&' : frac === 0.25 ? 'e' : frac === 0.75 ? 'a' : '';
-    // "Match the notes": between beats, count only where a note (or rest) in the shown parts starts.
-    let count = true;
+    // "Match the notes": between beats, a part counts only where one of its own notes (or rests) starts.
+    let parts = shownIndexes();
     if (!state.unit && frac !== 0) {
       const at = q - lead;
-      count = shownIndexes().some(ti => score.tracks[ti].staves[0].bars[bi].voices[0].beats.some(b => b.playbackStart === at));
+      parts = parts.filter(ti => score.tracks[ti].staves[0].bars[bi].voices[0].beats.some(b => b.playbackStart === at));
     }
-    return { bi, n, rel, strong: q % fullBar === 0, label, at: Math.max(0, q - lead), count };
+    return { bi, n, rel, strong: q % fullBar === 0, label, at: Math.max(0, q - lead), count: parts.length > 0, parts: new Set(parts) };
   }
   function showCounts(g) {
     for (const [ti, map] of countIndex) {
@@ -2641,15 +2641,18 @@ body.following .host-only { display: none !important; }
         const key = g.bi + ':' + g.n;
         const newCount = key !== lastGrid && g.count;
         // Move the light to whatever is sounding now (nothing during the count-in) before any swell.
+        let fresh = [];
         if (pulseOn()) {
-          const fresh = setSounding(counting ? [] : soundingBeats(est));
+          fresh = setSounding(counting ? [] : soundingBeats(est));
           if (!newCount) fresh.forEach(hold); // a note that starts between counts just lights up
         }
         if (key !== lastGrid) {
           lastGrid = key;
           if (g.count) {
             lastPulseAt = now;
-            if (pulseOn()) pulsing.forEach(el => pulse(el, g.strong));
+            // Each note swells on its own part's counts: a held quarter doesn't swell again on an "&" that only
+            // another part's eighth notes play.
+            if (pulseOn()) pulsing.forEach(el => { if (g.parts.has(el._part)) pulse(el, g.strong); else if (fresh.includes(el)) hold(el); });
             showCounts(g);
           }
         }
