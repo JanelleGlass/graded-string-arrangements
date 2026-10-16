@@ -11,6 +11,9 @@ What it checks
      no script errors.
   2. Every song page, at laptop and phone-landscape size: the score loads with all parts,
      notes are drawn, Play moves the music forward, nothing scrolls sideways, no script errors.
+     The page settings are separate buttons in the strip; on a laptop the music button switches
+     between pages and one long line, and the finger button puts the finger numbers inside the
+     notes or to their right.
      Laptop: the Full screen button goes in and out of full screen. Phone (acting like an iPhone,
      which doesn't allow it): no Full screen button.
      The Parts panel: the music runs a little under a tab at the right edge, which pulls the panel out over it, each part's eye
@@ -122,6 +125,33 @@ async def song_checks(browser, base):
             check(drawn > 0, f'{label}: notes are drawn')
             wide = await pg.evaluate('() => document.documentElement.scrollWidth - window.innerWidth')
             check(wide <= 1, f'{label}: no sideways scrolling ({wide}px extra)')
+            # What's drawn on the page: one tap-to-change button per setting in the strip, no "On the page" panel.
+            strip = await pg.evaluate('''() => ['g-colors', 'g-ltype', 'g-fnum', 'g-fpos', 'g-layout', 'g-count', 'g-page', 'countTog']
+              .filter(id => { const e = document.getElementById(id); return e && e.offsetParent && e.closest('#fabRow'); })''')
+            want = ['g-colors', 'g-fnum', 'g-fpos', 'g-count'] if label == 'laptop' else ['g-colors', 'g-ltype', 'g-fnum', 'g-count']
+            check(strip == want, f'{label}: the page settings are separate buttons in the strip ({strip})')
+            # The size of the music, and on bigger screens Line or Pages, sit at the top right of the music.
+            top = await pg.evaluate('''() => ['zoomOut', 'zoomIn', 'g-layout'].filter(id => { const e = document.getElementById(id); return e.offsetParent && e.closest('#topTools'); })''')
+            above = await pg.evaluate("() => document.getElementById('topTools').getBoundingClientRect().bottom <= document.querySelector('#sheet .at-surface').getBoundingClientRect().top + 1")
+            want_top = ['zoomOut', 'zoomIn', 'g-layout'] if label == 'laptop' else ['zoomOut', 'zoomIn']
+            check(top == want_top and above, f'{label}: the size buttons{" and Line/Pages" if label == "laptop" else ""} sit at the top, above the music ({top})')
+            await pg.click('#g-count')
+            off = await pg.evaluate("() => document.getElementById('sheet').classList.contains('counts-off')")
+            await pg.click('#g-count')
+            on = await pg.evaluate("() => !document.getElementById('sheet').classList.contains('counts-off')")
+            check(off and on, f'{label}: the Counting button in the strip hides and shows the counts')
+            if label == 'laptop':
+                await pg.click('#g-layout'); await pg.wait_for_timeout(1500)
+                paged = await pg.evaluate("() => !document.getElementById('sheet').classList.contains('line') && document.getElementById('g-layout').title")
+                await pg.click('#g-layout'); await pg.wait_for_timeout(1500)
+                lined = await pg.evaluate("() => document.getElementById('sheet').classList.contains('line') && document.getElementById('g-layout').title")
+                check(paged == 'Music: pages' and lined == 'Music: one long line', f'{label}: the music button switches between pages and one long line')
+                await pg.click('#g-fpos')
+                fpos = await pg.get_attribute('#g-fpos', 'title')
+                await pg.click('#g-fpos')
+                back = await pg.get_attribute('#g-fpos', 'title')
+                check(fpos == 'Finger numbers go right of the notes' and back == 'Finger numbers go inside the notes',
+                      f'{label}: the finger button puts the finger numbers inside the notes or to their right ("{fpos}", "{back}")')
             shown = await pg.evaluate("() => !!document.getElementById('fullBtn').offsetParent")
             if label == 'phone landscape':
                 check(not shown, f'{label}: no Full screen button where the browser does not allow it')
@@ -184,6 +214,14 @@ async def parts_checks(browser, base):
     check(names == ['Vln Open str.', 'C Adv. melody'], f'the staves are labelled with the same short names as the table ({names})')
     check(await pg.evaluate(PLAYING_JS) == [0, 18], 'ticked, the parts on the page are the parts that play')
     check(await pg.evaluate("() => document.querySelectorAll('#mixParts .tog.see').length") == 24, 'one eye for every part')
+    # In The First Noel: Open Strings has violin with bass and viola with cello; Easy, Melody and Advanced Melody
+    # have all four on the tune; Harmony and Obbligato give each instrument its own line.
+    same = await pg.evaluate("() => [0, 1, 2, 3, 4, 5].map(t => document.getElementById('same-' + t).textContent)")
+    check(same == ['violin & bass have the same notes\nviola & cello have the same notes', 'all parts have the same notes',
+                   'all parts have the same notes', '', 'all parts have the same notes', ''],
+          f'a line under each level name says which parts play the same notes ({same})')
+    said = await pg.get_attribute('#see-0-0', 'title')
+    check(said.endswith('(same notes as Bass)'), f'pointing at a part names its match ("{said}")')
     label = await pg.get_attribute('#g-parts', 'title')
     check(label == 'Parts: 2 parts', f'the Parts tab counts the parts on the page ("{label}")')
     await pg.click('#hearSame')

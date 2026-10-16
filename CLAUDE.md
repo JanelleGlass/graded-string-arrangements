@@ -114,8 +114,17 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   the playing note sits a third of the way from the left so students see what's coming. Music is
   top-aligned under the header.
 - Every setting is always visible in a strip at the bottom, on phones too, never covering notes.
-  Zoom − / + lives in that strip (0.3x to 1.75x). Phone-landscape buttons are compact so the strip
-  fits one row on regular iPhones.
+  Phone-landscape buttons are compact so the strip fits one row on regular iPhones.
+- The size of the music (− / +, 0.3x to 1.75x) and, on bigger screens, Line or Pages sit at the top
+  right of the music, in the band with the Strings key, so they never cover notes (moved there from
+  the strip on 2026-10-16). The band always keeps its room, even with string colors off.
+- What's drawn on the page has no panel: each setting is its own tap-to-change button in the strip,
+  stepping through its choices and showing a toast. Every screen: string colors (All, 1st, Off) and
+  finger numbers (All, 1st, Off). Laptops: where finger numbers go (Inside or Right only, Janelle's choice).
+  Every screen: Counting (on, off). The finger buttons say so in
+  words ("Fingers: All", "Inside the note", "Right of the note"). Phones: letter names in the notes (All, 1st, Off); phones
+  always use one long line with finger numbers to the right. Janelle replaced the "On the page"
+  button and its panel with these (2026-10-16).
 - Parts: a quiet bump-out tab on the right edge of the screen, halfway down the music (a chevron
   and "Parts", read sideways, in soft grey; 34px wide, 136px tall), with swoopy sides: its top and
   bottom curve smoothly into the screen edge (and into the panel's edge when open). It slides a
@@ -130,6 +139,14 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   own, so a violin at Open Strings can read with a cello at Advanced Melody. Parts show in score
   order; one part always stays on the page. The table scrolls, fading at the bottom, when the
   screen is short.
+- Same notes: under each level's name, a quiet grey line says which of its parts play the same notes
+  (same rhythm and note names, so the tune an octave lower counts), in plain words, one line per
+  group, in small type: "all parts have the same notes" (Janelle's wording), or "violin & bass have
+  the same notes" over "viola & cello have the same notes"; a level where every
+  part has its own line shows nothing. Not "Vln = B": Janelle found that it reads like a note name. Worked out
+  from each score as it loads, so a new song needs nothing listed; only exact matches count.
+  Pointing at a part names its match. (Corner dots with a key came first; Janelle found them messy
+  and distracting, 2026-10-16.)
 - Hear: a "Hear the parts I see" checkbox under the table, ticked by default, works like "billing
   address same as shipping". Ticked, the parts on the page are the parts that play. Unticked, a
   Hear speaker for each part appears beside the eyes (headed "Hear") and chooses what plays, so the
@@ -154,9 +171,10 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   or lights up past the loop end. There is no separate practice-loop panel.
 - Counting: one straight row of counts under the staff, soft grey, "&" the same as the numbers,
   the current count in teal bold, no circles or pops. Held notes join their counts with a line
-  (ties too, rests not). Dynamics sit below the count row. A "Counting" toggle sits just before the
-  first count and sticks to the left edge when scrolled. The count-in overlay is the same size,
-  lighter.
+  (ties too, rests not). Dynamics sit below the count row. The counts are switched on and off by a
+  Counting button in the strip ("Counting: On"; on phones a "1 &" mark and On/Off), moved there from
+  beside the first count on 2026-10-16; switched off, the row keeps its room. The count-in overlay
+  is the same size, lighter.
 - Hover (mouse) or tap (touch) explains the clef, each sharp or flat in the key signature, the time
   signature and dynamics.
 - Full screen: a button at the end of the bottom strip, shown only where the browser allows it (Android,

@@ -120,6 +120,11 @@ h1 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: c
 /* String colour key in a strip of its own at the top of the music, above the first line of notes. */
 .key-dock { position: absolute; left: 0; top: 0; right: 0; height: 0; z-index: 5; pointer-events: none; }
 .sheet.keyed { padding-top: 46px; }
+/* Top right of the music, in the same band as the Strings key (so they never cover notes): the size of the music,
+   and on bigger screens one long line or pages */
+.top-tools { position: absolute; right: 10px; top: 5px; display: flex; align-items: center; gap: 8px; pointer-events: auto; }
+.top-tools .zoom-pill, .top-tools .fab-btn { height: 36px; }
+.top-tools .zoom-pill button { width: 36px; font-size: 20px; }
 .key { position: absolute; left: 10px; top: 8px; display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px 5px 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.92); border: 1px solid #D5DCD9; box-shadow: 0 1px 3px rgba(18, 22, 20, 0.08); font-family: var(--font-body); }
 .key[hidden] { display: none; }
 .key-lbl { font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em; color: #55615B; margin-right: 2px; }
@@ -198,17 +203,6 @@ hr.div { border: 0; border-top: 1px solid var(--line); margin: 0; }
 #sheet.counts-off .count-layer { visibility: hidden; }
 /* Dynamics (mf, f…) are nudged down under the count row; let them draw past the edge of their svg if need be */
 #sheet .at-surface svg { overflow: visible; }
-/* The counts switch: at the left edge of the music, level with the row of counts */
-.count-tog { position: absolute; left: 6px; top: 0; z-index: 1001; /* above the counts and cursors (1000), below a time-signature tip (1002) */ display: inline-flex; align-items: center; justify-content: center; gap: 0.12em; padding: 0 0.55em; border-radius: 999px; border: 1.5px solid #1D5B72; background: #FFFFFF; color: #1D5B72; font-family: var(--font-body); font-weight: 700; line-height: 1; white-space: nowrap; cursor: pointer; box-shadow: 0 1px 3px rgba(18, 22, 20, 0.12); }
-/* Waiting at the left edge while the music scrolls past: a halo of paper so counts fade out behind it instead of peeking out beside it */
-.count-tog.stuck { box-shadow: 0 1px 3px rgba(18, 22, 20, 0.12), -1px 0 0 5px var(--paper), 16px 0 12px 6px var(--paper); }
-.count-tog[hidden] { display: none; }
-/* A bigger invisible target for fingers than the drawn pill */
-.count-tog::after { content: ""; position: absolute; inset: -9px -8px; }
-.count-tog[aria-pressed="false"] { border: 1.5px dashed #AEB8B3; color: #8A948F; background: #FFFFFF; box-shadow: none; }
-.count-tog.stuck[aria-pressed="false"] { box-shadow: -1px 0 0 5px var(--paper), 16px 0 12px 6px var(--paper); }
-.count-tog[aria-pressed="false"] .ct-n { text-decoration: line-through; text-decoration-thickness: 1.5px; }
-.count-tog:focus-visible { outline: 2px solid #1D5B72; outline-offset: 2px; }
 
 /* Tap a note: a thin ring marks where Play will start, until the music starts */
 .start-layer, .loop-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; }
@@ -331,12 +325,19 @@ html.small #tierNote { display: none; }
 /* An instrument's name, wider than its column of buttons, reaches a little into the gaps either side */
 .mix-h.ab:not(:empty) { margin-inline: -5px; }
 .mix-name { padding-right: 8px; font-weight: 600; white-space: nowrap; }
-.tog { display: grid; place-items: center; width: var(--tog); height: var(--tog); padding: 0; border-radius: 50%; border: 1px solid var(--line); background: #FFFFFF; color: #9AA5A0; }
+.tog { position: relative; display: grid; place-items: center; width: var(--tog); height: var(--tog); padding: 0; border-radius: 50%; border: 1px solid var(--line); background: #FFFFFF; color: #9AA5A0; }
 .tog:hover { border-color: var(--accent); }
 .tog svg { width: 18px; height: 18px; fill: currentColor; }
 .tog[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .tog:focus-visible { outline-offset: 1px; }
 #pop-parts .tier-note b { color: var(--ink); font-weight: 600; }
+/* Under a level's name, a quiet line for each group of its parts that play the same notes ("all parts have the same notes",
+   "violin & bass have the same notes"); the same tune an octave lower counts too. Words, not "Vln = B", which reads like a note name. */
+.mix-name { line-height: 1.2; }
+.lvl-same { display: block; margin-top: 1px; font-size: 0.66rem; font-weight: 500; color: var(--muted); white-space: pre-line; }
+.lvl-same:empty { display: none; }
+html.small .mix-name { line-height: 1.1; }
+html.small .lvl-same { margin-top: 0; font-size: 0.58rem; }
 .tempo-big { font-family: var(--font-display); font-size: 2.1rem; font-weight: 600; line-height: 1; text-align: center; font-variant-numeric: tabular-nums; }
 .qn { width: 0.42em; height: 1em; fill: currentColor; vertical-align: -0.12em; }
 .fab-btn svg.qn { width: 9px; height: 21px; }
@@ -355,7 +356,12 @@ html.small #tierNote { display: none; }
 .toggle[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
 .toggle[aria-pressed="true"]::before { content: "● "; color: var(--accent); }
 .toggle.solid { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-/* Phones get three tap-to-change buttons instead of the "On the page" panel */
+/* What's drawn on the page: one tap-to-change button per setting, in the strip. Letter names are drawn only on
+   phones, so their button is phones only; phones always use one long line with finger numbers to the right, so the
+   finger-position and pages buttons are for bigger screens. */
+.fab-btn[hidden] { display: none !important; }
+/* Words a button shows on bigger screens only, so the phone strip stays one row */
+html.small .wide-only { display: none; }
 .small-only { display: none !important; }
 html.small .small-only { display: inline-flex !important; }
 html.small .small-only[hidden], html.small .big-only { display: none !important; }
@@ -396,6 +402,9 @@ body.following .host-only { display: none !important; }
   .zoom-pill button { width: 36px; font-size: 20px; }
   .key { left: 6px; top: 6px; gap: 5px; padding: 3px 8px 3px 10px; }
   .sheet.keyed { padding-top: 36px; }
+  .top-tools { right: 6px; top: 3px; gap: 6px; }
+  .top-tools .zoom-pill, .top-tools .fab-btn { height: 30px; }
+  .top-tools .zoom-pill button { width: 32px; font-size: 18px; }
   .key-lbl { font-size: 0.7rem; }
   .key-head { width: 24px; height: 18px; }
   .key-head b { font-size: 0.74rem; }
@@ -422,12 +431,15 @@ body.following .host-only { display: none !important; }
   .zoom-pill button { width: 32px; font-size: 19px; }
   .pop { padding-block: 8px 12px; gap: 10px; max-height: calc(100dvh - var(--dock-h) - 12px); }
   .pop.drawer { padding-top: calc(4px + env(safe-area-inset-top, 0px)); padding-bottom: 8px; gap: 8px; }
-  .mix-list { --tog: 28px; gap: 3px 5px; }
+  .mix-list { --tog: 28px; gap: 2px 5px; }
   .tog svg { width: 16px; height: 16px; }
   #pop-parts .tier-note { font-size: 0.82rem; line-height: 1.3; }
   .toggle { padding: 5px 10px; font-size: 0.82rem; }
   .key { left: 6px; top: 4px; gap: 5px; padding: 3px 8px 3px 10px; }
   .sheet.keyed { padding-top: 32px; }
+  .top-tools { right: 6px; top: 2px; gap: 6px; }
+  .top-tools .zoom-pill, .top-tools .fab-btn { height: 27px; }
+  .top-tools .zoom-pill button { width: 30px; font-size: 17px; }
   .key-lbl { font-size: 0.7rem; }
   .key-head { width: 24px; height: 18px; }
   .key-head b { font-size: 0.74rem; }
@@ -473,9 +485,9 @@ body.following .host-only { display: none !important; }
   <p class="err" id="err" role="alert"></p>
 
   <div class="sheet-wrap">
-    <div class="key-dock"><div class="key" id="legend" role="note" aria-label="String colors"></div></div>
+    <div class="key-dock"><div class="key" id="legend" role="note" aria-label="String colors"></div>
+      <div class="top-tools" id="topTools"><div class="zoom-pill" role="group" aria-label="Size of the music"><button type="button" id="zoomOut" aria-label="Smaller music" title="Smaller">−</button><button type="button" id="zoomIn" aria-label="Bigger music" title="Bigger">+</button></div><button class="fab-btn big-only cyc" id="g-layout" type="button"></button></div></div>
     <div class="sheet" id="sheet"></div>
-    <button class="count-tog" id="countTog" type="button" aria-pressed="true" aria-label="Counts under the notes" title="Counts under the notes" hidden><span class="ct-n">Counting</span></button>
     <div class="loading" id="loading">Setting out the music…</div>
   </div>
 
@@ -498,25 +510,6 @@ body.following .host-only { display: none !important; }
 </section>
 <button class="parts-tab" id="g-parts" type="button" aria-expanded="false" aria-controls="pop-parts" title="Parts to see and hear"><svg class="pt-shape" viewBox="0 0 34 136" aria-hidden="true"><path class="pt-fill" d="M34 0C34 14 1 12 1 28L1 108C1 124 34 122 34 136Z"/><path class="pt-line" d="M34 0C34 14 1 12 1 28L1 108C1 124 34 122 34 136"/></svg><svg class="pt-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg><span class="pt-lbl">Parts</span></button>
 <div class="fab" id="fab">
-  <section class="pop" id="pop-page" aria-labelledby="h-page" hidden>
-    <div class="pop-head"><h2 id="h-page">On the page</h2><button class="pop-x" type="button" aria-label="Close">×</button></div>
-    <div class="pop-sub">
-      <span class="sub-label" id="lbl-layout">Music</span>
-      <div class="opts" role="radiogroup" aria-labelledby="lbl-layout" id="layoutOpts"></div>
-    </div>
-    <div class="pop-sub">
-      <span class="sub-label" id="lbl-colors">String colors</span>
-      <div class="opts" role="radiogroup" aria-labelledby="lbl-colors" id="colorOpts"></div>
-    </div>
-    <div class="pop-sub">
-      <span class="sub-label" id="lbl-fnum">Finger numbers</span>
-      <div class="opts" role="radiogroup" aria-labelledby="lbl-fnum" id="fnumOpts"></div>
-    </div>
-    <div class="pop-sub" id="fingerRow">
-      <span class="sub-label" id="lbl-finger">Put them</span>
-      <div class="opts" role="radiogroup" aria-labelledby="lbl-finger" id="fingerOpts"></div>
-    </div>
-  </section>
   <section class="pop host-only" id="pop-tempo" aria-labelledby="h-tempo" hidden>
     <div class="pop-head"><h2 id="h-tempo">Tempo</h2><button class="pop-x" type="button" aria-label="Close">×</button></div>
     <output class="tempo-big" id="tempoOut" for="tempo"><svg class="qn" viewBox="0 0 10 24" aria-hidden="true"><ellipse cx="4.6" cy="19.2" rx="4.4" ry="3.1" transform="rotate(-22 4.6 19.2)"/><rect x="7.7" y="1" width="1.5" height="18.2"/></svg> = 100</output>
@@ -536,14 +529,14 @@ body.following .host-only { display: none !important; }
     </button>
     <button class="fab-btn" id="g-together" type="button" aria-pressed="false" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg><span class="fab-lbl" id="togetherLbl"></span></button>
     <button class="fab-btn" id="moreBtn" type="button" aria-expanded="false" aria-controls="fabMore"><span id="moreIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg></span><span class="fab-lbl" id="moreLbl">Settings</span></button>
-    <div class="zoom-pill" role="group" aria-label="Size of the music"><button type="button" id="zoomOut" aria-label="Smaller music" title="Smaller">−</button><button type="button" id="zoomIn" aria-label="Bigger music" title="Bigger">+</button></div>
     </div>
     <div class="fab-more" id="fabMore" hidden>
     <div class="fab-set" role="group" aria-label="Your part and the page">
-    <button class="fab-btn small-only cyc" id="g-colors" type="button"></button>
+    <button class="fab-btn cyc" id="g-colors" type="button"></button>
     <button class="fab-btn small-only cyc" id="g-ltype" type="button"></button>
-    <button class="fab-btn small-only cyc" id="g-fnum" type="button"></button>
-    <button class="fab-btn big-only" id="g-page" type="button" aria-expanded="false" aria-controls="pop-page" aria-label="On the page" title="On the page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg></button>
+    <button class="fab-btn cyc" id="g-fnum" type="button"></button>
+    <button class="fab-btn big-only cyc" id="g-fpos" type="button"></button>
+    <button class="fab-btn cyc" id="g-count" type="button"></button>
     </div>
     <div class="fab-set" role="group" aria-label="Playback settings">
     <button class="fab-btn host-only" id="g-tempo" type="button" aria-expanded="false" aria-controls="pop-tempo" title="Tempo"><svg class="qn" viewBox="0 0 10 24" aria-hidden="true"><ellipse cx="4.6" cy="19.2" rx="4.4" ry="3.1" transform="rotate(-22 4.6 19.2)"/><rect x="7.7" y="1" width="1.5" height="18.2"/></svg><span id="tempoChip">100</span></button>
@@ -660,7 +653,8 @@ body.following .host-only { display: none !important; }
     // The beat is always shown the same way: pulsing notes, with the counts under the notes matching the notes.
     follow: 'pulse',
     unit: 0,
-    fingers: ['inside', 'left', 'right', 'above'].includes(saved.fingers) ? saved.fingers : 'inside',
+    // Finger numbers go inside the notes or to their right (left of the notes, saved before, becomes right).
+    fingers: saved.fingers === 'right' || saved.fingers === 'left' ? 'right' : 'inside',
     // The counts under the notes: on unless switched off with the Counting switch beside them.
     countAlong: saved.counts !== 'off',
     layout: saved.layout === 'page' ? 'page' : 'line',
@@ -738,12 +732,6 @@ body.following .host-only { display: none !important; }
   else { $('buyNote').textContent = 'PDF store link coming soon. Free to read and play along here.'; }
 
   // ---- Controls ----
-  function chip(label, attrs) {
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'chip'; b.textContent = label;
-    for (const [k, v] of Object.entries(attrs)) b.setAttribute(k, v);
-    return b;
-  }
   // The string colour key: the strings of the instrument on the page, highest first, coloured like the notes.
   const STRINGS_OF = [['E', 'A', 'D', 'G'], ['A', 'D', 'G', 'C'], ['A', 'D', 'G', 'C'], ['G', 'D', 'A', 'E']];
   function renderKey() {
@@ -763,7 +751,7 @@ body.following .host-only { display: none !important; }
       key.append(h);
     }
     key.setAttribute('aria-label', 'String colors: ' + strings.join(', '));
-    $('sheet').classList.toggle('keyed', !key.hidden || document.documentElement.classList.contains('small'));
+    $('sheet').classList.add('keyed'); // the band along the top always keeps its room: the size buttons live in it
   }
   // Phone buttons that step through their choices on each tap.
   const STEP_MARKS = ['all', 'first', 'off'], MARK_WORD = { all: 'every note', first: 'first time only', off: 'off' }, MARK_BADGE = { all: 'All', first: '1st', off: 'Off' };
@@ -773,20 +761,42 @@ body.following .host-only { display: none !important; }
     ['#F0B000', '#DC2626', '#1D4ED8', '#15803D'].map((c, i) => `<circle cx="${4 + i * 6}" cy="6" r="3.3" fill="${on ? c : GREY}"/>`).join('') + '</svg>';
   const headIco = (on, num, ch = '1') => `<svg class="cyc-ico" viewBox="0 0 22 16" style="width:24px;height:18px" aria-hidden="true"><ellipse cx="11" cy="8" rx="8.6" ry="6" transform="rotate(-20 11 8)" fill="${on ? '#1D4ED8' : GREY}"/>` +
     (num ? `<text x="11" y="11.4" text-anchor="middle" font-size="9.5" font-weight="800" fill="#fff" font-family="Figtree, Arial, sans-serif">${ch}</text>` : '') + '</svg>';
-  // A note head with a finger number beside it.
-  const fingerIco = (on) => `<svg class="cyc-ico" viewBox="0 0 30 16" style="width:30px;height:18px" aria-hidden="true"><ellipse cx="9.5" cy="8" rx="7.6" ry="5.4" transform="rotate(-20 9.5 8)" fill="${on ? '#1D4ED8' : GREY}"/>` +
-    (on ? '<text x="24.5" y="12.6" text-anchor="middle" font-size="12" font-weight="800" fill="#17201C" font-family="Figtree, Arial, sans-serif">1</text>' : '') + '</svg>';
+  // A note head (the button's own words say "Fingers").
+  const fingerIco = (on) => `<svg class="cyc-ico" viewBox="0 0 18 16" style="width:18px;height:16px" aria-hidden="true"><ellipse cx="9" cy="8" rx="7.6" ry="5.4" transform="rotate(-20 9 8)" fill="${on ? '#1D4ED8' : GREY}"/></svg>`;
+  // Where the finger numbers go: a note head with its "1" inside it, or to its right.
+  const FPOS_STEPS = ['inside', 'right'];
+  const FPOS_WORD = { inside: 'inside the notes', right: 'right of the notes' };
+  const FPOS_BADGE = { inside: 'Inside the note', right: 'Right of the note' };
+  const FPOS_AT = { inside: [15, 15.4, '#fff'], right: [26, 15.4, '#17201C'] };
+  const fposIco = (at) => { const [x, y, c] = FPOS_AT[at];
+    return `<svg class="cyc-ico" viewBox="0 0 30 20" style="width:28px;height:19px" aria-hidden="true"><ellipse cx="15" cy="12" rx="7.4" ry="5.3" transform="rotate(-20 15 12)" fill="#1D4ED8"/>` +
+      `<text x="${x}" y="${y}" text-anchor="middle" font-size="${at === 'inside' ? 8.5 : 9.5}" font-weight="800" fill="${c}" font-family="Figtree, Arial, sans-serif">1</text></svg>`; };
+  // The counts under the notes: "1 &", as they are counted.
+  const countIco = (on) => `<svg class="cyc-ico" viewBox="0 0 26 18" style="width:24px;height:17px" aria-hidden="true">` +
+    `<text x="13" y="14.5" text-anchor="middle" font-size="15" font-weight="600" fill="${on ? '#1D5B72' : GREY}" font-family="'EB Garamond', Georgia, serif">1 &amp;</text></svg>`;
+  // One long line (a staff running off to the right) or pages (lines of music stacked on a page).
+  const layoutIco = (layout) => `<svg class="cyc-ico" viewBox="0 0 28 18" style="width:26px;height:17px" aria-hidden="true">` + (layout === 'line'
+    ? '<path d="M1 6h21M1 9h21M1 12h21" stroke="#1D5B72" stroke-width="1.5" fill="none"/><path d="M22.5 5l4.5 4-4.5 4z" fill="#1D5B72"/>'
+    : '<rect x="7" y="1" width="14" height="16" rx="1.8" fill="none" stroke="#1D5B72" stroke-width="1.4"/><path d="M9.5 4.6h9M9.5 6.8h9M9.5 11h9M9.5 13.2h9" stroke="#1D5B72" stroke-width="1.1" fill="none"/>') + '</svg>';
   function renderCycles() {
     $('g-metro').innerHTML = metroIco(state.metro !== 'off') + '<span class="cyc-badge">' + METRO_BADGE[state.metro] + '</span>';
     $('g-metro').setAttribute('aria-label', METRO_WORD[state.metro] + '. Tap to change.');
-    $('g-metro').title = METRO_WORD[state.metro];
     $('g-colors').innerHTML = dotsIco(state.colorMode !== 'off') + '<span class="cyc-badge">' + MARK_BADGE[state.colorMode] + '</span>';
     $('g-colors').setAttribute('aria-label', 'String colors: ' + MARK_WORD[state.colorMode] + '. Tap to change.');
     const lOn = state.letterMode !== 'off';
     $('g-ltype').innerHTML = headIco(lOn, lOn, 'A') + '<span class="cyc-badge">' + MARK_BADGE[state.letterMode] + '</span>';
     $('g-ltype').setAttribute('aria-label', 'Letter names inside the notes: ' + MARK_WORD[state.letterMode] + '. Tap to change.');
-    $('g-fnum').innerHTML = fingerIco(state.fingerMode !== 'off') + '<span class="cyc-badge">' + MARK_BADGE[state.fingerMode] + '</span>';
-    $('g-fnum').setAttribute('aria-label', 'Finger numbers beside the notes: ' + MARK_WORD[state.fingerMode] + '. Tap to change.');
+    $('g-fnum').innerHTML = fingerIco(state.fingerMode !== 'off') + '<span class="cyc-badge">Fingers: ' + MARK_BADGE[state.fingerMode] + '</span>';
+    $('g-fnum').setAttribute('aria-label', 'Finger numbers: ' + MARK_WORD[state.fingerMode] + '. Tap to change.');
+    $('g-fpos').innerHTML = fposIco(state.fingers) + '<span class="cyc-badge">' + FPOS_BADGE[state.fingers] + '</span>';
+    $('g-fpos').setAttribute('aria-label', 'Finger numbers go ' + FPOS_WORD[state.fingers] + '. Tap to change.');
+    $('g-layout').innerHTML = layoutIco(state.layout) + '<span class="cyc-badge">' + (state.layout === 'line' ? 'Line' : 'Pages') + '</span>';
+    $('g-layout').setAttribute('aria-label', 'Music: ' + (state.layout === 'line' ? 'one long line' : 'pages') + '. Tap to change.');
+    // Pointing at a button (mouse) says what it does, as the panel used to.
+    const cOn = state.countAlong;
+    $('g-count').innerHTML = countIco(cOn) + '<span class="cyc-badge"><span class="wide-only">Counting: </span>' + (cOn ? 'On' : 'Off') + '</span>';
+    $('g-count').setAttribute('aria-label', 'Counts under the notes: ' + (cOn ? 'on' : 'off') + '. Tap to change.');
+    for (const id of ['g-metro', 'g-colors', 'g-ltype', 'g-fnum', 'g-fpos', 'g-layout', 'g-count']) $(id).title = $(id).getAttribute('aria-label').replace(/\. Tap to change\.$/, '');
   }
   function toast(text, ms = 1700) {
     const el = $('toast');
@@ -818,6 +828,13 @@ body.following .host-only { display: none !important; }
   $('g-colors').addEventListener('click', () => { setPop(null); state.colorMode = nextOf(STEP_MARKS, state.colorMode); changed({ marks: true, size: true }); toast('String colors: ' + MARK_WORD[state.colorMode]); });
   $('g-fnum').addEventListener('click', () => { setPop(null); state.fingerMode = nextOf(STEP_MARKS, state.fingerMode); changed({ marks: true, size: true }); toast('Finger numbers: ' + MARK_WORD[state.fingerMode]); });
   $('g-ltype').addEventListener('click', () => { setPop(null); state.letterMode = nextOf(STEP_MARKS, state.letterMode); changed({ marks: true, size: true }); toast('Letter names: ' + MARK_WORD[state.letterMode]); });
+  $('g-fpos').addEventListener('click', () => { setPop(null); state.fingers = nextOf(FPOS_STEPS, state.fingers); changed({ marks: true, size: true }); toast('Finger numbers: ' + FPOS_WORD[state.fingers]); });
+  $('g-layout').addEventListener('click', () => {
+    setPop(null);
+    state.layout = state.layout === 'line' ? 'page' : 'line';
+    changed({ size: true, layout: true });
+    toast(state.layout === 'line' ? 'Music: one long line' : 'Music: pages');
+  });
   // ---- Parts: what is on the page, and what plays ----
   // A level on each row, with an eye and a speaker for each instrument: every part is on the page or not, and plays
   // or not, on its own.
@@ -850,11 +867,37 @@ body.following .host-only { display: none !important; }
     TIERS.forEach((t, ti) => {
       const name = mixCell(list, 'mix-name', '');
       name.title = t.note;
-      name.innerHTML = '<span class="lvl-long"></span><span class="lvl-short"></span>';
-      name.firstChild.textContent = t.name; name.lastChild.textContent = TIER_SHORT[ti];
+      name.innerHTML = '<span class="lvl-long"></span><span class="lvl-short"></span><span class="lvl-same"></span>';
+      name.children[0].textContent = t.name; name.children[1].textContent = TIER_SHORT[ti];
+      name.children[2].id = 'same-' + ti;
       INSTRUMENTS.forEach((name, i) => mixTog(list, 'see', 'see-' + ti + '-' + i, 'See ' + name + ', ' + t.name, () => { noteTier = ti; toggleSee(trackIndex(ti, i)); }));
       mixCell(list, 'mix-gap hcol', '', true);
       INSTRUMENTS.forEach((name, i) => mixTog(list, 'hear', 'hear-' + ti + '-' + i, 'Hear ' + name + ', ' + t.name, () => { noteTier = ti; hearPart(trackIndex(ti, i)); }));
+    });
+  }
+  // Which parts at each level play the same notes, from the score: the same rhythm and the same note names (so the
+  // tune an octave lower counts). A line under the level's name says so, and pointing at a part names its match.
+  const andList = (a) => a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+  function markSame() {
+    const tune = (track) => track.staves[0].bars.flatMap((bar, bi) => bar.voices[0].beats.filter(b => !b.isRest)
+      .map(b => (score.masterBars[bi].start + b.playbackStart) + ':' + b.playbackDuration + ':'
+        + b.notes.map(n => ((n.realValue % 12) + 12) % 12).sort((x, y) => x - y).join('.'))).join(',');
+    TIERS.forEach((_, t) => {
+      const groups = new Map();
+      INSTRUMENTS.forEach((_, i) => {
+        const k = tune(score.tracks[trackIndex(t, i)]);
+        if (k) { if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); }
+      });
+      const same = [...groups.values()].filter(g => g.length > 1);
+      $('same-' + t).textContent = same.length === 1 && same[0].length === 4 ? 'all parts have the same notes'
+        : same.map(g => andList(g.map(i => INSTRUMENTS[i].toLowerCase())).replace(' and ', ' & ') + ' have the same notes').join('\n');
+      same.forEach((g) => g.forEach((i) => {
+        const note = ' (same notes as ' + andList(g.filter(k => k !== i).map(k => INSTRUMENTS[k])) + ')';
+        for (const id of ['see-' + t + '-' + i, 'hear-' + t + '-' + i]) {
+          const b = $(id);
+          b.title += note; b.setAttribute('aria-label', b.getAttribute('aria-label') + note);
+        }
+      }));
     });
   }
   function toggleSee(ti) {
@@ -915,30 +958,10 @@ body.following .host-only { display: none !important; }
   function buildControls() {
     renderCycles();
     renderMix();
-    const fing = $('fingerOpts'); fing.replaceChildren();
-    [{ id: 'inside', label: 'Inside the notes' }, { id: 'left', label: 'Left of the notes' }, { id: 'right', label: 'Right of the notes' }, { id: 'above', label: 'Above the notes' }].forEach((f) => {
-      const b = chip(f.label, { role: 'radio', 'aria-checked': String(f.id === state.fingers), id: 'finger-' + f.id });
-      b.addEventListener('click', () => { if (state.fingers !== f.id) { state.fingers = f.id; changed({ marks: true, size: true }); } });
-      fing.append(b);
-    });
-    $('fingerRow').hidden = state.fingerMode === 'off' || !fingersShown();
-    $('fnumOpts').parentNode.hidden = !fingersShown();
+    // Open Strings parts have no finger numbers, so their buttons go while only those are on the page.
     $('g-fnum').hidden = !fingersShown();
-    const lay = $('layoutOpts'); lay.replaceChildren();
-    [{ id: 'line', label: 'One long line' }, { id: 'page', label: 'Pages' }].forEach((l) => {
-      const b = chip(l.label, { role: 'radio', 'aria-checked': String(l.id === state.layout), id: 'layout-' + l.id });
-      b.addEventListener('click', () => { if (state.layout !== l.id) { state.layout = l.id; changed({ size: true, layout: true }); } });
-      lay.append(b);
-    });
+    $('g-fpos').hidden = state.fingerMode === 'off' || !fingersShown();
     $('sheet').classList.toggle('line', state.layout === 'line');
-    for (const [boxId, key, prefix] of [['colorOpts', 'colorMode', 'color-'], ['fnumOpts', 'fingerMode', 'fnum-']]) {
-      const box = $(boxId); box.replaceChildren();
-      MARK_MODES.forEach((m) => {
-        const b = chip(m.label, { role: 'radio', 'aria-checked': String(m.id === state[key]), id: prefix + m.id });
-        b.addEventListener('click', () => { if (state[key] !== m.id) { state[key] = m.id; changed({ marks: true, size: true }); } });
-        box.append(b);
-      });
-    }
     renderKey();
     $('sheet').classList.toggle('show-line', state.follow !== 'pulse');
     showTempo();
@@ -975,7 +998,7 @@ body.following .host-only { display: none !important; }
     if (r.height) document.documentElement.style.setProperty('--dock-h', Math.round(window.innerHeight - r.top + 10) + 'px');
   }
   // One round button per group; each opens its own small panel above the buttons. Only one is open at a time.
-  const GROUPS = ['page', 'tempo'];
+  const GROUPS = ['tempo'];
   let openPop = null;
   function setPop(name) {
     openPop = name;
@@ -2316,7 +2339,7 @@ body.following .host-only { display: none !important; }
     const wrap = $('sheet').querySelector('.at-cursors');
     if (wrap) for (const l of [loopLayer, countLayer, markLayer]) wrap.appendChild(l); // in this order: loop shading, counts, start frame
     countRows = [];
-    if (!api || !api.boundsLookup || !score) { placeCountTog(); return; }
+    if (!api || !api.boundsLookup || !score) { showCounting(); return; }
     const lookup = api.boundsLookup;
     const sz = countSize(api.settings.display.scale);
     const frag = document.createDocumentFragment();
@@ -2403,7 +2426,7 @@ body.following .host-only { display: none !important; }
     }
     countLayer.appendChild(frag);
     moveDynamics(sz);
-    placeCountTog();
+    showCounting();
   }
   function staffTopBelow(barBounds) {
     const vb = barBounds.visualBounds, sys = barBounds.masterBarBounds.staffSystemBounds;
@@ -2465,34 +2488,8 @@ body.following .host-only { display: none !important; }
     }
     if (found.length) ink = null;
   }
-  // The Counting switch sits just before the first count, level with the row; it waits at the left edge while the line scrolls.
-  function placeCountTog() {
-    const tog = $('countTog');
-    const surf = $('sheet').querySelector('.at-surface');
-    const row = countRows.reduce((a, r) => (!a || r.y0 < a.y0 ? r : a), null); // the top row
-    const words = state.countAlong ? 'Counts under the notes: on. Tap to hide them.' : 'Counts under the notes: off. Tap to show them.';
-    tog.setAttribute('aria-pressed', String(state.countAlong));
-    tog.setAttribute('aria-label', words); tog.title = words;
-    $('sheet').classList.toggle('counts-off', !state.countAlong);
-    if (!row || !surf) { tog.hidden = true; return; }
-    const sz = countSize(api.settings.display.scale);
-    const wrap = tog.parentNode.getBoundingClientRect(), s = surf.getBoundingClientRect();
-    const h = Math.round(Math.min(44, Math.max(24, sz * 0.8)));
-    Object.assign(tog.style, { height: h + 'px', fontSize: Math.round(h * 0.54) + 'px', top: Math.round(s.top - wrap.top + (row.y0 + row.y1) / 2 - h / 2) + 'px' });
-    tog.hidden = false;
-    // Just before the first count of the line. When the music scrolls past, it stops at the left edge and waits there.
-    const gap = Math.max(10, sz * 0.35);
-    togHome = s.left - wrap.left + row.first - sz / 2 - gap - tog.offsetWidth + $('sheet').scrollLeft;
-    slideCountTog();
-  }
-  let togHome = 0; // where the switch sits (left edge, relative to the music's box) with the music scrolled to its start
-  function slideCountTog() {
-    const tog = $('countTog');
-    const want = togHome - $('sheet').scrollLeft, stuck = want < 6;
-    tog.style.left = Math.round(stuck ? 6 : want) + 'px';
-    tog.classList.toggle('stuck', stuck);
-  }
-  $('sheet').addEventListener('scroll', () => { if (!$('countTog').hidden) slideCountTog(); }, { passive: true });
+  // The counts under the notes, on or off (the Counting button in the strip). Off, the row keeps its room.
+  function showCounting() { $('sheet').classList.toggle('counts-off', !state.countAlong); }
   function showZoom() {
     const i = ZOOMS.indexOf(state.zoom);
     $('zoomOut').disabled = i <= 0; $('zoomIn').disabled = i >= ZOOMS.length - 1;
@@ -2506,10 +2503,11 @@ body.following .host-only { display: none !important; }
   $('zoomIn').addEventListener('click', () => stepZoom(1));
   $('zoomOut').addEventListener('click', () => stepZoom(-1));
   showZoom();
-  $('countTog').addEventListener('click', () => {
+  $('g-count').addEventListener('click', () => {
+    setPop(null);
     state.countAlong = !state.countAlong;
-    save();
-    placeCountTog();
+    save(); renderCycles(); showCounting();
+    toast(state.countAlong ? 'Counting: on' : 'Counting: off');
   });
   // The lowest ink of this staff across its whole line of music (low notes, stems, beams, ledger lines),
   // so the counts sit in one level row just below it. alphaTab's bounds stop at the staff lines, so this
@@ -3084,6 +3082,7 @@ body.following .host-only { display: none !important; }
       score = alphaTab.importer.ScoreLoader.loadScoreFromBytes(new Uint8Array(xmlBuf), s);
     } catch (e) { return fail('The score file could not be read.'); }
     prepareScore();
+    markSame();
 
     api = new alphaTab.AlphaTabApi($('sheet'), s);
     api.customScrollHandler = scroller;
