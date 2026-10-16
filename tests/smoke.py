@@ -15,12 +15,15 @@ What it checks
      which doesn't allow it): no Full screen button.
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
      the teacher conducts, a student follows, and the student's music keeps up with the teacher's.
+  4. The app layer: the browser can install the site, every file is saved after one visit, every song
+     opens and plays with the server stopped and the network off, and an update reaches the saved
+     copy without downloading the unchanged files (the string sounds) again.
 
 Offline options (only needed where the internet is filtered):
   ALPHATAB_JS=/path/to/alphaTab.min.js   serve alphaTab from a local copy instead of jsdelivr
   NO_WEBFONTS=1                           skip Google Fonts
 """
-import asyncio, json, os, sys, threading
+import asyncio, json, os, re, sys, threading
 from functools import partial
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
@@ -44,11 +47,33 @@ class Quiet(SimpleHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
+    def do_GET(self):
+        self.server.asked.append(self.path)
+        if self.path.split('?')[0] == '/sw.js' and self.server.sw is not None:
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/javascript')
+            self.send_header('Content-Length', str(len(self.server.sw)))
+            self.end_headers()
+            self.wfile.write(self.server.sw)
+            return
+        super().do_GET()
 
-def serve():
-    httpd = ThreadingHTTPServer(('127.0.0.1', 0), partial(Quiet, directory=str(ROOT)))
+
+class Server(ThreadingHTTPServer):
+    asked = None  # paths asked for, in order
+    sw = None     # bytes served as /sw.js in place of the built one (to act out a new version)
+
+    def handle_error(self, request, client_address):
+        if not isinstance(sys.exc_info()[1], ConnectionError):  # a test window closed mid-download
+            super().handle_error(request, client_address)
+
+
+def serve(keep=False):
+    httpd = Server(('127.0.0.1', 0), partial(Quiet, directory=str(ROOT)))
+    httpd.asked = []
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
-    return f'http://127.0.0.1:{httpd.server_address[1]}'
+    base = f'http://127.0.0.1:{httpd.server_address[1]}'
+    return (base, httpd) if keep else base
 
 
 async def setup(ctx):
@@ -175,6 +200,110 @@ async def preview_checks(browser, base):
     await ctx.close()
 
 
+# Which of the files listed in sw.js are not saved yet (run in a page of the site).
+MISSING_JS = r'''async () => {
+  const text = await (await fetch('sw.js', { cache: 'no-store' })).text();
+  const files = JSON.parse(text.match(/const FILES = (\{.*\});/)[1]);
+  const keys = new Set((await (await caches.open('gsa-files')).keys()).map((r) => r.url));
+  const root = new URL('sw.js', location).href.replace(/sw\.js$/, '');
+  return Object.entries(files).filter(([u, rev]) => {
+    const url = new URL(u, root).href;
+    return !keys.has(url + (url.includes('?') ? '&' : '?') + '__rev=' + rev);
+  }).map(([u]) => u);
+}'''
+
+# Ask the browser to look for a new sw.js, and wait until it has taken over (or say why not).
+UPDATE_JS = '''async () => {
+  const reg = await navigator.serviceWorker.getRegistration();
+  await reg.update();
+  const next = reg.installing || reg.waiting;
+  if (!next) return 'no new version found';
+  return new Promise((done) => {
+    const look = () => { if (next.state === 'activated') done('ok'); if (next.state === 'redundant') done('the new version failed to install'); };
+    next.addEventListener('statechange', look); look();
+  });
+}'''
+
+LETTERING_JS = '''() => document.fonts.check('600 16px Figtree') && document.fonts.check('600 16px "EB Garamond"')'''
+
+
+async def app_checks(browser):
+    """The installable, offline site: what a student gets from "Add to Home Screen"."""
+    print('App: install, offline, updates')
+    base, httpd = serve(keep=True)
+    ctx = await browser.new_context(device_scale_factor=1)
+    await setup(ctx)
+    errors = []
+    pg = await ctx.new_page()
+    pg.on('pageerror', lambda e: errors.append(str(e)))
+    await pg.goto(base + '/')
+    try:
+        await pg.wait_for_function('() => !!navigator.serviceWorker.controller', timeout=120000)
+        saved = True
+    except Exception:
+        saved = False
+    check(saved, 'the offline copy is saved after one visit')
+    cdp = await ctx.new_cdp_session(pg)
+    blockers = (await cdp.send('Page.getInstallabilityErrors')).get('installabilityErrors', [])
+    check(not blockers, 'the browser offers to install it' + (f': {blockers}' if blockers else ''))
+    if saved:
+        missing = await pg.evaluate(MISSING_JS)
+        check(not missing, 'every file in sw.js is saved' + (f' (missing {missing})' if missing else ''))
+
+        # A new version where one song page changed: only that page is fetched again, the string sounds stay.
+        sw = (ROOT / 'sw.js').read_text(encoding='utf-8')
+        files = json.loads(re.search(r'const FILES = (\{.*\});', sw).group(1))
+        first = f"songs/{SONGS[0]['slug']}/"
+        files[first] = 'new-build'
+        httpd.sw = re.sub(r'const FILES = \{.*\};', lambda m: 'const FILES = ' + json.dumps(files) + ';', sw).encode('utf-8')
+        httpd.asked.clear()
+        result = await pg.evaluate(UPDATE_JS)
+        check(result == 'ok', f'a new version takes over the saved copy ({result})')
+        again = [a for a in httpd.asked if a.split('?')[0] != '/sw.js']
+        check(again == [f'/{first}'], f'only the changed file is fetched again (fetched {again})')
+        missing = await pg.evaluate(MISSING_JS)
+        check(not missing, 'the new version has every file saved' + (f' (missing {missing})' if missing else ''))
+
+    # Network off, server gone.
+    httpd.shutdown()
+    httpd.server_close()
+    await ctx.set_offline(True)
+    home = await ctx.new_page()
+    home.on('pageerror', lambda e: errors.append(str(e)))
+    try:
+        await home.goto(base + '/')
+        cards = await home.evaluate("() => document.querySelectorAll('a.song').length")
+    except Exception as e:
+        cards = e.__class__.__name__
+    check(cards == len(SONGS), f'offline: home page shows {len(SONGS)} cards (got {cards})')
+    for song in SONGS:
+        slug = song['slug']
+        try:
+            sp = await open_reader(ctx, f'{base}/songs/{slug}/', errors, slug, 844, 390)
+        except Exception as e:
+            check(False, f'offline: {slug} opens ({e.__class__.__name__})')
+            continue
+        drawn = await sp.evaluate("() => document.querySelectorAll('#sheet .at-surface > *').length")
+        check(drawn > 0, f'offline: {slug} draws its notes')
+        await sp.click('#play')
+        await sp.wait_for_timeout(2500)
+        tick = await sp.evaluate('() => reader.at()')
+        check(tick > 0, f'offline: {slug} plays (tick {round(tick)})')
+        await sp.click('#play')
+        if not os.environ.get('NO_WEBFONTS'):
+            check(await sp.evaluate(LETTERING_JS), f'offline: {slug} has its lettering')
+        await sp.close()
+    stray = await ctx.new_page()
+    try:
+        await stray.goto(base + '/songs/not-saved/')
+        cards = await stray.evaluate("() => document.querySelectorAll('a.song').length")
+    except Exception as e:
+        cards = e.__class__.__name__
+    check(cards == len(SONGS), f'offline: a page that was never saved shows the home page (got {cards})')
+    check(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
+    await ctx.close()
+
+
 async def main():
     base = serve()
     async with async_playwright() as p:
@@ -182,6 +311,7 @@ async def main():
         await home_checks(browser, base)
         await song_checks(browser, base)
         await preview_checks(browser, base)
+        await app_checks(browser)
         await browser.close()
     print()
     if failures:
