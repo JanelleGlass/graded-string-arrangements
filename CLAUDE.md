@@ -1,7 +1,8 @@
 # Graded String Arrangements (website)
 
-Janelle's free public website: hymns and carols arranged in six levels for violin, viola,
-cello and bass, each with a play-along reader. Janelle is a Suzuki strings teacher, not a
+Janelle's free public website: hymns and carols arranged for violin, viola, cello and bass in
+levels from open strings to advanced (four levels and three voices; songs built before 2026-10-16
+have six levels), each with a play-along reader. Janelle is a Suzuki strings teacher, not a
 programmer: tell her what changed on the page, not in the code.
 
 - Live: https://graded-string-arrangements.vercel.app
@@ -35,9 +36,7 @@ Commands (on Janelle's Windows PC use `python`; elsewhere `python3`):
     python tools/build_site.py
     python tests/smoke.py
 
-The test checks the Parts panel on the first 24-part song and the first 34-part song in `songs.json`. Until a
-34-part song is on the site, give it one to try in place of the first song's score:
-`VOICES_SCORE="../Christmas Collection/The First Noel/The-First-Noel.xml" python tests/smoke.py`.
+The test checks the Parts panel on the first 24-part song and the first 34-part song in `songs.json`.
 
 The test needs Playwright once per computer: `python -m pip install playwright` then
 `python -m playwright install chromium`. To look at a page yourself: `python -m http.server 8000`
@@ -68,7 +67,10 @@ Only after Janelle has checked the finished arrangement in the Music Arrangement
 3. Update the Claude preview: publish `reader/reader.html` as an artifact to
    https://claude.ai/artifact/WqVvah4mND1xSPHvPpybTv (pass that URL so it updates in place).
    Don't change its capabilities: it uses the `room` capability for the conductor. Its score,
-   font and sound files are already published there and are kept.
+   font and sound files are already published there and are kept. The preview plays the
+   four-level First Noel, so publish a copy of the reader with its two "six levels" lines (the
+   meta description and the About box) worded as the build words them for a 34-part song; the
+   master reader keeps "six levels" because the build swaps those lines song by song.
 4. Push when Janelle says go.
 
 If a reader change touches one of the song-specific strings the build swaps out (title, About box
@@ -78,7 +80,7 @@ one goes missing.
 
 ## The two versions of the reader
 
-- **Claude preview** (the artifact above): plays The First Noel, and has the conductor ("Play
+- **Claude preview** (the artifact above): plays The First Noel (four levels, 34 parts), and has the conductor ("Play
   together": the teacher's device leads, students' devices follow) through `window.claude`.
 - **Public site**: the same reader built per song. `window.claude` doesn't exist there, so the
   conductor hides itself. Planned later: a conductor on her own site, which needs a backend
