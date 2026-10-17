@@ -19,7 +19,8 @@ What it checks
      puts it on the page, the parts on the page play until "Hear the parts I see" is unticked and a
      speaker for each part chooses, and choices survive a reload.
      Songs in levels and voices (34 parts): a row for each level and voice, the cello and bass Inner
-     cells greyed out in place (a tap says why), the group rule over the table, and choices saved with
+     cells greyed out in place (a tap says why), the group rule over the table, the size buttons and
+     Line or Pages moved over beside the open panel (not under it), and choices saved with
      the six levels moving to their match. Run on the first 34-part song in songs.json; until there is
      one, give a 34-part score to try it on in place of the first song's:
          VOICES_SCORE="../Christmas Collection/The First Noel/The-First-Noel.xml" python tests/smoke.py
@@ -332,6 +333,14 @@ async def parts_checks(browser, base):
 
 VOICE_ROWS = ['Open Strings', 'Easy Melody', 'Easy Inner', 'Easy Bass Line', 'Melody', 'Inner', 'Bass Line',
               'Advanced Melody', 'Advanced Inner', 'Advanced Bass Line']
+# The size buttons and Line or Pages (where shown) can be tapped, and don't sit on the Strings key.
+TOOLS_CLEAR_JS = """() => {
+  const tools = ['zoomOut', 'zoomIn', 'g-layout'].map(id => document.getElementById(id)).filter(b => b.offsetParent);
+  const tapped = tools.every(b => { const r = b.getBoundingClientRect(), h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return h && b.contains(h); });
+  const key = document.getElementById('legend');
+  const keyClear = key.hidden || getComputedStyle(key).visibility === 'hidden' || key.getBoundingClientRect().right <= document.getElementById('topTools').getBoundingClientRect().left;
+  return tapped && keyClear;
+}"""
 
 
 async def voices_checks(browser, base):
@@ -369,6 +378,7 @@ async def voices_checks(browser, base):
         check(await pg.is_visible('#mixParts .group-rule') and rule.startswith('One player on Melody'), f'{label}: the group rule shows over the table ("{rule}")')
         wide = await pg.evaluate('() => document.documentElement.scrollWidth - window.innerWidth')
         check(wide <= 1, f'{label}: no sideways scrolling ({wide}px extra)')
+        check(await pg.evaluate(TOOLS_CLEAR_JS), f'{label}: with the panel open, the size buttons and Line or Pages sit beside it, clear of the Strings key')
         if label != 'laptop':
             check(not errors, f'{label}: no script errors' + (f': {errors[:3]}' if errors else ''))
             await ctx.close()
@@ -385,6 +395,8 @@ async def voices_checks(browser, base):
         await pg.click('#hearSame')
         speakers = await pg.evaluate("() => [...document.querySelectorAll('#mixParts .tog.hear')].filter(b => b.offsetParent).map(b => b.classList.contains('none'))")
         check(speakers.count(False) == 34 and speakers.count(True) == 6, 'unticking "Hear the parts I see" shows a speaker for every part, greyed out where there is no part')
+        await pg.wait_for_timeout(300)
+        check(await pg.evaluate(TOOLS_CLEAR_JS), 'the wider panel (with the speakers) still leaves the size buttons and Line or Pages beside it')
         await pg.reload()
         await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
         check(await pg.evaluate(SHOWN_JS) == [4, 9, 12], 'the choices are still there after a reload')

@@ -128,7 +128,12 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   keeps one width (its longest label) so nothing beside it shifts (Janelle, 2026-10-16).
 - The size of the music (− / +, 0.3x to 1.75x) and, on bigger screens, Line or Pages sit at the top
   right of the music, in the band with the Strings key, so they never cover notes (moved there from
-  the strip on 2026-10-16). The band always keeps its room, even with string colors off.
+  the strip on 2026-10-16). The band always keeps its room, even with string colors off. While Parts
+  is open they slide over with the panel's edge and sit just beside it, never under it (Janelle found
+  them hidden by the panel, 2026-10-17). Where that leaves too little room beside the Strings key (a
+  tablet held upright), the key and the buttons take their phone size; then the key drops the word
+  "Strings" and keeps its coloured letters; and with no room at all (a small phone with the Hear
+  speakers out) the key steps aside until the panel closes. The music doesn't move for any of this.
 - What's drawn on the page has no panel: each setting is its own tap-to-change button in the strip,
   stepping through its choices and showing a toast, the same buttons on every screen: string colors
   (All, 1st, Off), On the note, and Counting (on, off). On the note steps through five looks, each

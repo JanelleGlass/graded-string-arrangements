@@ -136,10 +136,27 @@ h1 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: c
 .key-dock { position: absolute; left: 0; top: 0; right: 0; height: 0; z-index: 5; pointer-events: none; }
 .sheet.keyed { padding-top: 46px; }
 /* Top right of the music, in the same band as the Strings key (so they never cover notes): the size of the music,
-   and on bigger screens one long line or pages */
-.top-tools { position: absolute; right: 10px; top: 5px; display: flex; align-items: center; gap: 8px; pointer-events: auto; }
+   and on bigger screens one long line or pages. While Parts is open they slide over to sit just beside the panel
+   (--tools-shift), so they are never under it. */
+.top-tools { --tools-pad: 10px; position: absolute; right: calc(var(--tools-pad) + var(--tools-shift, 0px)); top: 5px; display: flex; align-items: center; gap: 8px; pointer-events: auto; transition: right 0.22s ease; }
 .top-tools .zoom-pill, .top-tools .fab-btn { height: 36px; }
 .top-tools .zoom-pill button { width: 36px; font-size: 20px; }
+/* Too little room between the Strings key and the open panel (a tablet held upright): the key and the buttons take
+   their phone size. The band keeps its height, so the music doesn't move. */
+.key-dock.tight .key { top: 12px; gap: 5px; padding: 3px 8px 3px 10px; }
+.key-dock.tight .key-lbl { font-size: 0.7rem; }
+.key-dock.tight .key-head { width: 24px; height: 18px; }
+.key-dock.tight .key-head b { font-size: 0.74rem; }
+.key-dock.tight .top-tools { top: 8px; gap: 6px; }
+.key-dock.tight .top-tools .zoom-pill, .key-dock.tight .top-tools .fab-btn { height: 30px; }
+.key-dock.tight .top-tools .zoom-pill button { width: 32px; font-size: 18px; }
+.key-dock.tight .top-tools .fab-btn.cyc { gap: 4px; padding: 0 8px; }
+.key-dock.tight .top-tools .cyc-badge { font-size: 0.7rem; }
+/* Still too little room (an iPad mini upright): the key drops its word and keeps its coloured letters. With none at all
+   (a small phone with the Hear speakers out), the key steps aside until the panel closes. */
+.key-dock.bare .key-lbl { display: none; }
+.key-dock.bare .key { padding-left: 8px; }
+.key-dock.nokey .key { visibility: hidden; }
 .key { position: absolute; left: 10px; top: 8px; display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px 5px 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.92); border: 1px solid #D5DCD9; box-shadow: 0 1px 3px rgba(18, 22, 20, 0.08); font-family: var(--font-body); }
 .key[hidden] { display: none; }
 .key-lbl { font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em; color: #55615B; margin-right: 2px; }
@@ -434,7 +451,7 @@ body.following .host-only { display: none !important; }
   .zoom-pill button { width: 36px; font-size: 20px; }
   .key { left: 6px; top: 6px; gap: 5px; padding: 3px 8px 3px 10px; }
   .sheet.keyed { padding-top: 36px; }
-  .top-tools { right: 6px; top: 3px; gap: 6px; }
+  .top-tools { --tools-pad: 6px; top: 3px; gap: 6px; }
   .top-tools .zoom-pill, .top-tools .fab-btn { height: 30px; }
   .top-tools .zoom-pill button { width: 32px; font-size: 18px; }
   .key-lbl { font-size: 0.7rem; }
@@ -470,7 +487,7 @@ body.following .host-only { display: none !important; }
   .toggle { padding: 5px 10px; font-size: 0.82rem; }
   .key { left: 6px; top: 4px; gap: 5px; padding: 3px 8px 3px 10px; }
   .sheet.keyed { padding-top: 32px; }
-  .top-tools { right: 6px; top: 2px; gap: 6px; }
+  .top-tools { --tools-pad: 6px; top: 2px; gap: 6px; }
   .top-tools .zoom-pill, .top-tools .fab-btn { height: 27px; }
   .top-tools .zoom-pill button { width: 30px; font-size: 17px; }
   .key-lbl { font-size: 0.7rem; }
@@ -1139,8 +1156,27 @@ body.following .host-only { display: none !important; }
   }
   $('g-parts').addEventListener('click', () => setParts(!partsOpen));
   $('partsX').addEventListener('click', () => { setParts(false); $('g-parts').focus(); });
-  // The panel's width follows its table (short level names on phones, a phone turned around).
-  try { new ResizeObserver(() => { if (partsOpen) document.documentElement.style.setProperty('--drawer-w', $('pop-parts').offsetWidth + 'px'); }).observe($('pop-parts')); } catch {}
+  // The size of the music and Line or Pages sit at the top right of the music. While the panel is open they move over
+  // to sit just beside it. When that leaves too little room beside the Strings key, the key and the buttons take their
+  // phone size, then the key drops its word, then it steps aside until the panel closes.
+  function placeTools() {
+    const dock = document.querySelector('.key-dock'), tools = $('topTools'), key = $('legend');
+    dock.classList.remove('tight', 'bare', 'nokey');
+    let shift = 0;
+    if (partsOpen) {
+      const panelLeft = document.documentElement.clientWidth - $('pop-parts').offsetWidth;
+      const right = document.querySelector('.sheet-wrap').getBoundingClientRect().right;
+      shift = Math.max(0, Math.round(right - panelLeft));
+      const fits = () => key.hidden || right - parseFloat(getComputedStyle(tools).getPropertyValue('--tools-pad')) - shift - tools.offsetWidth >= key.getBoundingClientRect().right + 8;
+      const steps = document.documentElement.classList.contains('small') ? ['bare', 'nokey'] : ['tight', 'bare', 'nokey'];
+      for (const s of steps) { if (fits()) break; dock.classList.add(s); }
+    }
+    document.documentElement.style.setProperty('--tools-shift', shift + 'px');
+  }
+  // The panel's width follows its table (short level names on phones, a phone turned around, the Hear speakers).
+  try { new ResizeObserver(() => { if (partsOpen) { document.documentElement.style.setProperty('--drawer-w', $('pop-parts').offsetWidth + 'px'); requestAnimationFrame(placeTools); } }).observe($('pop-parts')); } catch {}
+  // The Strings key changes with the parts on the page (a violin and a cello have five strings between them).
+  try { new ResizeObserver(() => { if (partsOpen) requestAnimationFrame(placeTools); }).observe($('legend')); } catch {}
   // A tap anywhere else (the music, the settings) folds the open panel away.
   document.addEventListener('pointerdown', (e) => { if (openPop && !$('fab').contains(e.target)) setPop(null); });
   // The settings switch: everything except Play (and Conduct / Follow when it's on) folds away behind it.
@@ -3145,6 +3181,7 @@ body.following .host-only { display: none !important; }
     const b = document.body, edge = b.getBoundingClientRect().right - parseFloat(getComputedStyle(b).paddingRight);
     root.setProperty('--to-tab', Math.max(0, Math.round(edge - r.right)) + 'px');
     setDockH();
+    placeTools();
   }
   try { new ResizeObserver(placeFab).observe(mainCol); new ResizeObserver(setDockH).observe($('fabMain')); } catch {}
   window.addEventListener('resize', placeFab);
