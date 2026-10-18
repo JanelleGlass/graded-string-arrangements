@@ -81,7 +81,7 @@ one goes missing.
 
 ## The two versions of the reader
 
-- **Claude preview** (the artifact above): plays The First Noel (four levels, 34 parts), and has the conductor ("Play
+- **Claude preview** (the artifact above): plays The First Noel (four levels, 40 parts), and has the conductor ("Play
   together": the teacher's device leads, students' devices follow) through `window.claude`.
 - **Public site**: the same reader built per song. `window.claude` doesn't exist there, so the
   conductor hides itself. Planned later: a conductor on her own site, which needs a backend
