@@ -6115,26 +6115,13 @@
           <step>E</step>
           <octave>4</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>12</duration>
         <type>quarter</type>
+        <dot />
         <notehead color="#1D4ED8">normal</notehead>
         <notations>
           <technical>
             <fingering>1</fingering>
-          </technical>
-        </notations>
-      </note>
-      <note color="#15803D">
-        <pitch>
-          <step>B</step>
-          <octave>3</octave>
-        </pitch>
-        <duration>4</duration>
-        <type>eighth</type>
-        <notehead color="#15803D">normal</notehead>
-        <notations>
-          <technical>
-            <fingering>2</fingering>
           </technical>
         </notations>
       </note>
@@ -6254,22 +6241,9 @@
           <step>B</step>
           <octave>3</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>12</duration>
         <type>quarter</type>
-        <notehead color="#15803D">normal</notehead>
-        <notations>
-          <technical>
-            <fingering>2</fingering>
-          </technical>
-        </notations>
-      </note>
-      <note color="#15803D">
-        <pitch>
-          <step>B</step>
-          <octave>3</octave>
-        </pitch>
-        <duration>4</duration>
-        <type>eighth</type>
+        <dot />
         <notehead color="#15803D">normal</notehead>
         <notations>
           <technical>
@@ -6363,26 +6337,13 @@
           <step>E</step>
           <octave>4</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>12</duration>
         <type>quarter</type>
+        <dot />
         <notehead color="#1D4ED8">normal</notehead>
         <notations>
           <technical>
             <fingering>1</fingering>
-          </technical>
-        </notations>
-      </note>
-      <note color="#15803D">
-        <pitch>
-          <step>B</step>
-          <octave>3</octave>
-        </pitch>
-        <duration>4</duration>
-        <type>eighth</type>
-        <notehead color="#15803D">normal</notehead>
-        <notations>
-          <technical>
-            <fingering>2</fingering>
           </technical>
         </notations>
       </note>
@@ -6515,22 +6476,9 @@
           <step>B</step>
           <octave>3</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>12</duration>
         <type>quarter</type>
-        <notehead color="#15803D">normal</notehead>
-        <notations>
-          <technical>
-            <fingering>2</fingering>
-          </technical>
-        </notations>
-      </note>
-      <note color="#15803D">
-        <pitch>
-          <step>B</step>
-          <octave>3</octave>
-        </pitch>
-        <duration>4</duration>
-        <type>eighth</type>
+        <dot />
         <notehead color="#15803D">normal</notehead>
         <notations>
           <technical>
@@ -6658,23 +6606,10 @@
           <step>E</step>
           <octave>3</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>12</duration>
         <type>quarter</type>
+        <dot />
         <notehead color="#7C3AED">normal</notehead>
-        <notations>
-          <technical>
-            <fingering>2</fingering>
-          </technical>
-        </notations>
-      </note>
-      <note color="#15803D">
-        <pitch>
-          <step>B</step>
-          <octave>3</octave>
-        </pitch>
-        <duration>4</duration>
-        <type>eighth</type>
-        <notehead color="#15803D">normal</notehead>
         <notations>
           <technical>
             <fingering>2</fingering>
@@ -6686,23 +6621,10 @@
           <step>C</step>
           <octave>3</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>12</duration>
         <type>quarter</type>
+        <dot />
         <notehead color="#7C3AED">normal</notehead>
-        <notations>
-          <technical>
-            <fingering>0</fingering>
-          </technical>
-        </notations>
-      </note>
-      <note color="#15803D">
-        <pitch>
-          <step>G</step>
-          <octave>3</octave>
-        </pitch>
-        <duration>4</duration>
-        <type>eighth</type>
-        <notehead color="#15803D">normal</notehead>
         <notations>
           <technical>
             <fingering>0</fingering>
@@ -6797,22 +6719,9 @@
           <step>B</step>
           <octave>3</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>12</duration>
         <type>quarter</type>
-        <notehead color="#15803D">normal</notehead>
-        <notations>
-          <technical>
-            <fingering>2</fingering>
-          </technical>
-        </notations>
-      </note>
-      <note color="#15803D">
-        <pitch>
-          <step>B</step>
-          <octave>3</octave>
-        </pitch>
-        <duration>4</duration>
-        <type>eighth</type>
+        <dot />
         <notehead color="#15803D">normal</notehead>
         <notations>
           <technical>
@@ -6853,17 +6762,17 @@
           </technical>
         </notations>
       </note>
-      <note color="#7C3AED">
+      <note color="#1D4ED8">
         <pitch>
           <step>D</step>
-          <octave>3</octave>
+          <octave>4</octave>
         </pitch>
         <duration>4</duration>
         <type>eighth</type>
-        <notehead color="#7C3AED">normal</notehead>
+        <notehead color="#1D4ED8">normal</notehead>
         <notations>
           <technical>
-            <fingering>1</fingering>
+            <fingering>0</fingering>
           </technical>
         </notations>
       </note>
@@ -6906,23 +6815,10 @@
           <step>E</step>
           <octave>3</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>12</duration>
         <type>quarter</type>
+        <dot />
         <notehead color="#7C3AED">normal</notehead>
-        <notations>
-          <technical>
-            <fingering>2</fingering>
-          </technical>
-        </notations>
-      </note>
-      <note color="#15803D">
-        <pitch>
-          <step>B</step>
-          <octave>3</octave>
-        </pitch>
-        <duration>4</duration>
-        <type>eighth</type>
-        <notehead color="#15803D">normal</notehead>
         <notations>
           <technical>
             <fingering>2</fingering>
@@ -6934,23 +6830,10 @@
           <step>C</step>
           <octave>3</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>12</duration>
         <type>quarter</type>
+        <dot />
         <notehead color="#7C3AED">normal</notehead>
-        <notations>
-          <technical>
-            <fingering>0</fingering>
-          </technical>
-        </notations>
-      </note>
-      <note color="#15803D">
-        <pitch>
-          <step>G</step>
-          <octave>3</octave>
-        </pitch>
-        <duration>4</duration>
-        <type>eighth</type>
-        <notehead color="#15803D">normal</notehead>
         <notations>
           <technical>
             <fingering>0</fingering>
@@ -6990,17 +6873,17 @@
           </technical>
         </notations>
       </note>
-      <note color="#7C3AED">
+      <note color="#1D4ED8">
         <pitch>
           <step>D</step>
-          <octave>3</octave>
+          <octave>4</octave>
         </pitch>
         <duration>4</duration>
         <type>eighth</type>
-        <notehead color="#7C3AED">normal</notehead>
+        <notehead color="#1D4ED8">normal</notehead>
         <notations>
           <technical>
-            <fingering>1</fingering>
+            <fingering>0</fingering>
           </technical>
         </notations>
       </note>
@@ -7058,22 +6941,9 @@
           <step>B</step>
           <octave>3</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>12</duration>
         <type>quarter</type>
-        <notehead color="#15803D">normal</notehead>
-        <notations>
-          <technical>
-            <fingering>2</fingering>
-          </technical>
-        </notations>
-      </note>
-      <note color="#15803D">
-        <pitch>
-          <step>B</step>
-          <octave>3</octave>
-        </pitch>
-        <duration>4</duration>
-        <type>eighth</type>
+        <dot />
         <notehead color="#15803D">normal</notehead>
         <notations>
           <technical>
@@ -7201,8 +7071,9 @@
           <step>E</step>
           <octave>2</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>12</duration>
         <type>quarter</type>
+        <dot />
         <notehead color="#7C3AED">normal</notehead>
         <notations>
           <technical>
@@ -7210,42 +7081,15 @@
           </technical>
         </notations>
       </note>
-      <note color="#15803D">
-        <pitch>
-          <step>B</step>
-          <octave>2</octave>
-        </pitch>
-        <duration>4</duration>
-        <type>eighth</type>
-        <notehead color="#15803D">normal</notehead>
-        <notations>
-          <technical>
-            <fingering>3</fingering>
-          </technical>
-        </notations>
-      </note>
-      <note color="#15803D">
+      <note color="#7C3AED">
         <pitch>
           <step>C</step>
-          <octave>3</octave>
-        </pitch>
-        <duration>8</duration>
-        <type>quarter</type>
-        <notehead color="#15803D">normal</notehead>
-        <notations>
-          <technical>
-            <fingering>4</fingering>
-          </technical>
-        </notations>
-      </note>
-      <note color="#15803D">
-        <pitch>
-          <step>G</step>
           <octave>2</octave>
         </pitch>
-        <duration>4</duration>
-        <type>eighth</type>
-        <notehead color="#15803D">normal</notehead>
+        <duration>12</duration>
+        <type>quarter</type>
+        <dot />
+        <notehead color="#7C3AED">normal</notehead>
         <notations>
           <technical>
             <fingering>0</fingering>
@@ -7340,25 +7184,10 @@
           <step>B</step>
           <octave>2</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>12</duration>
         <type>quarter</type>
+        <dot />
         <notehead color="#15803D">normal</notehead>
-        <notations>
-          <technical>
-            <fingering>3</fingering>
-          </technical>
-        </notations>
-      </note>
-      <note color="#1D4ED8">
-        <pitch>
-          <step>F</step>
-          <alter>1</alter>
-          <octave>3</octave>
-        </pitch>
-        <duration>4</duration>
-        <type>eighth</type>
-        <accidental cautionary="yes">sharp</accidental>
-        <notehead color="#1D4ED8">normal</notehead>
         <notations>
           <technical>
             <fingering>3</fingering>
@@ -7451,8 +7280,9 @@
           <step>E</step>
           <octave>2</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>12</duration>
         <type>quarter</type>
+        <dot />
         <notehead color="#7C3AED">normal</notehead>
         <notations>
           <technical>
@@ -7460,42 +7290,15 @@
           </technical>
         </notations>
       </note>
-      <note color="#15803D">
-        <pitch>
-          <step>B</step>
-          <octave>2</octave>
-        </pitch>
-        <duration>4</duration>
-        <type>eighth</type>
-        <notehead color="#15803D">normal</notehead>
-        <notations>
-          <technical>
-            <fingering>3</fingering>
-          </technical>
-        </notations>
-      </note>
-      <note color="#15803D">
+      <note color="#7C3AED">
         <pitch>
           <step>C</step>
-          <octave>3</octave>
-        </pitch>
-        <duration>8</duration>
-        <type>quarter</type>
-        <notehead color="#15803D">normal</notehead>
-        <notations>
-          <technical>
-            <fingering>4</fingering>
-          </technical>
-        </notations>
-      </note>
-      <note color="#15803D">
-        <pitch>
-          <step>G</step>
           <octave>2</octave>
         </pitch>
-        <duration>4</duration>
-        <type>eighth</type>
-        <notehead color="#15803D">normal</notehead>
+        <duration>12</duration>
+        <type>quarter</type>
+        <dot />
+        <notehead color="#7C3AED">normal</notehead>
         <notations>
           <technical>
             <fingering>0</fingering>
@@ -7537,17 +7340,15 @@
       </note>
       <note color="#1D4ED8">
         <pitch>
-          <step>F</step>
-          <alter>1</alter>
+          <step>D</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
         <type>eighth</type>
-        <accidental cautionary="yes">sharp</accidental>
         <notehead color="#1D4ED8">normal</notehead>
         <notations>
           <technical>
-            <fingering>3</fingering>
+            <fingering>0</fingering>
           </technical>
         </notations>
       </note>
@@ -7605,25 +7406,10 @@
           <step>B</step>
           <octave>2</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>12</duration>
         <type>quarter</type>
+        <dot />
         <notehead color="#15803D">normal</notehead>
-        <notations>
-          <technical>
-            <fingering>3</fingering>
-          </technical>
-        </notations>
-      </note>
-      <note color="#1D4ED8">
-        <pitch>
-          <step>F</step>
-          <alter>1</alter>
-          <octave>3</octave>
-        </pitch>
-        <duration>4</duration>
-        <type>eighth</type>
-        <accidental cautionary="yes">sharp</accidental>
-        <notehead color="#1D4ED8">normal</notehead>
         <notations>
           <technical>
             <fingering>3</fingering>
@@ -7635,32 +7421,32 @@
       <barline location="right">
         <bar-style>light-heavy</bar-style>
       </barline>
-      <note color="#1D4ED8">
+      <note color="#7C3AED">
         <pitch>
           <step>E</step>
-          <octave>3</octave>
+          <octave>2</octave>
         </pitch>
         <duration>12</duration>
         <type>quarter</type>
         <dot />
-        <notehead color="#1D4ED8">normal</notehead>
+        <notehead color="#7C3AED">normal</notehead>
         <notations>
           <technical>
-            <fingering>1</fingering>
+            <fingering>3</fingering>
           </technical>
         </notations>
       </note>
-      <note color="#1D4ED8">
+      <note color="#7C3AED">
         <pitch>
           <step>E</step>
-          <octave>3</octave>
+          <octave>2</octave>
         </pitch>
         <duration>8</duration>
         <type>quarter</type>
-        <notehead color="#1D4ED8">normal</notehead>
+        <notehead color="#7C3AED">normal</notehead>
         <notations>
           <technical>
-            <fingering>1</fingering>
+            <fingering>3</fingering>
           </technical>
         </notations>
       </note>
@@ -7894,28 +7680,13 @@
           <step>B</step>
           <octave>2</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>12</duration>
         <type>quarter</type>
+        <dot />
         <notehead color="#DC2626">normal</notehead>
         <notations>
           <technical>
             <fingering>1</fingering>
-          </technical>
-        </notations>
-      </note>
-      <note color="#1D4ED8">
-        <pitch>
-          <step>F</step>
-          <alter>1</alter>
-          <octave>3</octave>
-        </pitch>
-        <duration>4</duration>
-        <type>eighth</type>
-        <accidental cautionary="yes">sharp</accidental>
-        <notehead color="#1D4ED8">normal</notehead>
-        <notations>
-          <technical>
-            <fingering>4</fingering>
           </technical>
         </notations>
       </note>
@@ -7943,26 +7714,13 @@
           <step>B</step>
           <octave>2</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>12</duration>
         <type>quarter</type>
+        <dot />
         <notehead color="#DC2626">normal</notehead>
         <notations>
           <technical>
             <fingering>1</fingering>
-          </technical>
-        </notations>
-      </note>
-      <note color="#1D4ED8">
-        <pitch>
-          <step>D</step>
-          <octave>3</octave>
-        </pitch>
-        <duration>4</duration>
-        <type>eighth</type>
-        <notehead color="#1D4ED8">normal</notehead>
-        <notations>
-          <technical>
-            <fingering>0</fingering>
           </technical>
         </notations>
       </note>
@@ -8080,28 +7838,13 @@
           <step>B</step>
           <octave>2</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>12</duration>
         <type>quarter</type>
+        <dot />
         <notehead color="#DC2626">normal</notehead>
         <notations>
           <technical>
             <fingering>1</fingering>
-          </technical>
-        </notations>
-      </note>
-      <note color="#1D4ED8">
-        <pitch>
-          <step>F</step>
-          <alter>1</alter>
-          <octave>3</octave>
-        </pitch>
-        <duration>4</duration>
-        <type>eighth</type>
-        <accidental cautionary="yes">sharp</accidental>
-        <notehead color="#1D4ED8">normal</notehead>
-        <notations>
-          <technical>
-            <fingering>4</fingering>
           </technical>
         </notations>
       </note>
@@ -8159,28 +7902,13 @@
           <step>B</step>
           <octave>2</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>12</duration>
         <type>quarter</type>
+        <dot />
         <notehead color="#DC2626">normal</notehead>
         <notations>
           <technical>
             <fingering>1</fingering>
-          </technical>
-        </notations>
-      </note>
-      <note color="#1D4ED8">
-        <pitch>
-          <step>F</step>
-          <alter>1</alter>
-          <octave>3</octave>
-        </pitch>
-        <duration>4</duration>
-        <type>eighth</type>
-        <accidental cautionary="yes">sharp</accidental>
-        <notehead color="#1D4ED8">normal</notehead>
-        <notations>
-          <technical>
-            <fingering>4</fingering>
           </technical>
         </notations>
       </note>
@@ -8189,32 +7917,32 @@
       <barline location="right">
         <bar-style>light-heavy</bar-style>
       </barline>
-      <note color="#1D4ED8">
+      <note color="#F0B000">
         <pitch>
           <step>E</step>
-          <octave>3</octave>
+          <octave>2</octave>
         </pitch>
         <duration>12</duration>
         <type>quarter</type>
         <dot />
-        <notehead color="#1D4ED8">normal</notehead>
+        <notehead color="#F0B000">normal</notehead>
         <notations>
           <technical>
-            <fingering>1</fingering>
+            <fingering>0</fingering>
           </technical>
         </notations>
       </note>
-      <note color="#1D4ED8">
+      <note color="#F0B000">
         <pitch>
           <step>E</step>
-          <octave>3</octave>
+          <octave>2</octave>
         </pitch>
         <duration>8</duration>
         <type>quarter</type>
-        <notehead color="#1D4ED8">normal</notehead>
+        <notehead color="#F0B000">normal</notehead>
         <notations>
           <technical>
-            <fingering>1</fingering>
+            <fingering>0</fingering>
           </technical>
         </notations>
       </note>
