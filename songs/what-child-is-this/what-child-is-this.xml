@@ -5561,18 +5561,18 @@
       <barline location="right">
         <bar-style>light-heavy</bar-style>
       </barline>
-      <note color="#DC2626">
+      <note color="#15803D">
         <pitch>
           <step>B</step>
-          <octave>4</octave>
+          <octave>3</octave>
         </pitch>
         <duration>12</duration>
         <type>quarter</type>
         <dot />
-        <notehead color="#DC2626">normal</notehead>
+        <notehead color="#15803D">normal</notehead>
         <notations>
           <technical>
-            <fingering>1</fingering>
+            <fingering>2</fingering>
           </technical>
         </notations>
       </note>
