@@ -121,7 +121,12 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
 
 - Line view: the music starts at the left edge with no lead-in space and the clef is never cut off;
   the playing note sits a third of the way from the left so students see what's coming. Music is
-  top-aligned under the header.
+  top-aligned under the header. The start of the line (each part's name, its clef and the key
+  signature) stays pinned at the left edge as the music slides under it, so students can look back at
+  the key signature; when the key changes, the pinned key changes as the new key reaches the edge.
+  It is a copy of the start as drawn, so at the start it sits exactly on it. When it is wider than a
+  third of the screen (big music), the playing note sits just past it instead (Janelle, 2026-10-17).
+- Pages: every line of music names its parts beside the staves, not just the first line (2026-10-17).
 - Every setting is always visible in a strip at the bottom, on phones too, never covering notes.
   Phone-landscape buttons are compact so the strip fits one row on regular iPhones.
 - Everything stays in the same place so people can orient themselves: a choice that doesn't apply
@@ -129,7 +134,9 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   keeps one width (its longest label) so nothing beside it shifts (Janelle, 2026-10-16).
 - The size of the music (− / +, 0.3x to 1.75x) and, on bigger screens, Line or Pages sit at the top
   right of the music, in the band with the Strings key, so they never cover notes (moved there from
-  the strip on 2026-10-16). The band always keeps its room, even with string colors off. While Parts
+  the strip on 2026-10-16). The band always keeps its room, even with string colors off. Scrolling down
+  the page, they stay at the top of the window, over the music (Janelle wanted them always in reach,
+  2026-10-17); the Strings key scrolls away with the music. While Parts
   is open they slide over with the panel's edge and sit just beside it, never under it (Janelle found
   them hidden by the panel, 2026-10-17). Where that leaves too little room beside the Strings key (a
   tablet held upright), the key and the buttons take their phone size; then the key drops the word
@@ -168,7 +175,8 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   part has its own line shows nothing. Not "Vln = B": Janelle found that it reads like a note name. Worked out
   from each score as it loads, so a new song needs nothing listed; only exact matches count.
   Pointing at a part names its match. (Corner dots with a key came first; Janelle found them messy
-  and distracting, 2026-10-16.)
+  and distracting, 2026-10-16.) Open Strings never shows the line or the hint: every part there is
+  open strings, so Janelle found it unnecessary (2026-10-17).
 - Parts for a song in levels and voices (Janelle approved it 2026-10-16): a
   row for each level and voice, headed "Level & voice": Open Strings, Easy Melody, Easy Inner, Easy
   Bass Line, then Melody, Inner, Bass Line (the middle level has no word, as in the part names), then

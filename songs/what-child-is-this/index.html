@@ -136,27 +136,29 @@ h1 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: c
 .key-dock { position: absolute; left: 0; top: 0; right: 0; height: 0; z-index: 5; pointer-events: none; }
 .sheet.keyed { padding-top: 46px; }
 /* Top right of the music, in the same band as the Strings key (so they never cover notes): the size of the music,
-   and on bigger screens one long line or pages. While Parts is open they slide over to sit just beside the panel
-   (--tools-shift), so they are never under it. */
+   and on bigger screens one long line or pages. They stay on screen as the page scrolls down, held at the top of the
+   window (then over the music). While Parts is open they slide over to sit just beside the panel (--tools-shift), so
+   they are never under it. */
+.tools-dock { position: sticky; top: env(safe-area-inset-top, 0px); height: 0; z-index: 1100; pointer-events: none; }
 .top-tools { --tools-pad: 10px; position: absolute; right: calc(var(--tools-pad) + var(--tools-shift, 0px)); top: 5px; display: flex; align-items: center; gap: 8px; pointer-events: auto; transition: right 0.22s ease; }
 .top-tools .zoom-pill, .top-tools .fab-btn { height: 36px; }
 .top-tools .zoom-pill button { width: 36px; font-size: 20px; }
 /* Too little room between the Strings key and the open panel (a tablet held upright): the key and the buttons take
    their phone size. The band keeps its height, so the music doesn't move. */
-.key-dock.tight .key { top: 12px; gap: 5px; padding: 3px 8px 3px 10px; }
-.key-dock.tight .key-lbl { font-size: 0.7rem; }
-.key-dock.tight .key-head { width: 24px; height: 18px; }
-.key-dock.tight .key-head b { font-size: 0.74rem; }
-.key-dock.tight .top-tools { top: 8px; gap: 6px; }
-.key-dock.tight .top-tools .zoom-pill, .key-dock.tight .top-tools .fab-btn { height: 30px; }
-.key-dock.tight .top-tools .zoom-pill button { width: 32px; font-size: 18px; }
-.key-dock.tight .top-tools .fab-btn.cyc { gap: 4px; padding: 0 8px; }
-.key-dock.tight .top-tools .cyc-badge { font-size: 0.7rem; }
+.sheet-wrap.tight .key { top: 12px; gap: 5px; padding: 3px 8px 3px 10px; }
+.sheet-wrap.tight .key-lbl { font-size: 0.7rem; }
+.sheet-wrap.tight .key-head { width: 24px; height: 18px; }
+.sheet-wrap.tight .key-head b { font-size: 0.74rem; }
+.sheet-wrap.tight .top-tools { top: 8px; gap: 6px; }
+.sheet-wrap.tight .top-tools .zoom-pill, .sheet-wrap.tight .top-tools .fab-btn { height: 30px; }
+.sheet-wrap.tight .top-tools .zoom-pill button { width: 32px; font-size: 18px; }
+.sheet-wrap.tight .top-tools .fab-btn.cyc { gap: 4px; padding: 0 8px; }
+.sheet-wrap.tight .top-tools .cyc-badge { font-size: 0.7rem; }
 /* Still too little room (an iPad mini upright): the key drops its word and keeps its coloured letters. With none at all
    (a small phone with the Hear speakers out), the key steps aside until the panel closes. */
-.key-dock.bare .key-lbl { display: none; }
-.key-dock.bare .key { padding-left: 8px; }
-.key-dock.nokey .key { visibility: hidden; }
+.sheet-wrap.bare .key-lbl { display: none; }
+.sheet-wrap.bare .key { padding-left: 8px; }
+.sheet-wrap.nokey .key { visibility: hidden; }
 .key { position: absolute; left: 10px; top: 8px; display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px 5px 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.92); border: 1px solid #D5DCD9; box-shadow: 0 1px 3px rgba(18, 22, 20, 0.08); font-family: var(--font-body); }
 .key[hidden] { display: none; }
 .key-lbl { font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em; color: #55615B; margin-right: 2px; }
@@ -175,6 +177,14 @@ hr.div { border: 0; border-top: 1px solid var(--line); margin: 0; }
    half a screen of space after it lets the last notes reach the middle too */
 .sheet.line > .at-surface { flex: none; }
 .sheet.line::after { content: ""; flex: none; width: var(--half, 45%); height: 1px; }
+/* One long line: the start of the line (each part's name, its clef and the key signature) stays pinned at the left
+   edge while the music slides under it, so the key signature is always there to look back at. It is a copy of the
+   start as drawn, so at the very start it sits exactly on top of it; once the music moves, a soft edge shows. It
+   covers the counts and marks that alphaTab layers over the music (z-index 1000, earlier in the page). */
+.line-head { position: absolute; left: 0; z-index: 1000; overflow: hidden; background: var(--paper); display: none; }
+.line-head.on { display: block; }
+.line-head.lifted { box-shadow: 7px 0 9px -7px rgba(20, 30, 26, 0.32); }
+.line-head svg { position: absolute; left: 0; top: 0; overflow: visible; }
 .loading { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: #55615B; font-family: var(--font-display); font-size: 1.25rem; pointer-events: none; }
 .loading[hidden] { display: none; }
 .hint { margin: 0; color: var(--muted); font-size: 0.86rem; }
@@ -539,8 +549,8 @@ body.following .host-only { display: none !important; }
   <p class="err" id="err" role="alert"></p>
 
   <div class="sheet-wrap">
-    <div class="key-dock"><div class="key" id="legend" role="note" aria-label="String colors"></div>
-      <div class="top-tools" id="topTools"><div class="zoom-pill" role="group" aria-label="Size of the music"><button type="button" id="zoomOut" aria-label="Smaller music" title="Smaller">−</button><button type="button" id="zoomIn" aria-label="Bigger music" title="Bigger">+</button></div><button class="fab-btn big-only cyc" id="g-layout" type="button"></button></div></div>
+    <div class="tools-dock"><div class="top-tools" id="topTools"><div class="zoom-pill" role="group" aria-label="Size of the music"><button type="button" id="zoomOut" aria-label="Smaller music" title="Smaller">−</button><button type="button" id="zoomIn" aria-label="Bigger music" title="Bigger">+</button></div><button class="fab-btn big-only cyc" id="g-layout" type="button"></button></div></div>
+    <div class="key-dock"><div class="key" id="legend" role="note" aria-label="String colors"></div></div>
     <div class="sheet" id="sheet"></div>
     <div class="loading" id="loading">Setting out the music…</div>
   </div>
@@ -1017,12 +1027,14 @@ body.following .host-only { display: none !important; }
   }
   // Which parts at each level play the same notes, from the score: the same rhythm and the same note names (so the
   // tune an octave lower counts). A line under the level's name says so, and pointing at a part names its match.
+  // Not for Open Strings: every part there is plucked open strings, so it isn't needed (Janelle, 2026-10-17).
   const andList = (a) => a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
   function markSame() {
     const tune = (track) => track.staves[0].bars.flatMap((bar, bi) => bar.voices[0].beats.filter(b => !b.isRest)
       .map(b => (score.masterBars[bi].start + b.playbackStart) + ':' + b.playbackDuration + ':'
         + b.notes.map(n => ((n.realValue % 12) + 12) % 12).sort((x, y) => x - y).join('.'))).join(',');
     ROWS.forEach((row, t) => {
+      if (row.name === 'Open Strings') return;
       const groups = new Map();
       row.cells.forEach((ti, i) => {
         const k = ti != null && score.tracks[ti] && tune(score.tracks[ti]);
@@ -1165,7 +1177,7 @@ body.following .host-only { display: none !important; }
   // to sit just beside it. When that leaves too little room beside the Strings key, the key and the buttons take their
   // phone size, then the key drops its word, then it steps aside until the panel closes.
   function placeTools() {
-    const dock = document.querySelector('.key-dock'), tools = $('topTools'), key = $('legend');
+    const dock = document.querySelector('.sheet-wrap'), tools = $('topTools'), key = $('legend');
     dock.classList.remove('tight', 'bare', 'nokey');
     let shift = 0;
     if (partsOpen) {
@@ -1427,6 +1439,10 @@ body.following .host-only { display: none !important; }
       t.playbackInfo.secondaryChannel = ch;
       ch++;
     }
+    // Every line of music on a page names its parts, not just the first (in one long line the pinned start does it).
+    const ALL = alphaTab.model.TrackNamePolicy ? alphaTab.model.TrackNamePolicy.AllSystems : 2;
+    score.stylesheet.singleTrackTrackNamePolicy = ALL;
+    score.stylesheet.multiTrackTrackNamePolicy = ALL;
     placeWords();
     applyMarks();
   }
@@ -1717,6 +1733,7 @@ body.following .host-only { display: none !important; }
       const r = surf.getBoundingClientRect();
       const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2, my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
       pinch = { d0: Math.max(1, span(e.touches)), z0: state.zoom, z: state.zoom, surf };
+      lineHead.style.visibility = 'hidden';
       surf.style.transformOrigin = Math.round(mx - r.left) + 'px ' + Math.round(my - r.top) + 'px';
     }, { passive: false });
     sheet.addEventListener('touchmove', (e) => {
@@ -1727,6 +1744,7 @@ body.following .host-only { display: none !important; }
     }, { passive: false });
     function endPinch() {
       if (!pinch) return;
+      lineHead.style.visibility = '';
       const pn = pinch; pinch = null;
       pn.surf.style.transform = ''; pn.surf.style.transformOrigin = '';
       setZoom(ZOOMS.reduce((a, b) => (Math.abs(b - pn.z) < Math.abs(a - pn.z) ? b : a)));
@@ -2936,14 +2954,131 @@ body.following .host-only { display: none !important; }
     if (right > surf.offsetWidth) surf.style.width = right + 'px';
     const h = Math.ceil(bottom + 8) + 'px';
     if (bottom && surf.style.height !== h) surf.style.height = h;
+    scheduleHead();
   }
+
+  // ---- One long line: the start pinned at the left edge ----
+  // A copy of the start of the line as drawn (names, brace, clefs, key signatures, up to the time signature) sits over
+  // the left edge of the music. When the key changes, the pinned key signature changes with it once the new key
+  // reaches the edge.
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const lineHead = document.createElement('div');
+  lineHead.className = 'line-head'; lineHead.setAttribute('aria-hidden', 'true');
+  $('sheet').after(lineHead);
+  let head = null; // { svg, keys: [{ from, glyphs, dx, w, g }], now, pad, bars }
+  let headW = 0;   // the widest the pinned start gets, in pixels from the left edge of the sheet
+  let headTimer = 0;
+  function scheduleHead() { clearTimeout(headTimer); headTimer = setTimeout(buildLineHead, 60); }
+  const glyphIn = (t, lo, hi) => { const c = (t.textContent || '').codePointAt(0) || 0; return c >= lo && c <= hi; };
+  const sharpOrFlat = (t) => { const c = (t.textContent || '').codePointAt(0); return c === 0xE260 || c === 0xE262; };
+  function buildLineHead() {
+    head = null; headW = 0;
+    lineHead.replaceChildren(); lineHead.classList.remove('on', 'lifted');
+    const sheet = $('sheet'), surf = sheet.querySelector('.at-surface');
+    const sys = api && api.boundsLookup && api.boundsLookup.staffSystems[0];
+    if (state.layout !== 'line' || !surf || !sys || !score) { setHalf(); return; }
+    const pieces = [...surf.children].filter(c => c.style.display !== 'none' && c.querySelector('svg')).sort((a, b) => a.offsetLeft - b.offsetLeft);
+    if (!pieces.length) return;
+    const src = pieces[0].querySelector('svg');
+    const sr = surf.getBoundingClientRect(), vr = src.getBoundingClientRect();
+    const xOf = (el) => el.getBoundingClientRect().left - sr.left;
+    const rightOf = (el) => el.getBoundingClientRect().right - sr.left;
+    const mb0 = sys.bars[0], space = mb0.bars[0].visualBounds.h / 4;
+    // Where the start ends: just before the time signature (or the first note).
+    const texts = [...src.querySelectorAll('text')];
+    const firstNote = Math.min(...mb0.bars.map(b => (b.beats[0] ? b.beats[0].visualBounds.x : Infinity)));
+    const times = texts.filter(t => glyphIn(t, 0xE080, 0xE08B) && xOf(t) < firstNote).map(xOf);
+    const end = Math.min(firstNote, ...times) - space * 0.4;
+    const clefs = texts.filter(t => glyphIn(t, 0xE050, 0xE07F) && xOf(t) < end);
+    if (!clefs.length) return;
+    const clefRight = Math.max(...clefs.map(rightOf));
+    // Copy the drawing, keeping only what lies in the start; the key signature is kept apart, to change with the key.
+    const copy = src.cloneNode(true), from = [...src.querySelectorAll('*')], to = [...copy.querySelectorAll('*')];
+    const key0 = [];
+    from.forEach((el, i) => {
+      const c = to[i];
+      if (!copy.contains(c)) return;
+      if (el.tagName === 'text') {
+        const cs = getComputedStyle(el);
+        Object.assign(c.style, { fontSize: cs.fontSize, fontFamily: cs.fontFamily, fontStyle: cs.fontStyle, fontWeight: cs.fontWeight, fill: cs.fill });
+        if (sharpOrFlat(el) && xOf(el) > clefRight - 1 && xOf(el) < end) { key0.push(el); c.remove(); return; }
+      }
+      if (el.tagName !== 'g' && el.tagName !== 'tspan' && xOf(el) >= end) c.remove();
+    });
+    for (const g of [...copy.querySelectorAll('g')].reverse()) if (!g.firstElementChild && !g.textContent.trim()) g.remove();
+    // The key signatures: the first one, and each change of key along the line (sharps and flats only, not the
+    // naturals that cancel the old key), each moved to where the first one starts.
+    const glyphGroup = (glyphs) => {
+      const g = document.createElementNS(SVG_NS, 'g');
+      for (const t of glyphs) {
+        const m = t.getCTM(), r = t.ownerSVGElement.getBoundingClientRect();
+        const w = document.createElementNS(SVG_NS, 'g');
+        w.setAttribute('transform', `translate(${r.left - vr.left} ${r.top - vr.top}) matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e} ${m.f})`);
+        const c = t.cloneNode(true), cs = getComputedStyle(t);
+        c.removeAttribute('transform');
+        Object.assign(c.style, { fontSize: cs.fontSize, fontFamily: cs.fontFamily, fill: cs.fill });
+        w.append(c); g.append(w);
+      }
+      return g;
+    };
+    const keyStart = key0.length ? Math.min(...key0.map(xOf)) : clefRight + space * 0.6;
+    const keyEnd = key0.length ? Math.max(...key0.map(rightOf)) : keyStart;
+    const tail = end - keyEnd; // the room between the key signature and the time signature, kept for every key
+    const allTexts = [...surf.querySelectorAll('svg text')];
+    const keys = [{ from: 0, glyphs: key0, dx: 0, w: end }];
+    score.masterBars.forEach((mb, bi) => {
+      if (!bi || mb.keySignature === score.masterBars[bi - 1].keySignature || !sys.bars[bi]) return;
+      const bar = sys.bars[bi], x0 = bar.visualBounds.x - space;
+      const x1 = Math.min(...bar.bars.map(b => (b.beats[0] ? b.beats[0].visualBounds.x : Infinity)));
+      const glyphs = allTexts.filter(t => sharpOrFlat(t) && xOf(t) >= x0 && xOf(t) < x1);
+      const left = glyphs.length ? Math.min(...glyphs.map(xOf)) : keyStart;
+      const right = glyphs.length ? Math.max(...glyphs.map(rightOf)) : keyStart;
+      keys.push({ from: bi, glyphs, dx: keyStart - left, w: keyStart + (right - left) + tail });
+    });
+    for (const k of keys) {
+      k.g = glyphGroup(k.glyphs);
+      if (k.dx) k.g.setAttribute('transform', `translate(${k.dx} 0)`);
+    }
+    // Place it level with the music, from the left edge of the sheet.
+    const wrap = sheet.parentNode.getBoundingClientRect(), shr = sheet.getBoundingClientRect();
+    const pad = sr.left + sheet.scrollLeft - shr.left; // from the sheet's edge to where the music starts
+    copy.removeAttribute('class');
+    copy.style.left = (vr.left - sr.left + pad) + 'px';
+    lineHead.style.top = (vr.top - wrap.top) + 'px';
+    lineHead.style.height = vr.height + 'px';
+    lineHead.append(copy);
+    head = { svg: copy, keys, now: null, pad, bars: sys.bars.map(b => b.visualBounds.x) };
+    headW = pad + Math.max(...keys.map(k => k.w));
+    lineHead.classList.add('on');
+    updateLineHead();
+    setHalf();
+  }
+  // Which key shows: the one in force at the bar now passing the pinned start's right-hand edge.
+  function updateLineHead() {
+    if (!head) return;
+    const s = $('sheet').scrollLeft;
+    lineHead.classList.toggle('lifted', s > 1);
+    let k = head.keys[0];
+    if (head.keys.length > 1) {
+      const x = s + (head.now || k).w;
+      let bi = 0;
+      while (bi + 1 < head.bars.length && head.bars[bi + 1] <= x) bi++;
+      for (const key of head.keys) if (key.from <= bi) k = key;
+    }
+    if (k === head.now) return;
+    if (head.now) head.now.g.remove();
+    head.svg.append(k.g);
+    head.now = k;
+    lineHead.style.width = (head.pad + k.w) + 'px';
+  }
+  $('sheet').addEventListener('scroll', updateLineHead, { passive: true });
 
   // ---- Following the music ----
   // One long line: the line glides left so the playing note stays in the middle of the screen.
   // Pages: the window scrolls a line at a time. Nothing moves until Play, so the page doesn't jump on load.
   let lastScrollKey = null, lineRaf = 0, xmap = null, lineState = null;
   // Where the note being played sits: a third of the way across, so more of what's coming is in view.
-  const playX = (sheet) => Math.round(sheet.clientWidth / 3);
+  const playX = (sheet) => Math.round(Math.max(sheet.clientWidth / 3, headW ? headW + Math.min(48, sheet.clientWidth * 0.05) : 0));
   const surfLeft = () => { const s = $('sheet').querySelector('.at-surface'); return s ? s.offsetLeft : 0; };
   function setHalf() {
     const sh = $('sheet'), half = Math.round(sh.clientWidth - playX(sh)) + 'px'; // room after the line so the last notes reach the playing spot
@@ -3284,7 +3419,7 @@ body.following .host-only { display: none !important; }
     api.customScrollHandler = scroller;
     window.reader = { api, score, conductor, xmap: () => xmap, line: () => lineState, at: () => playedTick(performance.now()) };
     api.error.on(() => fail('Something went wrong drawing the music. Reload the page to try again.'));
-    api.renderStarted.on(() => { if (!fitPending) fitTries = 0; });
+    api.renderStarted.on(() => { if (!fitPending) fitTries = 0; head = null; lineHead.classList.remove('on'); });
     api.renderFinished.on(() => { $('loading').hidden = true; ink = null; styleWords(); fitSurface(); placeFingers(); trackNotes(true); buildCounts(); placeTimeSigButtons(); drawLoop(); drawStartMark(); xmap = null; if (!playing && state.layout === 'line') { setHalf(); centerOnTick(api.tickPosition || 0, false); }
       // A phone on its side: size the line to the screen, then bring it into view.
       fitPending = false;

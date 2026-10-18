@@ -13,6 +13,9 @@ What it checks
      notes are drawn, Play moves the music forward, nothing scrolls sideways, no script errors.
      The page settings are separate buttons in the strip; On the note steps through its five looks,
      each drawn as it says; on a laptop the music button switches between pages and one long line.
+     On pages every line names its parts, and scrolled down the size buttons stay at the top of the
+     window. Along one long line, each part's name, clef and key signature (the key in force there,
+     after every change of key) stay pinned at the left edge.
      Laptop: the Full screen button goes in and out of full screen. Phone (acting like an iPhone,
      which doesn't allow it): no Full screen button, and pinching the music makes it bigger and smaller.
      The Parts panel: the music runs a little under a tab at the right edge, which pulls the panel out over it, each part's eye
@@ -106,6 +109,41 @@ async def open_reader(ctx, url, errors, name, w=1366, h=860):
     return pg
 
 
+# Pages: a part name beside every staff on every line (names drawn, and lines times parts on the page).
+NAMED_LINES_JS = '''() => {
+  const names = new Set(reader.api.tracks.map(t => t.name));
+  const drawn = [...document.querySelectorAll('#sheet svg text')].filter(t => names.has(t.textContent)).length;
+  const lines = new Set(reader.api.boundsLookup.staffSystems.map(s => Math.round(s.visualBounds.y))).size;
+  return [drawn, lines * reader.api.tracks.length];
+}'''
+# How far the page is scrolled, and whether the size buttons and Line or Pages can still be tapped at the top.
+TOOLS_HELD_JS = '''() => {
+  const ids = ['zoomOut', 'zoomIn', 'g-layout'].filter(id => document.getElementById(id).offsetParent);
+  const ok = ids.every(id => { const b = document.getElementById(id), r = b.getBoundingClientRect(), h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return r.top >= 0 && r.bottom < window.innerHeight * 0.25 && h && b.contains(h); });
+  return [Math.round(window.scrollY), ok];
+}'''
+# One long line: scrolled along to the middle and to just after each change of key, the pinned start shows a clef for
+# each part and the key signature in force there.
+LINE_HEAD_JS = '''async () => {
+  const sheet = document.getElementById('sheet'), head = document.querySelector('.line-head'), sc = reader.api.score;
+  const bars = reader.api.boundsLookup.staffSystems[0].bars.map(b => b.visualBounds.x), staves = reader.api.tracks.length;
+  const at = new Set([Math.floor(bars.length / 2)]);
+  sc.masterBars.forEach((mb, i) => { if (i && mb.keySignature !== sc.masterBars[i - 1].keySignature) at.add(i); });
+  const out = [];
+  for (const b of at) {
+    sheet.scrollLeft = bars[b];
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const g = [...head.querySelectorAll('text')].map(t => t.textContent.codePointAt(0));
+    out.push({ bar: b + 1, on: head.classList.contains('on') && head.classList.contains('lifted'), staves,
+      clefs: g.filter(c => c >= 0xE050 && c <= 0xE07F).length, keys: g.filter(c => c === 0xE260 || c === 0xE262).length,
+      want: Math.abs(sc.masterBars[b].keySignature) * staves });
+  }
+  sheet.scrollLeft = 0;
+  return out;
+}'''
+
+
 async def song_checks(browser, base):
     for song in SONGS:
         slug = song['slug']
@@ -184,9 +222,18 @@ async def song_checks(browser, base):
             if label == 'laptop':
                 await pg.click('#g-layout'); await pg.wait_for_timeout(1500)
                 paged = await pg.evaluate("() => !document.getElementById('sheet').classList.contains('line') && document.getElementById('g-layout').title")
+                named = await pg.evaluate(NAMED_LINES_JS)
+                check(named[0] > 1 and named[0] == named[1], f'{label}: on pages every line of music names its parts ({named[0]} names, {named[1]} wanted)')
+                await pg.evaluate('() => window.scrollTo(0, document.documentElement.scrollHeight)'); await pg.wait_for_timeout(400)
+                held = await pg.evaluate(TOOLS_HELD_JS)
+                check(held[0] > 300 and held[1], f'{label}: scrolled down the pages, the size buttons and Line or Pages stay at the top of the window, ready to tap ({held})')
+                await pg.evaluate('() => window.scrollTo(0, 0)')
                 await pg.click('#g-layout'); await pg.wait_for_timeout(1500)
                 lined = await pg.evaluate("() => document.getElementById('sheet').classList.contains('line') && document.getElementById('g-layout').title")
                 check(paged == 'Music: pages' and lined == 'Music: one long line', f'{label}: the music button switches between pages and one long line')
+            pinned = await pg.evaluate(LINE_HEAD_JS)
+            check(pinned and all(p['on'] and p['clefs'] == p['staves'] and p['keys'] == p['want'] for p in pinned),
+                  f'{label}: along the line, each part\'s name, clef and key signature (the key in force there) stay pinned at the left edge ({pinned})')
             shown = await pg.evaluate("() => !!document.getElementById('fullBtn').offsetParent")
             if label == 'phone landscape':
                 check(not shown, f'{label}: no Full screen button where the browser does not allow it')
@@ -379,6 +426,10 @@ async def voices40_checks(browser, base):
         wide = await pg.evaluate('() => document.documentElement.scrollWidth - window.innerWidth')
         check(wide <= 1, f'{label}: no sideways scrolling ({wide}px extra)')
         check(await pg.evaluate(TOOLS_CLEAR_JS), f'{label}: with the panel open, the size buttons and Line or Pages sit beside it, clear of the Strings key')
+        same = await pg.evaluate("() => [...document.querySelectorAll('#mixParts .lvl-same')].map(s => s.textContent)")
+        hint = await pg.get_attribute('#see-0-0', 'title')
+        check(same[0] == '' and 'same notes' not in hint and any(same[1:]),
+              f'{label}: no same-notes line or hint for Open Strings, while other levels keep theirs ({same[:2]}, "{hint}")')
         if label != 'laptop':
             check(not errors, f'{label}: no script errors' + (f': {errors[:3]}' if errors else ''))
             await ctx.close()
