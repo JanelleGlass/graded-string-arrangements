@@ -22,6 +22,7 @@ bars can be given in songs.json too; if one disagrees with the score, the build 
 scan or a stale entry gets noticed). The build also stops if the score's parts aren't one of the
 layouts the reader knows, in BUILD-SPEC order, and says which one it read:
   levels and voices, 40 parts: level by level; Melody, Inner, Bass Line in each; then violin-viola-cello-bass
+  the same 40 then a Countermelody on violin and viola (42 parts), and/or a Concert part on each (42 or 44 parts)
   levels and voices with no cello or bass Inner, 34 parts (built 2026-10-16): the same, Inner on violin and viola
   six tiers, 24 parts (songs built before 2026-10-16): level by level, violin-viola-cello-bass in each
 
@@ -34,7 +35,7 @@ songs.json fields
   pdf_url     Payhip (or other) link for the printable parts; "" = no Buy button
   key, time, bars   optional overrides; normally left out
 """
-import hashlib, html, json, re, sys
+import difflib, hashlib, html, json, re, sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -162,24 +163,44 @@ LAYOUTS = {
     'six tiers': [(inst, tier) for tier in TIERS for inst in INSTRUMENTS],  # 24 parts, songs built before 2026-10-16
     'levels and voices, no cello or bass Inner': voices(INSTRUMENTS[:2]),  # 34 parts, built 2026-10-16
     'levels and voices': voices(INSTRUMENTS),  # 40 parts, from 2026-10-17
+    # the 40, then parts for the strongest players on violin and viola (BUILD-SPEC section 3), from 2026-10-18
+    'levels and voices, with countermelody': voices(INSTRUMENTS) + [(i, 'Countermelody') for i in INSTRUMENTS[:2]],  # 42
+    'levels and voices, with concert': voices(INSTRUMENTS) + [(i, 'Concert') for i in INSTRUMENTS[:2]],  # 42 parts
+    'levels and voices, with countermelody and concert':
+        voices(INSTRUMENTS) + [(i, v) for v in ('Countermelody', 'Concert') for i in INSTRUMENTS[:2]],  # 44 parts
 }
+EXTRAS = {'levels and voices, with countermelody': ', plus a countermelody for violin and viola',
+          'levels and voices, with concert': ', plus a concert part for violin and viola',
+          'levels and voices, with countermelody and concert': ', plus a countermelody and a concert part for violin and viola'}
 PART_NAME = re.compile(r'(Violin|Viola|Cello|Bass)\s*[—–-]\s*(.*?)(?:\s*\(pizz\.\))?$')
 
 
 def part_layout(slug, names):
-    """Which of the reader's layouts the score's parts are in. Stops the build if they're in neither."""
-    for layout, want in LAYOUTS.items():
-        if len(names) == len(want):
-            break
-    else:
-        fail(f'{slug}: {len(names)} parts; the reader needs 40 (levels and voices), 34 (levels and voices '
+    """Which of the reader's layouts the score's parts are in. Stops the build if they're in none."""
+    def wrong(want):
+        for i, (name, (inst, label)) in enumerate(zip(names, want)):
+            m = PART_NAME.match(name.strip())
+            if not m or m.groups() != (inst, label):
+                return i, name, inst, label
+    same_size = [(layout, want) for layout, want in LAYOUTS.items() if len(names) == len(want)]
+    if not same_size:
+        fail(f'{slug}: {len(names)} parts; the reader needs 44 (levels and voices with a countermelody and a concert '
+             'part), 42 (with a countermelody, or with a concert part), 40 (levels and voices), 34 (levels and voices '
              'with no cello or bass Inner, built 2026-10-16) or 24 (six tiers, built before 2026-10-16)')
-    for i, (name, (inst, label)) in enumerate(zip(names, want)):
-        m = PART_NAME.match(name.strip())
-        if not m or m.groups() != (inst, label):
-            fail(f'{slug}: part {i + 1} is named {name!r}; the reader expects {inst} — {label} there '
-                 f'({len(want)} parts: {layout})')
-    return layout
+    for layout, want in same_size:
+        if not wrong(want):
+            return layout
+    # Report against the layout the score follows furthest (a Concert-only score against the Concert layout); on a tie,
+    # the one more of whose names the score has right, then the one whose expected name is closest to the name found
+    # ("Concrt" is a Concert part, not a Countermelody).
+    def fit(lw):
+        i, name, inst, label = wrong(lw[1])
+        right = sum(bool(m) and m.groups() == w for m, w in zip((PART_NAME.match(n.strip()) for n in names), lw[1]))
+        return i, right, difflib.SequenceMatcher(None, name.lower(), f'{inst} — {label}'.lower()).ratio()
+    layout, want = max(same_size, key=fit)
+    i, name, inst, label = wrong(want)
+    fail(f'{slug}: part {i + 1} is named {name!r}; the reader expects {inst} — {label} there '
+         f'({len(want)} parts: {layout})')
 
 
 def replace(text, old, new, count=1):
@@ -202,7 +223,8 @@ def song_page(reader, song, facts, app, revs):
 
     b = body
     b = replace(b, t['lede'], t['lede'] if facts['layout'] == 'six tiers' else
-                'Four levels for violin, viola, cello and bass, each with a melody, an inner part and a bass line.')
+                'Four levels for violin, viola, cello and bass, each with a melody, an inner part and a bass line'
+                + EXTRAS.get(facts['layout'], '') + '.')
     b = replace(b, f">{t['title']}<span class=\"info-i\"", f">{e(song['title'])}<span class=\"info-i\"")
     b = replace(b, f"<p class=\"info-title\">{t['title']}</p>", f"<p class=\"info-title\">{e(song['title'])}</p>")
     b = replace(b, f"<p class=\"eyebrow\">{t['collection']}</p>", f"<p class=\"eyebrow\">{e(song.get('collection', ''))}</p>")

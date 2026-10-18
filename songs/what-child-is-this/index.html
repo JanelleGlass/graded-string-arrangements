@@ -660,7 +660,14 @@ body.following .host-only { display: none !important; }
   // Songs built on 2026-10-16 (34 parts) have no cello or bass Inner part: those cells are greyed out.
   const VOICES34 = VOICES.map(row => row.name.endsWith('Inner') ? { ...row, insts: [0, 1],
     note: row.name === 'Advanced Inner' ? 'A descant on violin, a countermelody on viola. ' + B34 : row.note } : { ...row });
-  const LAYOUTS = { tiers: TIERS, voices: VOICES34, voices40: VOICES };
+  // Some songs add parts for the strongest players after the 40, on violin and viola only (BUILD-SPEC section 3): a
+  // Countermelody, and the Concert parts Janelle plays with the group. Their cello and bass cells are greyed out.
+  const COUNTER = { name: 'Countermelody', short: 'Countermelody', insts: [0, 1], level: true, extra: true,
+    note: 'A very challenging line of its own on violin and on viola. The two answer each other, and either one plays with any group. Up to fourth position.' };
+  const CONCERT = { name: 'Concert', short: 'Concert', insts: [0, 1], level: true, extra: true, plain: true, // no string colours or finger numbers
+    note: 'Played with the group by a teacher or an advanced player: double stops, three- and four-note chords and drones. Up to fifth position.' };
+  const LAYOUTS = { tiers: TIERS, voices: VOICES34, voices40: VOICES, 'voices40+counter': [...VOICES, COUNTER],
+    'voices40+concert': [...VOICES, CONCERT], 'voices40+counter+concert': [...VOICES, COUNTER, CONCERT] };
   let layout, ROWS, PARTS; // the song's layout, its rows, and for each part (by number) its row and instrument
   function useLayout(id) {
     layout = id; ROWS = LAYOUTS[id]; PARTS = [];
@@ -716,8 +723,10 @@ body.following .host-only { display: none !important; }
   // can read along with a cello at Advanced Melody, and the tune can play on one instrument while the harmony keeps
   // all four. Saved choices are numbered in the layout they were made in (saved.parts: the six levels for anything
   // saved before there were others); once the score says which layout the song has, they move over (switchLayout).
-  useLayout(LAYOUTS[saved.parts] ? saved.parts : 'tiers');
-  const trackIndex = (row, inst) => ROWS[row].cells[inst];
+  // A layout with extra rows is saved as the 40 graded parts it adds to, with its full id beside it (savedLayout).
+  const savedLayout = LAYOUTS[saved.partsFull] ? saved.partsFull : saved.parts;
+  useLayout(LAYOUTS[savedLayout] ? savedLayout : 'tiers');
+  const trackIndex = (row, inst) => ROWS[row]?.cells[inst]; // undefined for a row this layout doesn't have
   const rowOf = (ti) => PARTS[ti]?.row ?? -1;
   const instOf = (ti) => PARTS[ti]?.inst ?? 0;
   const firstVisit = () => [trackIndex(ROWS.findIndex(r => r.name === 'Melody'), 0)]; // Violin, Melody
@@ -792,7 +801,11 @@ body.following .host-only { display: none !important; }
   const letterKey = () => (document.documentElement.classList.contains('small') ? 'letterMode' : 'letterModeBig');
   const lettersOn = () => state[letterKey()] !== 'off';
   const fingerSpot = () => (lettersOn() ? 'right' : state.fingers);
-  const save = () => store.set({ zoom: state.zoom, parts: layout, seen: state.seen, heard: state.heard, hearOpen: state.hearOpen, colorMode: state.colorMode, fingerMode: state.fingerMode, tempo: state.tempo, follow: state.follow, countBy: state.unit, fingers: state.fingers, counts: state.countAlong ? 'on' : 'off', layout: state.layout, letterMode: state.letterMode, lettersBig: state.letterModeBig, metro: state.metro });
+  // Extra rows come after the 40 graded parts, so the graded parts keep their numbers. Saving the layout as 'voices40'
+  // (and the full id in partsFull) lets a reader from before the extra rows, such as an offline copy not yet updated,
+  // keep the graded parts and drop only the extras. An id it doesn't know would read as the six levels and swap parts.
+  const savedId = () => layout.startsWith('voices40+') ? 'voices40' : layout;
+  const save = () => store.set({ zoom: state.zoom, parts: savedId(), partsFull: layout, seen: state.seen, heard: state.heard, hearOpen: state.hearOpen, colorMode: state.colorMode, fingerMode: state.fingerMode, tempo: state.tempo, follow: state.follow, countBy: state.unit, fingers: state.fingers, counts: state.countAlong ? 'on' : 'off', layout: state.layout, letterMode: state.letterMode, lettersBig: state.letterModeBig, metro: state.metro });
 
   // ---- Room reverb ----
   // alphaTab plays through Web Audio; route whatever it sends to the speakers through a small reverb bus.
@@ -840,8 +853,8 @@ body.following .host-only { display: none !important; }
   const STRINGS_OF = [['E', 'A', 'D', 'G'], ['A', 'D', 'G', 'C'], ['A', 'D', 'G', 'C'], ['G', 'D', 'A', 'E']];
   function renderKey() {
     const key = $('legend');
-    key.hidden = state.colorMode === 'off';
-    const insts = [...new Set(state.seen.map(instOf))];
+    key.hidden = state.colorMode === 'off' || !coloursShown(); // only Concert parts on the page: no colours to explain
+    const insts = [...new Set(state.seen.filter(ti => !ROWS[rowOf(ti)]?.plain).map(instOf))]; // a Concert part has no colours to explain
     const strings = insts.length === 1 ? STRINGS_OF[insts[0]] : ['E', 'A', 'D', 'G', 'C'].filter(n => insts.some(i => STRINGS_OF[i].includes(n)));
     key.replaceChildren();
     const lbl = document.createElement('span');
@@ -940,13 +953,15 @@ body.following .host-only { display: none !important; }
     hostSeek(); // followers loop the same way
     toast(METRO_WORD[state.metro]);
   });
-  $('g-colors').addEventListener('click', () => { setPop(null); state.colorMode = nextOf(STEP_MARKS, state.colorMode); changed({ marks: true, size: true }); toast('String colors: ' + MARK_WORD[state.colorMode]); });
+  $('g-colors').addEventListener('click', () => { setPop(null); state.colorMode = nextOf(STEP_MARKS, state.colorMode); changed({ marks: true, size: true });
+    const why = state.colorMode !== 'off' && !coloursShown() ? noMarksWhy('string colors') : '';
+    toast('String colors: ' + MARK_WORD[state.colorMode] + why, why ? 2600 : 1700); });
   $('g-look').addEventListener('click', () => {
     setPop(null);
     const next = LOOKS[(LOOKS.indexOf(lookNow()) + 1) % LOOKS.length];
     setLook(next);
     changed({ marks: true, size: true });
-    toast(next.word + (next.fingers && !fingersShown() ? ' (Open Strings parts have no finger numbers)' : ''), next.fingers && !fingersShown() ? 2600 : 1700);
+    toast(next.word + (next.fingers && !fingersShown() ? noMarksWhy('finger numbers') : ''), next.fingers && !fingersShown() ? 2600 : 1700);
   });
   $('g-layout').addEventListener('click', () => {
     setPop(null);
@@ -977,9 +992,11 @@ body.following .host-only { display: none !important; }
     list.append(b);
     return b;
   }
-  // A part the song doesn't have (no cello or bass Inner in a 34-part song): greyed out in its place, and a tap says why.
+  // A part the song doesn't have (no cello or bass Inner in a 34-part song, no cello or bass Countermelody or Concert
+  // part): greyed out in its place, and a tap says why.
   function mixNone(list, kind, r, i) {
-    const why = 'No ' + ROWS[r].name + ' part for ' + INSTRUMENTS[i].toLowerCase() + ' in this piece: cellos and basses play a Bass Line or a Melody';
+    const why = 'No ' + ROWS[r].name + ' part for ' + INSTRUMENTS[i].toLowerCase() + (ROWS[r].extra
+      ? ': it is written for violin and viola' : ' in this piece: cellos and basses play a Bass Line or a Melody');
     const b = mixTog(list, kind, kind + '-' + r + '-' + i, why, () => toast(why, 2600));
     b.classList.add('none'); b.setAttribute('aria-disabled', 'true');
     b.innerHTML = kind === 'see' ? EYE_OFF : SPEAKER_OFF;
@@ -1308,8 +1325,16 @@ body.following .host-only { display: none !important; }
   }
 
   // Open Strings (pizzicato) parts are all open strings, so they show no finger numbers.
-  const hasFingers = (ti) => rowOf(ti) !== 0;
+  // Concert parts are plain: no finger numbers or string colours, as in Janelle's files.
+  const hasFingers = (ti) => rowOf(ti) !== 0 && !ROWS[rowOf(ti)]?.plain;
   const fingersShown = () => shownIndexes().some(hasFingers);
+  const coloursShown = () => shownIndexes().some(ti => !ROWS[rowOf(ti)]?.plain);
+  // Why the parts on the page have no finger numbers (or string colours): said when a tap can't show them.
+  function noMarksWhy(what) {
+    const rows = [...new Set(shownIndexes().map(rowOf))].map(r => ROWS[r]);
+    const names = [...new Set(rows.map(r => r.plain ? 'Concert' : r.name === 'Open Strings' && what === 'finger numbers' ? 'Open Strings' : null).filter(Boolean))];
+    return names.length ? ' (' + names.join(' and ') + ' parts have no ' + what + ')' : '';
+  }
   function applyMarks() {
     score.tracks.forEach((track, ti) => {
       const partMarks = marks[ti] || [];
@@ -1484,19 +1509,37 @@ body.following .host-only { display: none !important; }
   // Tap a note: Play starts there, and a frame marks it until the music starts.
   // Drag across bars (on a phone: press and hold, then drag): those bars loop. A tap outside them stops the loop.
   let markTick = 0;          // where Play will start
+  let markBeat = null;       // the note tapped to choose it (one of a chord's voices), while Play still starts there
   let loop = null;           // { from, to }: the bars (0-based) looping
   const markLayer = document.createElement('div'); markLayer.className = 'start-layer';
   const loopLayer = document.createElement('div'); loopLayer.className = 'loop-layer';
   const tickOfBeat = (beat) => score.masterBars[beat.voice.bar.index].start + beat.playbackStart;
-  // Where a beat's note head (or rest) is drawn, in the music's own coordinates.
+  // A part's note at a moment in a bar. A part with one voice (every graded part): the note sounding there, as always.
+  // With a second voice (a Concert part's drone and tune): the note tapped there, else a note starting there in the
+  // voice the counts follow (the tune), else the first voice's.
+  function beatAt(ti, bi, rel) {
+    const voices = score.tracks[ti].staves[0].bars[bi].voices, beats = voices[0].beats;
+    const first = beats.find(b => rel >= b.playbackStart - 1 && rel < b.playbackStart + b.playbackDuration) || beats[0];
+    if (voices.length < 2) return first;
+    if (markBeat && markBeat.voice.bar.staff.track.index === ti && markBeat.voice.bar.index === bi && Math.abs(rel - markBeat.playbackStart) <= 1) return markBeat;
+    const starts = voices.flatMap(v => v.beats).filter(b => !b.isRest && Math.abs(rel - b.playbackStart) <= 1);
+    if (!starts.length) return first;
+    const counted = countBeats(ti, bi);
+    return starts.find(b => counted.includes(b)) || (starts.includes(first) ? first : starts[0]);
+  }
+  // Where a beat's note head (or rest) is drawn, in the music's own coordinates; a chord's box takes in all its heads.
   function headBox(beat, bb) {
     const vb = bb.barBounds.visualBounds, space = vb.h / 4;
     const g = !beat.isRest && $('sheet').querySelector('svg g.b' + beat.id);
-    const h = g && headOf(g);
+    const heads = g && beat.notes.length > 1 ? headGlyphs(g) : [];
+    const h = g && (heads.length > 1 ? null : headOf(g));
     const surf = $('sheet').querySelector('.at-surface');
-    if (h && surf) {
+    if ((h || heads.length > 1) && surf) {
       const sr = g.ownerSVGElement.getBoundingClientRect(), fr = surf.getBoundingClientRect();
-      return { x: sr.left - fr.left + h.x, w: h.w, cy: sr.top - fr.top + h.y, h: h.w / 1.18, space };
+      if (h) return { x: sr.left - fr.left + h.x, w: h.w, cy: sr.top - fr.top + h.y, h: h.w / 1.18, space };
+      const x0 = Math.min(...heads.map(k => k.x)), x1 = Math.max(...heads.map(k => k.x + k.w));
+      const y0 = Math.min(...heads.map(k => k.y)), y1 = Math.max(...heads.map(k => k.y)), hh = heads[0].w / 1.18;
+      return { x: sr.left - fr.left + x0, w: x1 - x0, cy: sr.top - fr.top + (y0 + y1) / 2, h: y1 - y0 + hh, space };
     }
     return { x: bb.visualBounds.x, w: bb.visualBounds.w, cy: vb.y + vb.h / 2, h: space * 2.6, space };
   }
@@ -1506,8 +1549,7 @@ body.following .host-only { display: none !important; }
     if (!api || !api.boundsLookup || !score || (playing && !counting)) return;
     const tick = Math.max(0, markTick || 0), bi = barAtTick(tick), rel = tick - score.masterBars[bi].start;
     for (const ti of shownIndexes()) {
-      const beats = score.tracks[ti].staves[0].bars[bi].voices[0].beats;
-      const beat = beats.find(b => rel >= b.playbackStart - 1 && rel < b.playbackStart + b.playbackDuration) || beats[0];
+      const beat = beatAt(ti, bi, rel);
       const bb = beat && api.boundsLookup.findBeat(beat);
       if (!bb) continue;
       const hb = headBox(beat, bb), pad = Math.max(7, hb.space * 0.62);
@@ -1677,6 +1719,15 @@ body.following .host-only { display: none !important; }
       if (loop && !(bar != null && bar >= loop.from && bar <= loop.to)) { setLoop(null); toast('Loop off'); }
       const beat = beatAtPoint(p);
       if (beat) {
+        // alphaTab finds the note by x alone, and where two staves or two voices start a note at the same moment it takes
+        // the upper one. The ring goes on the note whose head is nearest the tap, of every note starting there in the
+        // parts on the page; where alphaTab finds one voice's rest under another's note, on the note.
+        const bi = beat.voice.bar.index;
+        const both = shownIndexes().flatMap(ti => score.tracks[ti].staves[0].bars[bi].voices.flatMap(v => v.beats))
+          .filter(b => !b.isRest && Math.abs(b.playbackStart - beat.playbackStart) <= 1);
+        const near = both.length < (beat.isRest ? 1 : 2) ? [] : both.map(b => [b, api.boundsLookup.findBeat(b)]).filter(([, bb]) => bb)
+          .map(([b, bb]) => [b, Math.abs(headBox(b, bb).cy - p.y)]).sort((a, c) => a[1] - c[1]);
+        markBeat = near.length ? near[0][0] : beat;
         seekTo(tickOfBeat(beat));
         let told = true;
         try { told = localStorage.getItem('reader-loop-tip') === '1'; localStorage.setItem('reader-loop-tip', '1'); } catch {}
@@ -2339,7 +2390,21 @@ body.following .host-only { display: none !important; }
     const m = inner && /translate\(([-\d.]+)[ ,]+([-\d.]+)\)/.exec(inner.getAttribute('transform') || '');
     if (!m || !text) return null;
     const w = text.getBoundingClientRect().width;
-    return { x: parseFloat(m[1]), y: parseFloat(m[2]), w, glyph: text.textContent };
+    return { x: parseFloat(m[1]), y: parseFloat(m[2]), w, glyph: text.textContent, text };
+  }
+  // A chord's note heads, top first, each with its g.at (also once it sits in its own swell wrapper, chordWraps).
+  function headGlyphs(group) {
+    const gs = [...group.children].flatMap(c => c.matches('g.at') ? [c] : c.classList.contains('head-wrap') ? [...c.querySelectorAll(':scope > g.at')] : []);
+    return gs.map(g => { const h = headOf({ querySelectorAll: () => [g] }); return h && { ...h, g }; })
+      .filter(h => h && h.glyph.charCodeAt(0) >= 0xE0A0 && h.glyph.charCodeAt(0) <= 0xE0FF).sort((a, b) => a.y - b.y);
+  }
+  // A chord (a double stop in a Concert part): each note with its own head, the highest note with the highest head.
+  // Null when the heads can't be told apart, so no letter lands on the wrong note.
+  function chordHeads(group, notes) {
+    const heads = headGlyphs(group);
+    const high = [...notes].sort((a, b) => b.realValue - a.realValue);
+    if (heads.length !== high.length || heads.some((h, k) => k && h.y - heads[k - 1].y < 0.5)) return null;
+    return high.map((n, k) => [n, heads[k]]);
   }
   function prepGroup(group) {
     if (group.dataset.origin) return;
@@ -2348,6 +2413,25 @@ body.following .host-only { display: none !important; }
     group.style.transformBox = 'view-box';
     group.style.transformOrigin = `${h.x + h.w / 2}px ${h.y}px`;
     group.dataset.origin = '1';
+  }
+  // A chord swells head by head, each about its own centre (with a half note's white ring), so every head stays
+  // under its note name; swelling the whole chord about one head would pull the others off theirs. Each head goes
+  // into a wrapper of its own (a g.at carries its place in its transform, which a swell would override).
+  function chordWraps(group) {
+    if (group._wraps !== undefined) return group._wraps;
+    const heads = headGlyphs(group);
+    if (heads.length < 2) return (group._wraps = null);
+    const rings = [...group.querySelectorAll(':scope > ellipse')];
+    return (group._wraps = heads.map(h => {
+      let w = h.g.parentNode;
+      if (!w.classList.contains('head-wrap')) {
+        w = document.createElementNS('http://www.w3.org/2000/svg', 'g'); w.setAttribute('class', 'head-wrap');
+        h.g.parentNode.insertBefore(w, h.g); w.appendChild(h.g);
+      }
+      for (const r of rings) if (Math.abs(parseFloat(r.getAttribute('cy')) - h.y) < 1) w.appendChild(r);
+      w.style.transformBox = 'view-box'; w.style.transformOrigin = `${h.x + h.w / 2}px ${h.y}px`;
+      return w;
+    }));
   }
   function settle(el) { el.getAnimations().forEach(a => a.cancel()); }
   function swell(el, from) {
@@ -2378,7 +2462,11 @@ body.following .host-only { display: none !important; }
     if (key === soundKey) return [];
     soundKey = key;
     const sheet = $('sheet'), next = [];
-    for (const beat of beats) sheet.querySelectorAll('g.b' + beat.id).forEach(el => { prepGroup(el); el._part = beat.voice.bar.staff.track.index; next.push(el); });
+    for (const beat of beats) sheet.querySelectorAll('g.b' + beat.id).forEach(el => {
+      const part = beat.voice.bar.staff.track.index, wraps = beat.notes.length > 1 && chordWraps(el);
+      if (wraps) wraps.forEach(w => { w._part = part; next.push(w); });
+      else { prepGroup(el); el._part = part; next.push(el); }
+    });
     const fresh = next.filter(el => !pulsing.includes(el));
     pulsing = next;
     return fresh;
@@ -2413,17 +2501,18 @@ body.following .host-only { display: none !important; }
     const accidentals = new Map(); // per SVG: sharps, flats and naturals, to keep a left-hand number clear of them
     const flags = new Map();
     for (const ti of shownIndexes()) {
-      for (const bar of score.tracks[ti].staves[0].bars) for (const beat of bar.voices[0].beats) {
-        const note = beat.notes[0];
-        if (beat.isRest || !note || (!note.finger && !note.letter)) continue;
+      // Every voice: a Concert part carries the tune in its second voice under a held drone.
+      for (const bar of score.tracks[ti].staves[0].bars) for (const voice of bar.voices) for (const beat of voice.beats) {
+        if (beat.isRest || !beat.notes.some(n => n.finger || n.letter)) continue;
         const group = sheet.querySelector('g.b' + beat.id);
         if (!group || group.dataset.fin) continue;
         group.dataset.fin = '1';
         // Numbers and letters go just after the note's group, not inside it, so they hold still while the head pulses.
         let anchor = group;
         const put = (el) => { anchor.parentNode.insertBefore(el, anchor.nextSibling); anchor = el; };
-        const h = headOf(group);
-        if (!h) continue;
+        const pairs = beat.notes.length === 1 ? [[beat.notes[0], headOf(group)]] : chordHeads(group, beat.notes) || [];
+        for (const [note, h] of pairs) {
+        if (!h || (!note.finger && !note.letter)) continue;
         const headH = h.w / 1.18;
         const add = (txt, x, y, size, fill, anchor, halo) => {
           const t = document.createElementNS(NS, 'text');
@@ -2442,7 +2531,7 @@ body.following .host-only { display: none !important; }
           if (hollow) {
             // A half note with a letter is drawn as an open oval with a roomy white middle (the printed half-note
             // head has only a thin slit). It sits inside the note's group, so it still pulses with the beat.
-            const glyph = [...group.querySelectorAll(':scope > g.at > text')].find(t => t.textContent === h.glyph);
+            const glyph = h.text || [...group.querySelectorAll(':scope > g.at > text')].find(t => t.textContent === h.glyph);
             if (glyph) glyph.style.opacity = '0';
             const ring = document.createElementNS(NS, 'ellipse');
             ring.setAttribute('cx', cx.toFixed(1)); ring.setAttribute('cy', h.y.toFixed(1));
@@ -2507,6 +2596,7 @@ body.following .host-only { display: none !important; }
             add(note.finger, left - gap, y, fs.toFixed(1), '#121614', 'end', true);
           }
         }
+        }
       }
     }
   }
@@ -2541,6 +2631,14 @@ body.following .host-only { display: none !important; }
     return lv;
   }
   // Write every count under each staff at once; playback lights up the current one.
+  // The voice a part's counts follow in a bar: the one with the most notes, so a Concert part's tune is counted, not
+  // the drone held under or over it. A bar with one voice (every other part) counts that voice, as always.
+  function countBeats(ti, bi) {
+    const voices = score.tracks[ti].staves[0].bars[bi].voices;
+    let best = voices[0];
+    for (const v of voices) if (v.beats.filter(b => !b.isRest).length > best.beats.filter(b => !b.isRest).length) best = v;
+    return best.beats;
+  }
   function buildCounts() {
     clearCounts();
     const wrap = $('sheet').querySelector('.at-cursors');
@@ -2562,7 +2660,7 @@ body.following .host-only { display: none !important; }
         const beatTicks = 3840 / mb.timeSignatureDenominator, fullBar = mb.timeSignatureNumerator * beatTicks;
         const lead = mb.isAnacrusis ? fullBar - mb.calculateDuration() : 0;
         const step = state.unit || 240;
-        const beats = score.tracks[ti].staves[0].bars[bi].voices[0].beats;
+        const beats = countBeats(ti, bi);
         for (let q = Math.ceil(lead / step) * step; q < fullBar; q += step) {
           const at = q - lead;
           const label = countLabel(q, beatTicks, mb.timeSignatureNumerator);
@@ -2801,7 +2899,7 @@ body.following .host-only { display: none !important; }
     let parts = shownIndexes();
     if (!state.unit && frac !== 0) {
       const at = q - lead;
-      parts = parts.filter(ti => score.tracks[ti].staves[0].bars[bi].voices[0].beats.some(b => b.playbackStart === at));
+      parts = parts.filter(ti => countBeats(ti, bi).some(b => b.playbackStart === at));
     }
     return { bi, n, rel, strong: q % fullBar === 0, label, at: Math.max(0, q - lead), count: parts.length > 0, parts: new Set(parts) };
   }
@@ -3092,8 +3190,7 @@ body.following .host-only { display: none !important; }
     if (!api || !score || !api.boundsLookup) return;
     const ti = shownIndexes()[0];
     const bi = barAtTick(tick), mb = score.masterBars[bi], rel = tick - mb.start;
-    const beats = score.tracks[ti].staves[0].bars[bi].voices[0].beats;
-    const beat = beats.find(b => rel >= b.playbackStart - 1 && rel < b.playbackStart + b.playbackDuration) || beats[0];
+    const beat = beatAt(ti, bi, rel);
     const bb = beat && api.boundsLookup.findBeat(beat);
     if (!bb) return;
     const sheet = $('sheet'), behavior = smooth && !reduceMotion ? 'smooth' : 'auto';
@@ -3242,8 +3339,7 @@ body.following .host-only { display: none !important; }
   // Where the note at this tick is printed (in the first part shown).
   function noteXAt(tick) {
     const ti = shownIndexes()[0], bi = barAtTick(tick), rel = tick - score.masterBars[bi].start;
-    const beats = score.tracks[ti].staves[0].bars[bi].voices[0].beats;
-    const beat = beats.find(b => rel >= b.playbackStart - 1 && rel < b.playbackStart + b.playbackDuration) || beats[0];
+    const beat = beatAt(ti, bi, rel);
     const bb = beat && api.boundsLookup && api.boundsLookup.findBeat(beat);
     return bb ? bb.onNotesX : xAt(tick);
   }

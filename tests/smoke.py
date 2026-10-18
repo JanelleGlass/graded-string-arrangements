@@ -26,7 +26,16 @@ What it checks
      moved over beside the open panel (not under it), and choices saved with the six levels or with
      34 parts moving to their match. Songs built on 2026-10-16 (34 parts): the cello and bass Inner
      cells greyed out in place (a tap says why). Run on the first 34-part song in songs.json, or on
-     the first 40-part song's score cut to 34 parts when there is none.
+     the first 40-part song's score cut to 34 parts when there is none. Songs with parts for the strongest
+     players after the 40 (a Countermelody and/or Concert parts, 42 or 44 parts): a row for each at the bottom,
+     an eye for violin and viola, cello and bass greyed out in place (a tap says why), the chosen parts shown,
+     played and labelled, every Concert part with notes and no string colours (a Countermelody with them), the
+     About box naming them, note names on every note of a Concert part's double stops in pitch order, a finger
+     look saying Concert parts have none, and a Concert part's tune in its second voice counted. Run on every such
+     song. Tapping a note rings that note: where a Concert part's two voices start a note together (alone and with a
+     part shown above it), and where a note sits over the other voice's rest. Choices are saved as the graded 40
+     ('voices40', which a reader from before the extra rows knows) with the full layout beside it, and a second
+     visit shows the same parts.
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
      the teacher conducts, a student follows, and the student's music keeps up with the teacher's.
   4. The app layer: the browser can install the site, every file is saved after one visit, every song
@@ -696,6 +705,216 @@ async def app_checks(browser):
     await ctx.close()
 
 
+async def extras_checks(browser, base):
+    """Parts for the strongest players after the 40 (BUILD-SPEC section 3), on violin and viola only: a Countermelody
+    and/or Concert parts (42 or 44 parts). The Concert parts have chords and a second voice, with no string colours
+    or finger numbers."""
+    import xml.etree.ElementTree as ET
+    def extra_rows(slug):
+        names = ET.parse(ROOT / 'songs' / slug / f'{slug}.xml').getroot().find('part-list').findall('score-part')
+        rows = []
+        for sp in names[40:]:
+            row = re.split(r'\s*[—–-]\s*', sp.findtext('part-name').strip(), maxsplit=1)[1]
+            if row not in rows: rows.append(row)
+        return rows
+    slugs = [s['slug'] for s in SONGS if PARTS[s['slug']] in (42, 44)]
+    if not slugs:
+        print('Parts panel, countermelody and concert parts: no such song, skipped')
+    for slug in slugs:
+        await extras_song_checks(browser, base, slug, extra_rows(slug))
+
+
+async def extras_song_checks(browser, base, slug, extra):
+    """One song's extra rows (Countermelody and/or Concert), from its part names."""
+    ck = lambda ok, what: check(ok, f'{slug}: {what}')    # two songs run these checks: each message names its song
+    n = PARTS[slug]
+    print(f'Parts panel, countermelody and concert parts ({n} parts: {", ".join(extra)}): {slug}')
+    row_of = {name: 10 + r for r, name in enumerate(extra)}
+    track = lambda name, inst: 40 + 2 * extra.index(name) + inst          # violin 0, viola 1
+    for label, w, h in [('laptop', 1366, 860), ('phone landscape', 844, 390)]:
+        ctx = await browser.new_context(device_scale_factor=1, service_workers='block')
+        await setup(ctx)
+        errors = []
+        pg = await open_reader(ctx, f'{base}/songs/{slug}/', errors, slug, w, h)
+        await pg.evaluate(SPY_JS)
+        await pg.click('#g-parts'); await pg.wait_for_timeout(600)
+        names = await pg.evaluate("() => [...document.querySelectorAll('#mixParts .mix-name')].map(n => [...n.children].find(c => c.offsetParent && !c.classList.contains('lvl-same')).textContent)")
+        if label == 'laptop':
+            ck(names == VOICE_ROWS + extra, f'{label}: the extra rows come after the ten levels and voices ({names[10:]})')
+        else:
+            ck(len(names) == 10 + len(extra) and names[10:] == extra, f'{label}: the extra rows on a phone ({names[10:]})')
+        eyes = await pg.evaluate("() => [...document.querySelectorAll('#mixParts .tog.see')].filter(b => b.offsetParent).map(b => [b.id, b.classList.contains('none'), b.title])")
+        greyed = [i for i, none, t in eyes if none]
+        want = [f'see-{10 + r}-{i}' for r in range(len(extra)) for i in (2, 3)]
+        ck(len(eyes) == 40 + 4 * len(extra) and greyed == want,
+              f'{label}: an eye for violin and viola on each extra row, cello and bass greyed out in place ({greyed})')
+        why = [t for i, none, t in eyes if none]
+        ck(all('written for violin and viola' in t for t in why), f'{label}: a greyed-out cell says why ("{why[0] if why else ""}")')
+        wide = await pg.evaluate('() => document.documentElement.scrollWidth - window.innerWidth')
+        ck(wide <= 1, f'{label}: no sideways scrolling ({wide}px extra)')
+        if label != 'laptop':
+            ck(not errors, f'{label}: no script errors' + (f': {errors[:3]}' if errors else ''))
+            await ctx.close()
+            continue
+        # Violin on the first extra row and viola on the last, without the first visit's Violin Melody.
+        first, last = extra[0], extra[-1]
+        await pg.click(f'#see-{row_of[first]}-0'); await pg.click(f'#see-{row_of[last]}-1'); await pg.click('#see-4-0'); await pg.wait_for_timeout(1500)
+        want_idx = [track(first, 0), track(last, 1)]
+        ck(await pg.evaluate(SHOWN_JS) == want_idx and await pg.evaluate(PLAYING_JS) == want_idx,
+              f'eyes on Violin {first} and Viola {last} show and play those two ({await pg.evaluate(SHOWN_JS)})')
+        # The reader names a staff by whatever tells the shown staves apart: both rows differ, or only the instrument.
+        want_staves = [f'Vln {first}', f'Vla {last}'] if first != last else ['Vln', 'Vla']
+        staves = await pg.evaluate('() => reader.api.tracks.map(t => t.name)')
+        ck(staves == want_staves, f'the staves are labelled ({staves})')
+        # Concert parts have notes and no string colours; a Countermelody has its colours.
+        styled = await pg.evaluate("""() => reader.api.score.tracks.slice(40).map(t => { const ns = t.staves[0].bars.flatMap(b => b.voices.flatMap(v => v.beats.flatMap(be => be.notes)));
+              return [ns.length, ns.filter(x => x.style).length] })""")
+        for k, (count, coloured) in enumerate(styled):
+            name = ['Violin', 'Viola'][k % 2] + ' ' + extra[k // 2]
+            ok = count > 0 and (coloured == 0 if extra[k // 2] == 'Concert' else coloured > 0)
+            ck(ok, f'{name}: {count} notes, {coloured} with string colours ({"none" if extra[k // 2] == "Concert" else "some"} expected)')
+        about = (await pg.text_content('#infoPop')).lower()
+        ck(all(w in about for w in (['countermelody'] if 'Countermelody' in extra else []) + (['concert part'] if 'Concert' in extra else [])),
+              'the About box names the extra parts')
+        if 'Concert' in extra:
+            # Only Viola Concert on the page, with note names: each double stop has a name on every note, top to bottom
+            # in pitch order (the bars on screen at the start).
+            await pg.click(f'#see-{row_of[first]}-0')        # the violin part of the first extra row off: Viola Concert alone
+            for _ in range(5):
+                if (await pg.text_content('#g-look .now .word')) == 'Note names': break
+                await pg.click('#g-look'); await pg.wait_for_timeout(400)
+            await pg.wait_for_timeout(1500)
+            chords = await pg.evaluate(f"""() => {{ const out = [];
+              for (const bar of reader.api.score.tracks[{track('Concert', 1)}].staves[0].bars) for (const v of bar.voices) for (const be of v.beats) {{
+                if (be.isRest || be.notes.length < 2) continue;
+                const g = document.querySelector('#sheet g.b' + be.id); if (!g) continue;
+                const fins = []; let el = g.nextElementSibling;
+                while (el && el.classList && el.classList.contains('fin')) {{ fins.push([parseFloat(el.getAttribute('y')), el.firstChild.textContent]); el = el.nextElementSibling; }}
+                const want = [...be.notes].sort((a, b) => b.realValue - a.realValue).map(x => (x.letter || '').charAt(0));
+                out.push([fins.sort((a, b) => a[0] - b[0]).map(f => f[1]), want]);
+              }}
+              return out; }}""")
+            good = [c for c in chords if c[0] == c[1]]
+            ck(chords and len(good) == len(chords), f'note names on Viola Concert chords: one per note, top to bottom in pitch order ({len(good)} of {len(chords)}; e.g. {chords[:2]})')
+            # Only Concert parts on the page: the Strings key steps aside, and a finger look or String colors says why.
+            ck(await pg.evaluate("() => document.getElementById('legend').hidden"), 'with only a Concert part on the page the Strings key steps aside')
+            for _ in range(5):
+                await pg.click('#g-look'); await pg.wait_for_timeout(300)
+                if (await pg.text_content('#g-look .now .word')) == 'Fingers inside': break
+            told = await pg.text_content('#toast') or ''
+            ck('Concert parts have no finger numbers' in told, f'a finger look says the Concert parts have none ("{told}")')
+            for _ in range(3):
+                await pg.click('#g-colors'); await pg.wait_for_timeout(300)
+                told = await pg.text_content('#toast') or ''
+                if not told.endswith('off'): break
+            ck('Concert parts have no string colors' in told, f'String colors says the Concert parts have none ("{told}")')
+            for _ in range(5):
+                if (await pg.text_content('#g-look .now .word')) == 'Note names': break
+                await pg.click('#g-look'); await pg.wait_for_timeout(300)
+            # Violin Concert alone: its second voice (the Epic's tune under a drone, Joy's drone under the tune) gets note
+            # names, and counts follow whichever voice has the most notes.
+            await pg.click(f'#see-{row_of["Concert"]}-0'); await pg.click(f'#see-{row_of["Concert"]}-1'); await pg.wait_for_timeout(2000)
+            v2 = await pg.evaluate(f"""() => {{ const t = reader.api.score.tracks[{track('Concert', 0)}]; let n = 0, named = 0;
+              for (const bar of t.staves[0].bars) bar.voices.slice(1).forEach(v => v.beats.forEach(be => {{ if (be.isRest) return; n += be.notes.length;
+                const g = document.querySelector('#sheet g.b' + be.id); let el = g && g.nextElementSibling, k = 0;
+                while (el && el.classList && el.classList.contains('fin')) {{ k++; el = el.nextElementSibling; }}
+                named += Math.min(k, be.notes.length); }}));
+              return [n, named] }}""")
+            if v2[0]:
+                ck(v2[1] == v2[0], f'Violin Concert: every note of its second voice has a note name ({v2[1]} of {v2[0]})')
+            else:
+                print('  (Violin Concert has no second voice: second-voice names skipped)')
+            # Counts follow the voice with the most notes: in a bar where that is a second voice with notes between the
+            # beats, those notes are counted too.
+            counts = await pg.evaluate("""() => { const tr = reader.api.score.tracks[reader.api.tracks[0].index], mbs = reader.api.score.masterBars;
+              for (let k = 0; k < mbs.length; k++) {
+                const vs = tr.staves[0].bars[k].voices; if (vs.length < 2) continue;
+                const n = v => v.beats.filter(b => !b.isRest).length, best = vs.reduce((a, v) => n(v) > n(a) ? v : a, vs[0]);
+                const beat = 3840 / mbs[k].timeSignatureDenominator;
+                if (best === vs[0] || !best.beats.some(b => !b.isRest && b.playbackStart % beat !== 0)) continue;
+                const mb = reader.api.boundsLookup.findMasterBarByIndex(k); if (!mb) continue;
+                const r = mb.visualBounds;
+                const got = [...document.querySelectorAll('.beat-count')].filter(e => { const x = parseFloat(e.style.left); return x >= r.x && x < r.x + r.w && e.textContent; }).map(e => e.textContent);
+                return { bar: k + 1, beats: mbs[k].timeSignatureNumerator, got };
+              }
+              return null }""")
+            if counts:
+                ck(len(counts['got']) > counts['beats'], f"Violin Concert bar {counts['bar']}: counted from its second voice's tune ({counts['got']})")
+            else:
+                print('  (no bar where a Concert part counts from its second voice: skipped)')
+            # Where the drone and the tune start a note together (either may be the second voice), tapping either note
+            # rings that note, not the other.
+            heads = r"""(ids) => ids.map(id => { const g = document.querySelector('#sheet svg g.b' + id);
+              const a = g && [...g.querySelectorAll('g.at')].find(a => { const k = ((a.querySelector('text') || {}).textContent || '').charCodeAt(0); return k >= 0xE0A0 && k <= 0xE0FF; });
+              const m = a && /translate\(([-\d.]+)[ ,]+([-\d.]+)\)/.exec(a.getAttribute('transform')); if (!m) return null;
+              const r = g.ownerSVGElement.getBoundingClientRect(); return { x: r.left + +m[1] + a.querySelector('text').getBoundingClientRect().width / 2, y: r.top + +m[2] }; })"""
+            # In the one-line view the music slides sideways (as a swipe moves it); a page of music scrolls down.
+            bring = """(id) => { const sh = document.getElementById('sheet'), g = document.querySelector('#sheet svg g.b' + id);
+              if (!sh.classList.contains('line')) return g.scrollIntoView({ block: 'center' });
+              sh.scrollIntoView({ block: 'center' }); const r = g.getBoundingClientRect(), s = sh.getBoundingClientRect();
+              sh.scrollLeft += r.left - (s.left + s.width / 2);
+              const q = g.getBoundingClientRect(); window.scrollBy(0, q.top + q.height / 2 - innerHeight / 2); }"""
+            pair = await pg.evaluate('() => { const heads = ' + heads + """;
+              const tr = reader.api.score.tracks[reader.api.tracks[0].index];
+              for (const [k, bar] of tr.staves[0].bars.entries()) {
+                const all = bar.voices.flatMap(v => v.beats).filter(b => !b.isRest && b.notes.length === 1);
+                for (const b of all.filter(b => b.voice.index > 0)) {
+                  const o = all.find(q => q.voice.index === 0 && Math.abs(q.playbackStart - b.playbackStart) <= 1); if (!o) continue;
+                  const [hb, ho] = heads([b.id, o.id]);
+                  if (hb && ho && Math.abs(hb.y - ho.y) > 40) return { bar: k + 1, ids: [b.id, o.id] };
+                } }
+              return null }""")
+            if pair:
+                # Alone, then under Viola Inner: alphaTab takes the upper staff's note where two staves start one together.
+                for above in (None, 'see-5-1'):
+                    if above:
+                        await pg.evaluate('(id) => document.getElementById(id).click()', above); await pg.wait_for_timeout(2000)
+                    with_what = ' with Viola Inner above it' if above else ''
+                    for ids, what in ((pair['ids'], "the second voice's note"), (pair['ids'][::-1], "the first voice's note")):
+                        await pg.evaluate(bring, ids[0])
+                        await pg.wait_for_timeout(600)
+                        pos = await pg.evaluate(heads, ids)
+                        await pg.mouse.click(pos[0]['x'], pos[0]['y']); await pg.wait_for_timeout(600)
+                        pos = await pg.evaluate(heads, ids)  # the one-line view slides to bring the tapped note to its place
+                        rung = await pg.evaluate("""(ps) => { const rs = [...document.querySelectorAll('.start-mark')].map(e => e.getBoundingClientRect());
+                          return ps.map(p => rs.some(r => p.x > r.left && p.x < r.right && p.y > r.top && p.y < r.bottom)) }""", pos)
+                        ck(rung == [True, False], f"Violin Concert{with_what} bar {pair['bar']}: tapping {what} where the drone and the tune start together rings that note, not the other ({rung})")
+                    if above:
+                        await pg.evaluate('(id) => document.getElementById(id).click()', above); await pg.wait_for_timeout(2000)
+            else:
+                print('  (no bar where the drone and the tune start a note together: tap check skipped)')
+            # Where one voice rests under the other's note (Joy's bar 15, where the drone stops), tapping the note rings
+            # the note, not the rest.
+            over = await pg.evaluate("""() => { const tr = reader.api.score.tracks[reader.api.tracks[0].index];
+              for (const [k, bar] of tr.staves[0].bars.entries()) {
+                const all = bar.voices.flatMap(v => v.beats);
+                for (const b of all.filter(b => !b.isRest && b.notes.length === 1))
+                  if (all.some(q => q.isRest && !q.isEmpty && q.voice !== b.voice && Math.abs(q.playbackStart - b.playbackStart) <= 1)) return { bar: k + 1, id: b.id };
+              }
+              return null }""")
+            if over:
+                await pg.evaluate(bring, over['id']); await pg.wait_for_timeout(600)
+                pos = await pg.evaluate(heads, [over['id']])
+                await pg.mouse.click(pos[0]['x'], pos[0]['y']); await pg.wait_for_timeout(600)
+                pos = await pg.evaluate(heads, [over['id']])
+                rung = await pg.evaluate("""([p]) => [...document.querySelectorAll('.start-mark')].map(e => e.getBoundingClientRect())
+                  .some(r => p.x > r.left && p.x < r.right && p.y > r.top && p.y < r.bottom)""", pos)
+                ck(rung, f"Violin Concert bar {over['bar']}: tapping a note over the other voice's rest rings the note, not the rest")
+            else:
+                print("  (no bar where a Concert note sits over the other voice's rest: tap check skipped)")
+        # Saved choices: the layout is saved as the 40 graded parts ('voices40', which a reader from before the extra rows
+        # knows), with the full id beside it; a second visit shows the same parts.
+        stored = await pg.evaluate(f"() => JSON.parse(localStorage.getItem('{slug}-reader') || '{{}}')")
+        full = 'voices40+' + '+'.join({'Countermelody': 'counter', 'Concert': 'concert'}[x] for x in extra)
+        shown = await pg.evaluate(SHOWN_JS)
+        ck(stored.get('parts') == 'voices40' and stored.get('partsFull') == full and stored.get('seen') == shown,
+           f"choices are saved as the graded 40 plus the full layout ({stored.get('parts')}, {stored.get('partsFull')}, {stored.get('seen')})")
+        again = await open_reader(ctx, f'{base}/songs/{slug}/', errors, slug)
+        ck(await again.evaluate(SHOWN_JS) == shown, f'a second visit shows the same parts ({shown})')
+        ck(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
+        await ctx.close()
+
+
 async def main():
     base = serve()
     async with async_playwright() as p:
@@ -705,6 +924,7 @@ async def main():
         await parts_checks(browser, base)
         await voices40_checks(browser, base)
         await voices_checks(browser, base)
+        await extras_checks(browser, base)
         await preview_checks(browser, base)
         await app_checks(browser)
         await browser.close()
