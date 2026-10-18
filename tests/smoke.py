@@ -18,12 +18,12 @@ What it checks
      The Parts panel: the music runs a little under a tab at the right edge, which pulls the panel out over it, each part's eye
      puts it on the page, the parts on the page play until "Hear the parts I see" is unticked and a
      speaker for each part chooses, and choices survive a reload.
-     Songs in levels and voices (34 parts): a row for each level and voice, the cello and bass Inner
-     cells greyed out in place (a tap says why), the group rule over the table, the size buttons and
-     Line or Pages moved over beside the open panel (not under it), and choices saved with
-     the six levels moving to their match. Run on the first 34-part song in songs.json; until there is
-     one, give a 34-part score to try it on in place of the first song's:
-         VOICES_SCORE="../Christmas Collection/The First Noel/The-First-Noel.xml" python tests/smoke.py
+     Songs in levels and voices (40 parts): a row for each level and voice, an eye for every part
+     (cello and bass Inner too), the group rule over the table, the size buttons and Line or Pages
+     moved over beside the open panel (not under it), and choices saved with the six levels or with
+     34 parts moving to their match. Songs built on 2026-10-16 (34 parts): the cello and bass Inner
+     cells greyed out in place (a tap says why). Run on the first 34-part song in songs.json, or on
+     the first 40-part song's score cut to 34 parts when there is none.
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
      the teacher conducts, a student follows, and the student's music keeps up with the teacher's.
   4. The app layer: the browser can install the site, every file is saved after one visit, every song
@@ -343,25 +343,95 @@ TOOLS_CLEAR_JS = """() => {
 }"""
 
 
-async def voices_checks(browser, base):
-    """The Parts panel for a song in levels and voices (34 parts)."""
-    slug = next((s['slug'] for s in SONGS if PARTS[s['slug']] == 34), None)
-    stand_in = os.environ.get('VOICES_SCORE')
-    if not slug and not stand_in:
-        print('Parts panel, levels and voices: no 34-part song, skipped (VOICES_SCORE=<34-part xml> tries one)')
-        return
+def without_low_inner(slug):
+    """A 40-part score cut to the 34-part layout (no cello or bass Inner parts), as songs built on 2026-10-16 have."""
+    text = (ROOT / 'songs' / slug / f'{slug}.xml').read_text(encoding='utf-8')
+    for pid in re.findall(r'<score-part id="([^"]+)">\s*<part-name>(?:Cello|Bass) — (?:Easy |Advanced )?Inner</part-name>', text):
+        text = re.sub(rf'<score-part id="{pid}">.*?</score-part>\s*', '', text, flags=re.S)
+        text = re.sub(rf'<part id="{pid}">.*?</part>\s*', '', text, flags=re.S)
+    return text.encode('utf-8')
+
+
+async def voices40_checks(browser, base):
+    """The Parts panel for a song in levels and voices with every voice on every instrument (40 parts)."""
+    slug = next((s['slug'] for s in SONGS if PARTS[s['slug']] == 40), None)
     if not slug:
-        slug = SONGS[0]['slug']
-        print(f'Parts panel, levels and voices: {Path(stand_in).name} in place of {slug}')
+        print('Parts panel, levels and voices (40 parts): no 40-part song, skipped')
+        return
+    print(f'Parts panel, levels and voices (40 parts): {slug}')
+    key = f'{slug}-reader'
+    for label, w, h in [('laptop', 1366, 860), ('phone landscape', 844, 390)]:
+        ctx = await browser.new_context(device_scale_factor=1, service_workers='block')
+        await setup(ctx)
+        errors = []
+        pg = await open_reader(ctx, f'{base}/songs/{slug}/', errors, 'voices40', w, h)
+        await pg.evaluate(SPY_JS)
+        await pg.click('#g-parts'); await pg.wait_for_timeout(600)
+        names = await pg.evaluate("() => [...document.querySelectorAll('#mixParts .mix-name')].map(n => [...n.children].find(c => c.offsetParent && !c.classList.contains('lvl-same')).textContent)")
+        if label == 'laptop':
+            check(names == VOICE_ROWS, f'{label}: a row for each level and voice ({names})')
+        else:
+            check(len(names) == 10 and names[0] == 'Open str.' and names[-1] == 'Adv. bass line', f'{label}: short names on a phone ({names})')
+        eyes = await pg.evaluate("() => [...document.querySelectorAll('#mixParts .tog.see')].filter(b => b.offsetParent).map(b => b.classList.contains('none'))")
+        check(len(eyes) == 40 and not any(eyes), f'{label}: an eye for every part, cello and bass Inner too, none greyed out')
+        rule = (await pg.text_content('#mixParts .group-rule') or '').strip()
+        check(await pg.is_visible('#mixParts .group-rule') and rule.startswith('One player on Melody'), f'{label}: the group rule shows over the table ("{rule}")')
+        wide = await pg.evaluate('() => document.documentElement.scrollWidth - window.innerWidth')
+        check(wide <= 1, f'{label}: no sideways scrolling ({wide}px extra)')
+        check(await pg.evaluate(TOOLS_CLEAR_JS), f'{label}: with the panel open, the size buttons and Line or Pages sit beside it, clear of the Strings key')
+        if label != 'laptop':
+            check(not errors, f'{label}: no script errors' + (f': {errors[:3]}' if errors else ''))
+            await ctx.close()
+            continue
+        check(await pg.evaluate(SHOWN_JS) == [16] and await pg.get_attribute('#g-parts', 'title') == 'Parts: Violin · Melody', 'a first visit shows Violin, Melody')
+        # A cello trio at Easy: Melody, Inner and Bass Line.
+        await pg.click('#see-1-2'); await pg.click('#see-2-2'); await pg.click('#see-3-2'); await pg.click('#see-4-0'); await pg.wait_for_timeout(1500)
+        check(await pg.evaluate(SHOWN_JS) == [6, 10, 14] and await pg.evaluate(PLAYING_JS) == [6, 10, 14], 'eyes on Cello Easy Melody, Easy Inner and Easy Bass Line show and play those three')
+        staves = await pg.evaluate('() => reader.api.tracks.map(t => t.name)')
+        check(staves == ['Easy melody', 'Easy inner', 'Easy bass line'], f'the staves are labelled with the short names ({staves})')
+        await pg.click('#hearSame')
+        speakers = await pg.evaluate("() => [...document.querySelectorAll('#mixParts .tog.hear')].filter(b => b.offsetParent).map(b => b.classList.contains('none'))")
+        check(len(speakers) == 40 and not any(speakers), 'unticking "Hear the parts I see" shows a speaker for every part')
+        await pg.reload()
+        await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
+        check(await pg.evaluate(SHOWN_JS) == [6, 10, 14], 'the choices are still there after a reload')
+        # Saved with the six levels: violin Melody and cello Harmony on the page, violin Melody and Harmony playing.
+        await pg.evaluate(f"localStorage.setItem('{key}', JSON.stringify({{ seen: [8, 14], heard: [8, 12], hearOpen: true }}))")
+        await pg.reload()
+        await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
+        await pg.evaluate(SPY_JS)
+        await pg.click('#g-parts'); await pg.click('#hear-0-0'); await pg.click('#hear-0-0')
+        check(await pg.evaluate(SHOWN_JS) == [16, 26] and await pg.evaluate(PLAYING_JS) == [16, 20],
+              'choices saved with the six levels move over (cello Harmony to Bass Line, violin Harmony to Inner)')
+        # Saved with 34 parts: Viola Easy Inner, Cello Easy Bass Line, Violin Bass Line keep their names.
+        await pg.evaluate(f"localStorage.setItem('{key}', JSON.stringify({{ parts: 'voices', seen: [9, 12, 20] }}))")
+        await pg.reload()
+        await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
+        check(await pg.evaluate(SHOWN_JS) == [9, 14, 24], 'choices saved with 34 parts move to the same parts here')
+        check(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
+        await ctx.close()
+
+
+async def voices_checks(browser, base):
+    """The Parts panel for a song in levels and voices with no cello or bass Inner (34 parts, built 2026-10-16)."""
+    slug = next((s['slug'] for s in SONGS if PARTS[s['slug']] == 34), None)
+    stand_in = None
+    if not slug:
+        slug = next((s['slug'] for s in SONGS if PARTS[s['slug']] == 40), None)
+        if not slug:
+            print('Parts panel, levels and voices (34 parts): no 34- or 40-part song, skipped')
+            return
+        stand_in = without_low_inner(slug)
+        print(f'Parts panel, levels and voices (34 parts): {slug} cut to 34 parts')
     else:
-        print(f'Parts panel, levels and voices: {slug}')
+        print(f'Parts panel, levels and voices (34 parts): {slug}')
     key = f'{slug}-reader'
     for label, w, h in [('laptop', 1366, 860), ('phone landscape', 844, 390)]:
         # No offline copy here, so a stand-in score can't be answered from it.
         ctx = await browser.new_context(device_scale_factor=1, service_workers='block')
         await setup(ctx)
-        if stand_in and PARTS[slug] != 34:
-            await ctx.route(f'**/songs/{slug}/{slug}.xml*', lambda r: r.fulfill(path=stand_in, content_type='application/xml'))
+        if stand_in:
+            await ctx.route(f'**/songs/{slug}/{slug}.xml*', lambda r: r.fulfill(body=stand_in, content_type='application/xml'))
         errors = []
         pg = await open_reader(ctx, f'{base}/songs/{slug}/', errors, 'voices', w, h)
         await pg.evaluate(SPY_JS)
@@ -582,6 +652,7 @@ async def main():
         await home_checks(browser, base)
         await song_checks(browser, base)
         await parts_checks(browser, base)
+        await voices40_checks(browser, base)
         await voices_checks(browser, base)
         await preview_checks(browser, base)
         await app_checks(browser)

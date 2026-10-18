@@ -19,11 +19,11 @@ the reader. The home-screen app file is manifest.webmanifest, with its icons in 
 
 Key, time signature, bar count and the written tempo are read from the score (key, time and
 bars can be given in songs.json too; if one disagrees with the score, the build stops so a bad
-scan or a stale entry gets noticed). The build also stops if the score's parts aren't one of the two
+scan or a stale entry gets noticed). The build also stops if the score's parts aren't one of the
 layouts the reader knows, in BUILD-SPEC order, and says which one it read:
+  levels and voices, 40 parts: level by level; Melody, Inner, Bass Line in each; then violin-viola-cello-bass
+  levels and voices with no cello or bass Inner, 34 parts (built 2026-10-16): the same, Inner on violin and viola
   six tiers, 24 parts (songs built before 2026-10-16): level by level, violin-viola-cello-bass in each
-  levels and voices, 34 parts: level by level; Melody, Inner, Bass Line in each; then violin-viola-cello-bass
-  (Inner on violin and viola only)
 
 songs.json fields
   slug        folder and file name, lowercase-with-dashes ("holy-holy-holy")
@@ -56,7 +56,7 @@ TEMPLATE = {
     'collection': 'Christmas Collection',
     'source': 'Traditional English carol',
     'key': 'D major', 'time': '3/4', 'bars': '25 bars',
-    'lede': 'Six levels for violin, viola, cello and bass.',  # About box; a 34-part song says what it has instead
+    'lede': 'Six levels for violin, viola, cello and bass.',  # About box; a song in levels and voices says what it has instead
     'score': 'scores/the-first-noel.xml',
     'storage': 'first-noel-reader',
     'tempo': 'const BASE_TEMPO = 100; // Andante, from bar 1 of the score',
@@ -142,18 +142,26 @@ def read_score(path):
             'part_names': names_found}
 
 
-# The reader picks parts by position, so a score's parts must be in one of its two layouts (BUILD-SPEC section 3),
+# The reader picks parts by position, so a score's parts must be in one of its layouts (BUILD-SPEC section 3),
 # each part named "<instrument> — <level or level and voice>". A score built to BUILD-SPEC comes out this way.
 INSTRUMENTS = ['Violin', 'Viola', 'Cello', 'Bass']
 TIERS = ['Open Strings', 'Easy', 'Melody', 'Harmony', 'Advanced Melody', 'Obbligato']
-VOICES = [(inst, 'Open Strings') for inst in INSTRUMENTS]
-for level in ['Easy ', '', 'Advanced ']:  # the Intermediate level has no word in the part names
-    VOICES += [(inst, level + 'Melody') for inst in INSTRUMENTS]
-    VOICES += [(inst, level + 'Inner') for inst in INSTRUMENTS[:2]]  # cello and bass take the bass line instead
-    VOICES += [(inst, level + 'Bass Line') for inst in INSTRUMENTS]
+
+
+def voices(inner):
+    """Open Strings, then each level's Melody, Inner and Bass Line, with Inner on the instruments given."""
+    out = [(inst, 'Open Strings') for inst in INSTRUMENTS]
+    for level in ['Easy ', '', 'Advanced ']:  # the Intermediate level has no word in the part names
+        out += [(inst, level + 'Melody') for inst in INSTRUMENTS]
+        out += [(inst, level + 'Inner') for inst in inner]
+        out += [(inst, level + 'Bass Line') for inst in INSTRUMENTS]
+    return out
+
+
 LAYOUTS = {
-    'six tiers': [(inst, tier) for tier in TIERS for inst in INSTRUMENTS],  # songs built before 2026-10-16
-    'levels and voices': VOICES,
+    'six tiers': [(inst, tier) for tier in TIERS for inst in INSTRUMENTS],  # 24 parts, songs built before 2026-10-16
+    'levels and voices, no cello or bass Inner': voices(INSTRUMENTS[:2]),  # 34 parts, built 2026-10-16
+    'levels and voices': voices(INSTRUMENTS),  # 40 parts, from 2026-10-17
 }
 PART_NAME = re.compile(r'(Violin|Viola|Cello|Bass)\s*[—–-]\s*(.*?)(?:\s*\(pizz\.\))?$')
 
@@ -164,8 +172,8 @@ def part_layout(slug, names):
         if len(names) == len(want):
             break
     else:
-        fail(f'{slug}: {len(names)} parts; the reader needs 24 (six tiers, songs built before 2026-10-16) '
-             'or 34 (levels and voices)')
+        fail(f'{slug}: {len(names)} parts; the reader needs 40 (levels and voices), 34 (levels and voices '
+             'with no cello or bass Inner, built 2026-10-16) or 24 (six tiers, built before 2026-10-16)')
     for i, (name, (inst, label)) in enumerate(zip(names, want)):
         m = PART_NAME.match(name.strip())
         if not m or m.groups() != (inst, label):

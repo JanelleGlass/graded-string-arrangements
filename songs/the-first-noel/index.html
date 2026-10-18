@@ -373,9 +373,9 @@ html.small #tierNote { display: none; }
 .lvl-same:empty { display: none; }
 html.small .mix-name { line-height: 1.1; }
 html.small .lvl-same { margin-top: 0; font-size: 0.58rem; }
-/* Levels and voices (34 parts): the group rule in one quiet line at the top of the table (it wraps to the table's
-   width rather than widening it, and scrolls away under the headings), a hairline between levels, and the cello and
-   bass Inner cells greyed out in their places (a tap says why) */
+/* Levels and voices: the group rule in one quiet line at the top of the table (it wraps to the table's width rather
+   than widening it, and scrolls away under the headings), a hairline between levels, and in a 34-part song the cello
+   and bass Inner cells greyed out in their places (a tap says why) */
 .group-rule { grid-column: 1 / -1; contain: inline-size; padding-bottom: 4px; font-size: 0.78rem; line-height: 1.3; color: var(--muted); }
 html.small .group-rule { padding-bottom: 2px; font-size: 0.7rem; }
 .mix-div { grid-column: 1 / -1; height: 1px; background: var(--line); }
@@ -607,7 +607,7 @@ body.following .host-only { display: none !important; }
 <script>
 (() => {
   // ---- Song setup. Each new song gets its own page with these four values changed. ----
-  const SCORE_URL = 'the-first-noel.xml?v=43001798c7';
+  const SCORE_URL = 'the-first-noel.xml?v=661d634e9a';
   const FONT_URL = '../../assets/font/Bravura.woff2?v=181e0e7c48';
   // String sounds: GeneralUser GS cut down to the violin, viola, cello, bass and pizzicato presets, as base64 text.
   const SOUNDFONT_URL = '../../assets/soundfont/strings-generaluser-sf2.b64.txt?v=bcdca70e5f';
@@ -630,24 +630,27 @@ body.following .host-only { display: none !important; }
     { name: 'Advanced Melody', short: 'Adv. melody', note: 'The tune as a variation in eighth notes. Goes into third position. Suzuki Book 3–4 level.' },
     { name: 'Obbligato', short: 'Obbligato', note: 'Its own line for each instrument: a descant, a countermelody, broken chords. Suzuki Book 3–4 level.' },
   ];
-  // Newer songs have levels and voices (34 parts), so any duet or trio has a bass: one player on a Melody, the lowest
-  // on a Bass Line, any other violins and violas on Inner. Cello and bass have no Inner part. A row that starts a
-  // level has a hairline above it. old: the row of the six levels that a part here was in before (a choice saved with
-  // the six levels carries over, and back).
+  // Newer songs have levels and voices, so any duet or trio has a bass: one player on a Melody, the lowest on a Bass
+  // Line, everyone else on Inner. Every instrument has every voice at every level (40 parts), so a cello or bass choir
+  // can play too. A row that starts a level has a hairline above it. old: the row of the six levels that a part here
+  // was in before (for a choice saved with the six levels).
   const B1 = 'Twinkle to Andantino notes (Suzuki Book 1).', B34 = 'Suzuki Book 3–4 level.';
   const VOICES = [
     { name: 'Open Strings', short: 'Open str.', old: 0, note: 'Plucked open strings, one on each new chord. No fingers needed. Works as the bass in any group.' },
     { name: 'Easy Melody', short: 'Easy melody', old: 1, level: true, note: 'The tune with the quick notes folded in. ' + B1 },
-    { name: 'Easy Inner', short: 'Easy inner', old: 1, insts: [0, 1], note: 'Long chord tones between the tune and the bass, changing with the chord. ' + B1 },
+    { name: 'Easy Inner', short: 'Easy inner', old: 1, note: 'Long chord tones between the tune and the bass, changing with the chord. ' + B1 },
     { name: 'Easy Bass Line', short: 'Easy bass line', old: 1, note: 'The hymn’s bass notes, long and low. ' + B1 },
     { name: 'Melody', short: 'Melody', old: 2, level: true, note: 'The tune as written. Cello and bass play it lower.' },
-    { name: 'Inner', short: 'Inner', old: 3, insts: [0, 1], note: 'Chord tones between the tune and the bass line, filling in the chord.' },
+    { name: 'Inner', short: 'Inner', old: 3, note: 'Chord tones between the tune and the bass line, filling in the chord.' },
     { name: 'Bass Line', short: 'Bass line', old: 3, note: 'The hymn’s bass line. Violin and viola play it in their own range.' },
     { name: 'Advanced Melody', short: 'Adv. melody', old: 4, level: true, note: 'The tune as a variation in eighth notes. Goes into third position. ' + B34 },
-    { name: 'Advanced Inner', short: 'Adv. inner', old: 5, insts: [0, 1], note: 'A descant on violin, a countermelody on viola. ' + B34 },
+    { name: 'Advanced Inner', short: 'Adv. inner', old: 5, note: 'Its own line on each instrument: a descant on violin, a countermelody on viola. ' + B34 },
     { name: 'Advanced Bass Line', short: 'Adv. bass line', old: 5, note: 'The hymn’s bass on every beat, with broken chords and runs. ' + B34 },
   ];
-  const LAYOUTS = { tiers: TIERS, voices: VOICES };
+  // Songs built on 2026-10-16 (34 parts) have no cello or bass Inner part: those cells are greyed out.
+  const VOICES34 = VOICES.map(row => row.name.endsWith('Inner') ? { ...row, insts: [0, 1],
+    note: row.name === 'Advanced Inner' ? 'A descant on violin, a countermelody on viola. ' + B34 : row.note } : { ...row });
+  const LAYOUTS = { tiers: TIERS, voices: VOICES34, voices40: VOICES };
   let layout, ROWS, PARTS; // the song's layout, its rows, and for each part (by number) its row and instrument
   function useLayout(id) {
     layout = id; ROWS = LAYOUTS[id]; PARTS = [];
@@ -702,8 +705,8 @@ body.following .host-only { display: none !important; }
   // Parts on the page and parts that play: each one on its own (numbered in score order), so a violin at Open Strings
   // can read along with a cello at Advanced Melody, and the tune can play on one instrument while the harmony keeps
   // all four. Saved choices are numbered in the layout they were made in (saved.parts: the six levels for anything
-  // saved before there were two); once the score says which layout the song has, they move over (switchLayout).
-  useLayout(saved.parts === 'voices' ? 'voices' : 'tiers');
+  // saved before there were others); once the score says which layout the song has, they move over (switchLayout).
+  useLayout(LAYOUTS[saved.parts] ? saved.parts : 'tiers');
   const trackIndex = (row, inst) => ROWS[row].cells[inst];
   const rowOf = (ti) => PARTS[ti]?.row ?? -1;
   const instOf = (ti) => PARTS[ti]?.inst ?? 0;
@@ -964,9 +967,9 @@ body.following .host-only { display: none !important; }
     list.append(b);
     return b;
   }
-  // A part the song doesn't have (cello and bass have no Inner part): greyed out in its place, and a tap says why.
+  // A part the song doesn't have (no cello or bass Inner in a 34-part song): greyed out in its place, and a tap says why.
   function mixNone(list, kind, r, i) {
-    const why = 'No ' + ROWS[r].name + ' part for ' + INSTRUMENTS[i].toLowerCase() + ': cellos and basses play a Bass Line or a Melody';
+    const why = 'No ' + ROWS[r].name + ' part for ' + INSTRUMENTS[i].toLowerCase() + ' in this piece: cellos and basses play a Bass Line or a Melody';
     const b = mixTog(list, kind, kind + '-' + r + '-' + i, why, () => toast(why, 2600));
     b.classList.add('none'); b.setAttribute('aria-disabled', 'true');
     b.innerHTML = kind === 'see' ? EYE_OFF : SPEAKER_OFF;
@@ -974,9 +977,9 @@ body.following .host-only { display: none !important; }
   function buildMix() {
     const list = $('mixParts');
     list.replaceChildren();
-    list.classList.toggle('voices', layout === 'voices');
+    list.classList.toggle('voices', layout !== 'tiers');
     // Levels and voices: the group rule over the table. It scrolls away with the rows, so a short screen gets the room back.
-    if (layout === 'voices') mixCell(list, 'group-rule', 'One player on Melody, the lowest player on Bass Line, everyone else on Inner');
+    if (layout !== 'tiers') mixCell(list, 'group-rule', 'One player on Melody, the lowest player on Bass Line, everyone else on Inner');
     mixCell(list, 'mix-h lvl', layout === 'tiers' ? 'Level' : 'Level & voice'); mixCell(list, 'mix-h grp', 'See');
     mixCell(list, 'mix-h hcol', '', true); mixCell(list, 'mix-h grp hcol', 'Hear', true);
     INST_ABBR.forEach((a) => mixCell(list, 'mix-h ab', a));
@@ -996,13 +999,15 @@ body.following .host-only { display: none !important; }
         : mixTog(list, 'hear', 'hear-' + r + '-' + i, 'Hear ' + INSTRUMENTS[i] + ', ' + row.name, () => { noteTier = r; hearPart(ti); }));
     });
   }
-  // The score's parts are in the other layout than the saved choices: each choice moves to its match (Harmony to Inner
-  // on violin and viola and to Bass Line on cello and bass, Obbligato to the Advanced ones, Easy to Easy Melody; and
-  // back again).
+  // The score's parts are in another layout than the saved choices: each choice moves to its match. From the six
+  // levels: Harmony to Inner on violin and viola and to Bass Line on cello and bass, Obbligato to the Advanced ones,
+  // Easy to Easy Melody (BUILD-SPEC section 3). Between the 34- and 40-part layouts, a part keeps its name. Back to
+  // the six levels, each part goes to the level it came from.
+  const FROM_TIERS = (t, i) => ['Open Strings', 'Easy Melody', 'Melody', i < 2 ? 'Inner' : 'Bass Line', 'Advanced Melody', i < 2 ? 'Advanced Inner' : 'Advanced Bass Line'][t];
   function switchLayout(id) {
-    const was = PARTS.map(p => ({ inst: p.inst, old: layout === 'voices' ? VOICES[p.row].old : p.row }));
+    const was = PARTS.map(p => ({ inst: p.inst, old: ROWS[p.row].old ?? p.row, name: layout === 'tiers' ? FROM_TIERS(p.row, p.inst) : ROWS[p.row].name }));
     useLayout(id);
-    const match = ({ inst, old }) => id === 'tiers' ? trackIndex(old, inst) : PARTS.findIndex(p => p.inst === inst && ROWS[p.row].old === old);
+    const match = ({ inst, old, name }) => id === 'tiers' ? trackIndex(old, inst) : PARTS.findIndex(p => p.inst === inst && ROWS[p.row].name === name);
     const move = (list) => list && [...new Set(list.map(ti => match(was[ti])))].filter(ti => ti >= 0).sort((a, b) => a - b);
     state.seen = move(state.seen);
     if (!state.seen.length) state.seen = firstVisit();
