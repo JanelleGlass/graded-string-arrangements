@@ -25,6 +25,8 @@ layouts the reader knows, in BUILD-SPEC order, and says which one it read:
   the same 40 then a Countermelody on violin and viola (42 parts), and/or a Concert part on each (42 or 44 parts)
   levels and voices with no cello or bass Inner, 34 parts (built 2026-10-16): the same, Inner on violin and viola
   six tiers, 24 parts (songs built before 2026-10-16): level by level, violin-viola-cello-bass in each
+  one line, 1 to 4 parts (a piece with no levels, such as Twinkle Harmony): the same line's name on each of its
+    instruments, in violin-viola-cello-bass order ("Viola — Harmony", "Cello — Harmony")
 
 songs.json fields
   slug        folder and file name, lowercase-with-dashes ("holy-holy-holy")
@@ -175,6 +177,22 @@ EXTRAS = {'levels and voices, with countermelody': ', plus a countermelody for v
 PART_NAME = re.compile(r'(Violin|Viola|Cello|Bass)\s*[—–-]\s*(.*?)(?:\s*\(pizz\.\))?$')
 
 
+def and_list(words):
+    return ' and '.join([', '.join(words[:-1]), words[-1]] if len(words) > 1 else words)
+
+
+def one_line(names):
+    """A piece with no levels: one line, named the same on each of its instruments, in violin-viola-cello-bass order.
+    The layout's name says who plays it ("one line for viola and cello"); None if the parts aren't like that."""
+    found = [PART_NAME.match(n.strip()) for n in names]
+    if not found or not all(found) or len({m.group(2) for m in found}) != 1 or not found[0].group(2):
+        return None
+    insts = [INSTRUMENTS.index(m.group(1)) for m in found]
+    if insts != sorted(set(insts)):
+        return None
+    return 'one line for ' + and_list([INSTRUMENTS[i].lower() for i in insts])
+
+
 def part_layout(slug, names):
     """Which of the reader's layouts the score's parts are in. Stops the build if they're in none."""
     def wrong(want):
@@ -184,9 +202,13 @@ def part_layout(slug, names):
                 return i, name, inst, label
     same_size = [(layout, want) for layout, want in LAYOUTS.items() if len(names) == len(want)]
     if not same_size:
+        if one_line(names):
+            return one_line(names)
         fail(f'{slug}: {len(names)} parts; the reader needs 44 (levels and voices with a countermelody and a concert '
              'part), 42 (with a countermelody, or with a concert part), 40 (levels and voices), 34 (levels and voices '
-             'with no cello or bass Inner, built 2026-10-16) or 24 (six tiers, built before 2026-10-16)')
+             'with no cello or bass Inner, built 2026-10-16), 24 (six tiers, built before 2026-10-16), or one line on '
+             'up to four instruments, each part named "<instrument> — <the line\'s name>" in violin-viola-cello-bass '
+             f'order (found: {", ".join(repr(n) for n in names)})')
     for layout, want in same_size:
         if not wrong(want):
             return layout
@@ -217,12 +239,15 @@ def song_page(reader, song, facts, app, revs):
     head, body = reader[:cut], reader[cut:]
     t = TEMPLATE
     head = replace(head, f"<title>{t['title']}</title>", f"<title>{e(song['title'])}</title>")
-    levels = 'six levels' if facts['layout'] == 'six tiers' else 'four levels'
-    head = replace(head, f"play along with {t['title']} in six levels", f"play along with {e(song['title'])} in {levels}")
+    # A piece with no levels says who plays it instead ("one line for viola and cello").
+    one = facts['layout'].removeprefix('one line ') if facts['layout'].startswith('one line ') else None
+    levels = one or ('in six levels' if facts['layout'] == 'six tiers' else 'in four levels') + ' for violin, viola, cello and bass'
+    head = replace(head, f"play along with {t['title']} in six levels for violin, viola, cello and bass",
+                   f"play along with {e(song['title'])} {levels}")
     head = replace(head, '</style>', HOME_LINK_CSS + '</style>')
 
     b = body
-    b = replace(b, t['lede'], t['lede'] if facts['layout'] == 'six tiers' else
+    b = replace(b, t['lede'], t['lede'] if facts['layout'] == 'six tiers' else f'One line, {one}.' if one else
                 'Four levels for violin, viola, cello and bass, each with a melody, an inner part and a bass line'
                 + EXTRAS.get(facts['layout'], '') + '.')
     b = replace(b, f">{t['title']}<span class=\"info-i\"", f">{e(song['title'])}<span class=\"info-i\"")

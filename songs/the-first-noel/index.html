@@ -668,16 +668,35 @@ body.following .host-only { display: none !important; }
     note: 'Played with the group by a teacher or an advanced player: double stops, three- and four-note chords and drones. Up to fifth position.' };
   const LAYOUTS = { tiers: TIERS, voices: VOICES34, voices40: VOICES, 'voices40+counter': [...VOICES, COUNTER],
     'voices40+concert': [...VOICES, CONCERT], 'voices40+counter+concert': [...VOICES, COUNTER, CONCERT] };
+  // A piece with no levels has one line, named the same on each of its instruments (Twinkle Harmony: "Viola —
+  // Harmony", "Cello — Harmony"): one row, with the other instruments greyed out. Its id names the instruments and the
+  // line ("one:12:Harmony"), so saved choices find it again before the score has loaded.
+  const andList = (a) => a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+  function oneLine(id) {
+    const m = /^one:([0-3]+):(.+)$/.exec(id || ''), insts = m ? [...m[1]].map(Number) : [];
+    if (!m || insts.some((v, k) => k && v <= insts[k - 1])) return undefined;
+    const who = andList(insts.map(i => INSTRUMENTS[i].toLowerCase()));
+    if (!LAYOUTS[id]) LAYOUTS[id] = [{ name: m[2], short: m[2], insts, one: true, who, note: 'This piece has one line, for ' + who + '.' }];
+    return LAYOUTS[id];
+  }
+  const layoutRows = (id) => LAYOUTS[id] || oneLine(id);
   let layout, ROWS, PARTS; // the song's layout, its rows, and for each part (by number) its row and instrument
   function useLayout(id) {
-    layout = id; ROWS = LAYOUTS[id]; PARTS = [];
+    layout = id; ROWS = layoutRows(id); PARTS = [];
     for (const [r, row] of ROWS.entries()) row.cells = INSTRUMENTS.map((_, i) => (row.insts || [0, 1, 2, 3]).includes(i) ? PARTS.push({ row: r, inst: i }) - 1 : null);
   }
-  // The layout whose part names ("Viola — Easy Inner") the score has, in order; the six levels if neither.
+  // The layout whose part names ("Viola — Easy Inner") the score has, in order; else one line, if every part has the
+  // same line's name, in violin-to-bass order; the six levels if neither.
   const layoutOf = (names) => Object.keys(LAYOUTS).find(id => {
     const want = LAYOUTS[id].flatMap(row => (row.insts || [0, 1, 2, 3]).map(i => INSTRUMENTS[i] + ' — ' + row.name));
     return want.length === names.length && want.every((w, k) => names[k].replace(/\s*\(pizz\.\)\s*$/, '').replace(/\s*[—–-]\s*/, ' — ').trim() === w);
-  }) || 'tiers';
+  }) || oneLineOf(names) || 'tiers';
+  function oneLineOf(names) {
+    const parts = names.map(n => /^(Violin|Viola|Cello|Bass)\s*[—–-]\s*(.+?)(?:\s*\(pizz\.\))?$/.exec(n.trim()));
+    if (!parts.length || parts.some(p => !p || p[2] !== parts[0][2])) return undefined;
+    const id = 'one:' + parts.map(p => INSTRUMENTS.indexOf(p[1])).join('') + ':' + parts[0][2];
+    return oneLine(id) ? id : undefined;
+  }
   const MELODY = 2;
   // Short instrument names, on the staff labels and over the Parts table alike (Janelle's choice: C and B).
   const SHORT = { Violin: 'Vln', Viola: 'Vla', Cello: 'C', Bass: 'B' };
@@ -724,12 +743,13 @@ body.following .host-only { display: none !important; }
   // all four. Saved choices are numbered in the layout they were made in (saved.parts: the six levels for anything
   // saved before there were others); once the score says which layout the song has, they move over (switchLayout).
   // A layout with extra rows is saved as the 40 graded parts it adds to, with its full id beside it (savedLayout).
-  const savedLayout = LAYOUTS[saved.partsFull] ? saved.partsFull : saved.parts;
-  useLayout(LAYOUTS[savedLayout] ? savedLayout : 'tiers');
+  const savedLayout = layoutRows(saved.partsFull) ? saved.partsFull : saved.parts;
+  useLayout(layoutRows(savedLayout) ? savedLayout : 'tiers');
   const trackIndex = (row, inst) => ROWS[row]?.cells[inst]; // undefined for a row this layout doesn't have
   const rowOf = (ti) => PARTS[ti]?.row ?? -1;
   const instOf = (ti) => PARTS[ti]?.inst ?? 0;
-  const firstVisit = () => [trackIndex(ROWS.findIndex(r => r.name === 'Melody'), 0)]; // Violin, Melody
+  // Violin, Melody; a piece with one line, its first instrument (one part, big enough to read, as on every song).
+  const firstVisit = () => [ROWS[0].one ? 0 : trackIndex(ROWS.findIndex(r => r.name === 'Melody'), 0)];
   const indexList = (v, n) => Array.isArray(v) ? [...new Set(v.filter(x => Number.isInteger(x) && x >= 0 && x < n))].sort((a, b) => a - b) : null;
   // Settings saved before every part had its own eye: an eye per instrument and per level (every instrument chosen
   // at every level chosen); before that, one instrument and level, maybe with the tune above or all four
@@ -993,10 +1013,10 @@ body.following .host-only { display: none !important; }
     return b;
   }
   // A part the song doesn't have (no cello or bass Inner in a 34-part song, no cello or bass Countermelody or Concert
-  // part): greyed out in its place, and a tap says why.
+  // part, no violin or bass in a piece for viola and cello): greyed out in its place, and a tap says why.
   function mixNone(list, kind, r, i) {
-    const why = 'No ' + ROWS[r].name + ' part for ' + INSTRUMENTS[i].toLowerCase() + (ROWS[r].extra
-      ? ': it is written for violin and viola' : ' in this piece: cellos and basses play a Bass Line or a Melody');
+    const why = 'No ' + ROWS[r].name + ' part for ' + INSTRUMENTS[i].toLowerCase() + (ROWS[r].one ? ': this piece is for ' + ROWS[r].who
+      : ROWS[r].extra ? ': it is written for violin and viola' : ' in this piece: cellos and basses play a Bass Line or a Melody');
     const b = mixTog(list, kind, kind + '-' + r + '-' + i, why, () => toast(why, 2600));
     b.classList.add('none'); b.setAttribute('aria-disabled', 'true');
     b.innerHTML = kind === 'see' ? EYE_OFF : SPEAKER_OFF;
@@ -1006,8 +1026,8 @@ body.following .host-only { display: none !important; }
     list.replaceChildren();
     list.classList.toggle('voices', layout !== 'tiers');
     // Levels and voices: the group rule over the table. It scrolls away with the rows, so a short screen gets the room back.
-    if (layout !== 'tiers') mixCell(list, 'group-rule', 'One player on Melody, the lowest player on Bass Line, everyone else on Inner');
-    mixCell(list, 'mix-h lvl', layout === 'tiers' ? 'Level' : 'Level & voice'); mixCell(list, 'mix-h grp', 'See');
+    if (layout.startsWith('voices')) mixCell(list, 'group-rule', 'One player on Melody, the lowest player on Bass Line, everyone else on Inner');
+    mixCell(list, 'mix-h lvl', layout === 'tiers' ? 'Level' : ROWS[0].one ? 'Part' : 'Level & voice'); mixCell(list, 'mix-h grp', 'See');
     mixCell(list, 'mix-h hcol', '', true); mixCell(list, 'mix-h grp hcol', 'Hear', true);
     INST_ABBR.forEach((a) => mixCell(list, 'mix-h ab', a));
     mixCell(list, 'mix-h ab hcol', '', true);
@@ -1045,7 +1065,6 @@ body.following .host-only { display: none !important; }
   // Which parts at each level play the same notes, from the score: the same rhythm and the same note names (so the
   // tune an octave lower counts). A line under the level's name says so, and pointing at a part names its match.
   // Not for Open Strings: every part there is plucked open strings, so it isn't needed (Janelle, 2026-10-17).
-  const andList = (a) => a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
   function markSame() {
     const tune = (track) => track.staves[0].bars.flatMap((bar, bi) => bar.voices[0].beats.filter(b => !b.isRest)
       .map(b => (score.masterBars[bi].start + b.playbackStart) + ':' + b.playbackDuration + ':'
@@ -1326,7 +1345,7 @@ body.following .host-only { display: none !important; }
 
   // Open Strings (pizzicato) parts are all open strings, so they show no finger numbers.
   // Concert parts are plain: no finger numbers or string colours, as in Janelle's files.
-  const hasFingers = (ti) => rowOf(ti) !== 0 && !ROWS[rowOf(ti)]?.plain;
+  const hasFingers = (ti) => ROWS[rowOf(ti)]?.name !== 'Open Strings' && !ROWS[rowOf(ti)]?.plain;
   const fingersShown = () => shownIndexes().some(hasFingers);
   const coloursShown = () => shownIndexes().some(ti => !ROWS[rowOf(ti)]?.plain);
   // Why the parts on the page have no finger numbers (or string colours): said when a tap can't show them.
@@ -3475,7 +3494,7 @@ body.following .host-only { display: none !important; }
     const xmlDoc = new DOMParser().parseFromString(new TextDecoder().decode(xmlBuf), 'application/xml');
     marks = readMarks(xmlDoc);
     words = readWords(xmlDoc);
-    // The six levels (24 parts) or levels and voices (34), from the part names; the Parts table follows.
+    // The six levels, levels and voices, or one line, from the part names; the Parts table follows.
     const found = layoutOf([...xmlDoc.querySelectorAll('part-list > score-part')].map(p => p.querySelector('part-name')?.textContent.trim() || ''));
     if (found !== layout) { switchLayout(found); buildControls(); }
 
