@@ -573,8 +573,8 @@ async def one_line_checks(browser, base):
         errors = []
         pg = await open_reader(ctx, f'{base}/songs/{slug}/', errors, 'one line', w, h)
         await pg.evaluate(SPY_JS)
-        check(await pg.evaluate(SHOWN_JS) == [0] and await pg.evaluate(PLAYING_JS) == [0],
-              f'{label}: a first visit shows and plays the first instrument\'s part ({insts[0]})')
+        check(await pg.evaluate(SHOWN_JS) == [0] and await pg.evaluate("() => document.getElementById('hearSame').checked"),
+              f'{label}: a first visit shows the first instrument\'s part ({insts[0]}), with "Hear the parts I see" ticked')
         await pg.click('#g-parts'); await pg.wait_for_timeout(600)
         names = await pg.evaluate("() => [...document.querySelectorAll('#mixParts .mix-name')].map(n => [...n.children].find(c => c.offsetParent && !c.classList.contains('lvl-same')).textContent)")
         heading = (await pg.text_content('#mixParts .mix-h.lvl')).strip()
