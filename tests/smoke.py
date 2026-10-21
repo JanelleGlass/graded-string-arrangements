@@ -35,10 +35,11 @@ What it checks
      song. Tapping a note rings that note: where a Concert part's two voices start a note together (alone and with a
      part shown above it), and where a note sits over the other voice's rest. Choices are saved as the graded 40
      ('voices40', which a reader from before the extra rows knows) with the full layout beside it, and a second
-     visit shows the same parts. A piece with no levels (one line on some instruments, such as Twinkle Harmony for
-     viola and cello): a first visit shows and plays the first part, one row named for the line under a Part heading,
-     the other instruments greyed out in place (a tap says why), no group rule, the About box saying who it is for,
-     and a part taken off the page staying off after a reload.
+     visit shows the same parts. A piece with no levels (one line on some or all instruments, such as Twinkle
+     Harmony): a first visit shows the first part, one row named for the line under a Part heading, any instrument it
+     isn't for greyed out in place (a tap says why), no group rule, the About box saying who it is for, a part taken
+     off the page staying off after a reload, and (Twinkle Harmony) a choice saved when it was for viola and cello
+     only moving to the same part.
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
      the teacher conducts, a student follows, and the student's music keeps up with the teacher's.
   4. The app layer: the browser can install the site, every file is saved after one visit, every song
@@ -557,7 +558,7 @@ def one_line_parts(slug):
 
 
 async def one_line_checks(browser, base):
-    """The Parts panel for a piece with no levels: one line on some of the instruments (Twinkle Harmony: viola and cello)."""
+    """The Parts panel for a piece with no levels: one line on some or all of the instruments (Twinkle Harmony: all four)."""
     slug = next((s['slug'] for s in SONGS if PARTS[s['slug']] <= 4 and one_line_parts(s['slug'])), None)
     if not slug:
         print('Parts panel, one line: no such song, skipped')
@@ -591,14 +592,15 @@ async def one_line_checks(browser, base):
             continue
         if slug == 'twinkle-harmony':
             same = await pg.text_content('#same-0')
-            check(same == 'viola & cello have the same notes', f'the line under the row says viola and cello have the same notes ("{same}")')
+            check(same == 'all parts have the same notes', f'the line under the row says all parts have the same notes ("{same}")')
         lede = await pg.evaluate("() => document.querySelector('#infoPop .lede').textContent")
         check(lede.startswith(f'One line, for {who}.'), f'the About box says who the piece is for ("{lede[:40]}")')
-        none = next(i for i in range(4) if i not in cols)
-        await pg.click(f'#see-0-{none}', force=True); await pg.wait_for_timeout(300)
-        said = await pg.text_content('#toast')
-        check(said.startswith(f'No {line} part for ') and said.endswith(f'this piece is for {who}') and await pg.evaluate(SHOWN_JS) == [0],
-              f'a tap on a greyed-out cell says why and changes nothing ("{said}")')
+        none = next((i for i in range(4) if i not in cols), None)
+        if none is not None:
+            await pg.click(f'#see-0-{none}', force=True); await pg.wait_for_timeout(300)
+            said = await pg.text_content('#toast')
+            check(said.startswith(f'No {line} part for ') and said.endswith(f'this piece is for {who}') and await pg.evaluate(SHOWN_JS) == [0],
+                  f'a tap on a greyed-out cell says why and changes nothing ("{said}")')
         if len(cols) > 1:
             # The second instrument joins the first, then the first leaves: the staves and the tab follow.
             short = {'Violin': 'Vln', 'Viola': 'Vla', 'Cello': 'C', 'Bass': 'B'}
@@ -616,6 +618,13 @@ async def one_line_checks(browser, base):
             stored = await pg.evaluate(f"() => JSON.parse(localStorage.getItem('{key}') || '{{}}')")
             check(await pg.evaluate(SHOWN_JS) == [1] and stored.get('partsFull', '').startswith('one:'),
                   f"the choice is still there after a reload ({stored.get('partsFull')}, {stored.get('seen')})")
+        if slug == 'twinkle-harmony':
+            # Saved when Twinkle Harmony was for viola and cello only (2026-10-21): the cello part on the page.
+            await pg.evaluate(f"localStorage.setItem('{key}', JSON.stringify({{ parts: 'one:12:Harmony', partsFull: 'one:12:Harmony', seen: [1] }}))")
+            await pg.reload()
+            await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
+            shown = await pg.evaluate(SHOWN_JS)
+            check(shown == [insts.index('Cello')], f'a choice saved when it was for viola and cello moves to the same part (cello: {shown})')
         check(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
         await ctx.close()
 
