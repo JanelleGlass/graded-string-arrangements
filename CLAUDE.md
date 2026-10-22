@@ -131,12 +131,13 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
 ## Decisions Janelle has made about the reader (keep them)
 
 - Line view: the music starts at the left edge with no lead-in space and the clef is never cut off;
-  the playing note sits a third of the way from the left so students see what's coming. Music is
+  the playing note sits in the middle of the screen (Janelle, 2026-10-21; it sat a third of the way
+  from the left before). Music is
   top-aligned under the header. The start of the line (each part's name, its clef and the key
   signature) stays pinned at the left edge as the music slides under it, so students can look back at
   the key signature; when the key changes, the pinned key changes as the new key reaches the edge.
-  It is a copy of the start as drawn, so at the start it sits exactly on it. When it is wider than a
-  third of the screen (big music), the playing note sits just past it instead (Janelle, 2026-10-17).
+  It is a copy of the start as drawn, so at the start it sits exactly on it. When it is wider than
+  half the screen (big music), the playing note sits just past it instead (Janelle, 2026-10-17).
 - Pages: every line of music names its parts beside the staves, not just the first line (2026-10-17).
 - Every setting is always visible in a strip at the bottom, on phones too, never covering notes.
   Phone-landscape buttons are compact so the strip fits one row on regular iPhones.

@@ -3194,8 +3194,8 @@ body.following .host-only { display: none !important; }
   // One long line: the line glides left so the playing note stays in the middle of the screen.
   // Pages: the window scrolls a line at a time. Nothing moves until Play, so the page doesn't jump on load.
   let lastScrollKey = null, lineRaf = 0, xmap = null, lineState = null;
-  // Where the note being played sits: a third of the way across, so more of what's coming is in view.
-  const playX = (sheet) => Math.round(Math.max(sheet.clientWidth / 3, headW ? headW + Math.min(48, sheet.clientWidth * 0.05) : 0));
+  // Where the note being played sits: in the middle of the screen (Janelle, 2026-10-21; it was a third of the way across).
+  const playX = (sheet) => Math.round(Math.max(sheet.clientWidth / 2, headW ? headW + Math.min(48, sheet.clientWidth * 0.05) : 0));
   const surfLeft = () => { const s = $('sheet').querySelector('.at-surface'); return s ? s.offsetLeft : 0; };
   function setHalf() {
     const sh = $('sheet'), half = Math.round(sh.clientWidth - playX(sh)) + 'px'; // room after the line so the last notes reach the playing spot
@@ -3204,7 +3204,7 @@ body.following .host-only { display: none !important; }
     if (api && !playing && state.layout === 'line') requestAnimationFrame(() => centerOnTick(api.tickPosition || 0, false));
   }
   try { new ResizeObserver(setHalf).observe($('sheet')); } catch { setHalf(); }
-  // Bring the note at this tick to the playing spot (a third of the way along the line) (or its line of music into view on pages).
+  // Bring the note at this tick to the playing spot (the middle of the line) (or its line of music into view on pages).
   function centerOnTick(tick, smooth) {
     if (!api || !score || !api.boundsLookup) return;
     const ti = shownIndexes()[0];
