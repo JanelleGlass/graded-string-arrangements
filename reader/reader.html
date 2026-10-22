@@ -226,7 +226,7 @@ hr.div { border: 0; border-top: 1px solid var(--line); margin: 0; }
 /* A held note (half note, dotted quarter…): a line joins the counts it lasts through, and lights up as the note is held */
 .count-link { position: absolute; z-index: 0; border-radius: 999px; background: #CDD4D1; transition: background 0.12s; }
 .count-link.now { background: #1D5B72; }
-/* Counts switched off: the row keeps its room (so nothing moves), it just goes blank */
+/* Counts switched off: the row goes blank (the music is drawn again without its room, so the lines close up) */
 #sheet.counts-off .count-layer { visibility: hidden; }
 /* Dynamics (mf, f…) are nudged down under the count row; let them draw past the edge of their svg if need be */
 #sheet .at-surface svg { overflow: visible; }
@@ -1249,7 +1249,7 @@ body.following .host-only { display: none !important; }
     if (!score) return;
     if (what.parts) { applyAudio(); renderParts(); }
     if (what.audio) applyAudio();
-    if (what.layout) { $('sheet').scrollLeft = 0; lastScrollKey = null; }
+    if (what.layout) { $('sheet').scrollLeft = 0; lastScrollKey = null; nameRoom = { part: 0, line: 0 }; }
     if (what.size || what.marks) applySize();
     if (what.marks || what.size) { applyMarks(); api.render(); }
     if (what.parts) trackNotes(true);
@@ -1494,6 +1494,7 @@ body.following .host-only { display: none !important; }
     $('loading').hidden = false;
     const idx = shownIndexes();
     labelStaves(idx);
+    if (nameRoom.part || nameRoom.line) { nameRoom = { part: 0, line: 0 }; setSpacing(api.settings.display); api.updateSettings(); } // new names: measure afresh
     api.renderTracks(idx.map(i => score.tracks[i]));
   }
 
@@ -1657,7 +1658,7 @@ body.following .host-only { display: none !important; }
       const top = Math.min(...staves.map(v => v.y)) - space * 1.6;
       let bottom = Math.max(...staves.map(v => v.y + v.h)) + space * 2;
       const sv = sys.visualBounds;
-      for (const r of countRows) if (r.line >= sv.y && r.line <= sv.y + sv.h) bottom = Math.max(bottom, r.y1 + sz * 0.2);
+      if (state.countAlong) for (const r of countRows) if (r.line >= sv.y && r.line <= sv.y + sv.h) bottom = Math.max(bottom, r.y1 + sz * 0.2);
       const el = document.createElement('div');
       el.className = 'loop-mark' + (picking ? ' picking' : '');
       Object.assign(el.style, { left: a.x + 'px', top: top + 'px', width: (z.x + z.w - a.x) + 'px', height: (bottom - top) + 'px' });
@@ -2686,8 +2687,9 @@ body.following .host-only { display: none !important; }
   function clearLinks(ti) { for (const ln of linkNow.get(ti) || []) ln.classList.remove('now'); linkNow.delete(ti); }
   function clearNow() { for (const el of countNow.values()) el.classList.remove('now', 'one'); countNow = new Map(); for (const ti of [...linkNow.keys()]) clearLinks(ti); }
   const countSize = (scale) => (document.documentElement.classList.contains('small') ? Math.max(20, 9 * scale) : Math.max(26, 17 * scale));
-  // Room for the count row under the staff. alphaTab multiplies paddings by the scale, so give it unscaled units.
-  const countPad = (scale) => Math.round((countSize(scale) * 1.6 + 8) / scale);
+  // Room for the count row under the staff: the gap above it, the row, and a little below it (a dynamic moved under
+  // the row uses the room alphaTab keeps for it). alphaTab multiplies paddings by the scale, so give it unscaled units.
+  const countPad = (scale) => Math.round((countSize(scale) * 1.4 + 4) / scale);
   const countLabel = (q, beatTicks, perBar) => {
     const frac = (q % beatTicks) / beatTicks;
     return frac === 0 ? String(Math.floor(q / beatTicks) % perBar + 1) : frac === 0.5 ? '&' : frac === 0.25 ? 'e' : frac === 0.75 ? 'a' : '';
@@ -2765,7 +2767,7 @@ body.following .host-only { display: none !important; }
           if (!rows) { rows = new Map(); rowOf.set(sys, rows); }
           if (!rows.has(ti)) {
             const vb = bb.barBounds.visualBounds, sv = sys ? sys.visualBounds : bar;
-            const row = { ti, y0: y, y1: y + sz, sx: sv.x, sr: sv.x + sv.w, line: vb.y + vb.h, space: vb.h / 4, below: staffTopBelow(bb.barBounds), first: Infinity };
+            const row = { ti, y0: y, y1: y + sz, sx: sv.x, sr: sv.x + sv.w, line: vb.y + vb.h, space: vb.h / 4, below: staffTopBelow(bb.barBounds), end: nextLineTop(sys), first: Infinity };
             rows.set(ti, row); countRows.push(row);
           }
           const row = rows.get(ti);
@@ -2801,13 +2803,21 @@ body.following .host-only { display: none !important; }
       countIndex.set(ti, map);
     }
     countLayer.appendChild(frag);
-    moveDynamics(sz);
+    if (state.countAlong) moveDynamics(sz); // with the counts off there's no row to clear, so they stay under the notes
     showCounting();
   }
   function staffTopBelow(barBounds) {
     const vb = barBounds.visualBounds, sys = barBounds.masterBarBounds.staffSystemBounds;
     let top = Infinity;
     if (sys) for (const mbb of sys.bars) for (const b of mbb.bars) { const y = b.visualBounds.y; if (y > vb.y + 1 && y < top) top = y; }
+    return top;
+  }
+  // Where the next line of music down the page starts (the top of its room, above its bar numbers); one long line has none.
+  function nextLineTop(sys) {
+    if (!sys) return Infinity;
+    const end = sys.realBounds.y + sys.realBounds.h - 1;
+    let top = Infinity;
+    for (const s of api.boundsLookup.staffSystems) if (s.realBounds.y >= end && s.realBounds.y < top) top = s.realBounds.y;
     return top;
   }
   // How far a dynamic's glyph really reaches above and below its baseline, in ems (measured once per glyph).
@@ -2852,7 +2862,7 @@ body.following .host-only { display: none !important; }
     const need = new Map();
     for (const d of found) {
       const want = d.row.y1 + sz * 0.12 - d.box.y;
-      const room = d.row.below - d.row.space * 2 - d.box.b; // never down into the next staff's notes
+      const room = Math.min(d.row.below - d.row.space * 2, d.row.end) - d.box.b; // never down into the next staff's notes or line
       need.set(d.row, Math.max(need.get(d.row) || 0, Math.min(want, room)));
     }
     for (const d of found) {
@@ -2864,7 +2874,8 @@ body.following .host-only { display: none !important; }
     }
     if (found.length) ink = null;
   }
-  // The counts under the notes, on or off (the Counting button in the strip). Off, the row keeps its room.
+  // The counts under the notes, on or off (the Counting button in the strip). Off, the row gives up its room and the
+  // lines of music sit closer together (Janelle, 2026-10-22; until then the row kept its room so nothing moved).
   function showCounting() { $('sheet').classList.toggle('counts-off', !state.countAlong); }
   function showZoom() {
     const i = ZOOMS.indexOf(state.zoom);
@@ -2885,7 +2896,11 @@ body.following .host-only { display: none !important; }
   $('g-count').addEventListener('click', () => {
     setPop(null);
     state.countAlong = !state.countAlong;
-    save(); renderCycles(); showCounting();
+    save(); renderCycles();
+    // Draw the music again with or without the room for the counts, keeping the line being read where it is.
+    // Switched on, the counts show once their room is there (buildCounts), never over the next staff.
+    if (api && score) { holdPlace(); nameRoom = { part: 0, line: 0 }; applySize(); api.render(); }
+    if (!api || !score || !state.countAlong) showCounting();
     toast(state.countAlong ? 'Counting: on' : 'Counting: off');
   });
   // The lowest ink of this staff across its whole line of music (low notes, stems, beams, ledger lines),
@@ -2938,17 +2953,23 @@ body.following .host-only { display: none !important; }
       if (y > vb.y + 1 && y < nextTop) nextTop = y;
     }
     const space = vb.h / 4;
-    const limit = Math.min(own + space * 6, nextTop - space);
+    const limit = Math.min(own + space * 6, nextTop - space, nextLineTop(sys)); // never the next line of music's notes
     const sx = sys.visualBounds.x, sr = sx + sys.visualBounds.w;
     if (!ink) ink = collectInk();
-    let low = own;
-    for (const e of ink) {
-      if (e.dyn) continue; // a lone mf shouldn't push the whole row down; counts step under it instead (buildCounts)
-      if (e.r < sx || e.x > sr) continue;
+    const mine = ink.filter(e => {
+      if (e.dyn) return false; // a lone mf shouldn't push the whole row down; counts step under it instead (buildCounts)
+      if (e.r < sx || e.x > sr) return false;
       // Only this staff's own drawing: not the line that joins it to the staff below (a system's left edge), nor
       // anything that reaches into the next staff.
-      if (e.y < vb.y - 1 || e.y >= limit || e.b > nextTop - space) continue;
-      if (e.b - e.y > vb.h * 1.9 && e.r - e.x < space) continue;
+      if (e.y < vb.y - 1 || e.y >= limit || e.b > nextTop - space) return false;
+      return !(e.b - e.y > vb.h * 1.9 && e.r - e.x < space);
+    }).sort((a, b) => a.y - b.y);
+    // This staff's drawing hangs down from its bottom line with no gap of more than about a space (ledger lines, notes,
+    // stems, beams). After a bigger gap it's the staff below: a high note there with its beam (found 2026-10-22, with
+    // the count row drawn on the next staff's top line), or the next line of music.
+    let low = own;
+    for (const e of mine) {
+      if (e.y > low + space * 1.2) break;
       if (e.b > low) low = e.b;
     }
     perSys.set(ti, low);
@@ -3060,6 +3081,35 @@ body.following .host-only { display: none !important; }
     applySize(); api.render();
     return true;
   }
+  // Each part's name runs sideways beside its staff. With the lines close together a long name ("C Adv. bass line")
+  // can be taller than its staff and run into the next part's name; then the music is drawn again with just enough
+  // room between those staves (between parts, or between lines of music). Returns true when it started a new drawing.
+  let nameRoom = { part: 0, line: 0 }, nameTries = 0, namePending = false;
+  function fitNames() {
+    const surf = $('sheet').querySelector('.at-surface');
+    if (!surf || !api || !api.boundsLookup || nameTries >= 2) return false;
+    const top = surf.getBoundingClientRect().top, systems = api.boundsLookup.staffSystems;
+    const names = [];
+    for (const t of surf.querySelectorAll('svg g[transform*="rotate"] > text')) {
+      const r = t.getBoundingClientRect();
+      if (!r.height) continue;
+      const mid = (r.top + r.bottom) / 2 - top;
+      names.push({ top: r.top, bottom: r.bottom, line: systems.findIndex(s => mid >= s.realBounds.y && mid <= s.realBounds.y + s.realBounds.h) });
+    }
+    names.sort((a, b) => a.top - b.top);
+    const scale = api.settings.display.scale, clear = 5 * scale; // about half a staff space between two names
+    let part = 0, line = 0;
+    for (let i = 1; i < names.length; i++) {
+      const short = clear - (names[i].top - names[i - 1].bottom);
+      if (short <= 0) continue;
+      if (names[i].line === names[i - 1].line) part = Math.max(part, short); else line = Math.max(line, short);
+    }
+    if (!part && !line) return false;
+    nameRoom = { part: nameRoom.part + Math.ceil(part / scale), line: nameRoom.line + Math.ceil(line / scale) };
+    nameTries++; namePending = true;
+    applySize(); api.render();
+    return true;
+  }
   let resizeTimer = 0, lastW = window.innerWidth, lastH = window.innerHeight;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
@@ -3078,10 +3128,19 @@ body.following .host-only { display: none !important; }
     d.layoutMode = state.layout === 'line' ? alphaTab.LayoutMode.Horizontal : alphaTab.LayoutMode.Page;
     d.padding = document.documentElement.classList.contains('small') ? [10, 2] : [10, 10];
     d.stretchForce = BIG() && fingerSpot() !== 'inside' ? 1.35 : 1;
-    // The count row always keeps its room, so switching the counts off or on never moves the music.
-    d.notationStaffPaddingBottom = defaults.notationStaffPaddingBottom + countPad(d.scale);
-    d.lastNotationStaffPaddingBottom = defaults.lastNotationStaffPaddingBottom + countPad(d.scale);
+    setSpacing(d);
     api.updateSettings();
+  }
+  // The space under each staff and between the lines of music, kept tight so more lines fit on the screen (Janelle,
+  // 2026-10-22): room for the row of counts only while they are on, and about two staff spaces of paper between one
+  // line's lowest notes or counts and the next line's bar numbers (alphaTab units, 9 to a space; the counts' own room
+  // leaves some paper below them, so with the counts on the lines add less). A long part name can add more (fitNames).
+  function setSpacing(d) {
+    const pad = state.countAlong ? countPad(d.scale) : 0;
+    d.notationStaffPaddingBottom = defaults.notationStaffPaddingBottom + pad + nameRoom.part;
+    d.lastNotationStaffPaddingBottom = defaults.lastNotationStaffPaddingBottom + pad + nameRoom.line;
+    d.systemPaddingTop = state.countAlong ? 6 : 10;
+    d.systemPaddingBottom = state.countAlong ? 4 : 6;
   }
 
   // ---- Sound banks ----
@@ -3277,6 +3336,24 @@ body.following .host-only { display: none !important; }
     }
   }
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Pages: when the music is drawn again with more or less room under the staves (the Counting button), the line being
+  // read stays where it is on the screen instead of the page sliding to another line.
+  let place = null;
+  function holdPlace() {
+    place = null;
+    const surf = $('sheet').querySelector('.at-surface');
+    if (state.layout !== 'page' || !surf || !api || !api.boundsLookup) return;
+    const top = surf.getBoundingClientRect().top;
+    const sys = api.boundsLookup.staffSystems.find(s => top + s.realBounds.y + s.realBounds.h / 2 > 0); // the first line at least half in view
+    if (sys) place = { bar: sys.bars[0].index, y: top + sys.realBounds.y };
+  }
+  function keepPlace() {
+    const p = place, surf = $('sheet').querySelector('.at-surface');
+    place = null;
+    if (!p || state.layout !== 'page' || !surf || !api || !api.boundsLookup) return;
+    const sys = api.boundsLookup.staffSystems.find(s => s.bars.some(m => m.index === p.bar));
+    if (sys) window.scrollTo({ top: Math.max(0, window.scrollY + surf.getBoundingClientRect().top + sys.realBounds.y - p.y), behavior: 'auto' });
+  }
   // In one long line, make sure the line of music itself is on screen (on a phone turned sideways the header can push it down).
   const topInset = () => $('topInset').offsetHeight;
   function visibleRoom() {
@@ -3329,9 +3406,9 @@ body.following .host-only { display: none !important; }
     }
     const key = $('legend');
     if (!key.hidden) top = Math.min(top, key.getBoundingClientRect().top - 4);
-    // The rows of counts (kept even while the counts are switched off).
+    // The rows of counts, while they are on.
     const sv = sys.visualBounds;
-    for (const r of countRows) if (r.line >= sv.y && r.line <= sv.y + sv.h) bottom = Math.max(bottom, s.top + r.y1 + 6);
+    if (state.countAlong) for (const r of countRows) if (r.line >= sv.y && r.line <= sv.y + sv.h) bottom = Math.max(bottom, s.top + r.y1 + 6);
     return { top, bottom };
   }
   // Steady scrolling. Printed music is not spaced evenly in time (a half note takes less room per beat
@@ -3560,7 +3637,7 @@ body.following .host-only { display: none !important; }
     s.display.layoutMode = state.layout === 'line' ? alphaTab.LayoutMode.Horizontal : alphaTab.LayoutMode.Page;
     s.display.scale = musicScale();
     s.display.stretchForce = BIG() && fingerSpot() !== 'inside' ? 1.35 : 1;
-    s.display.notationStaffPaddingBottom += countPad(s.display.scale); s.display.lastNotationStaffPaddingBottom += countPad(s.display.scale);
+    setSpacing(s.display);
     s.display.padding = document.documentElement.classList.contains('small') ? [10, 2] : [10, 10]; // phones: no spare room above and below the line
     const R = s.display.resources;
     R.barNumberColor = alphaTab.model.Color.fromJson('#7A847F');
@@ -3587,8 +3664,9 @@ body.following .host-only { display: none !important; }
     holdPictureForSound();
     window.reader = { api, score, conductor, xmap: () => xmap, line: () => lineState, at: () => playedTick(performance.now()), lag: reportLag };
     api.error.on(() => fail('Something went wrong drawing the music. Reload the page to try again.'));
-    api.renderStarted.on(() => { if (!fitPending) fitTries = 0; head = null; lineHead.classList.remove('on'); });
-    api.renderFinished.on(() => { $('loading').hidden = true; ink = null; styleWords(); fitSurface(); placeFingers(); trackNotes(true); buildCounts(); placeTimeSigButtons(); drawLoop(); drawStartMark(); xmap = null; if (!playing && state.layout === 'line') { setHalf(); centerOnTick(api.tickPosition || 0, false); }
+    api.renderStarted.on(() => { if (!fitPending) fitTries = 0; if (!namePending) nameTries = 0; head = null; lineHead.classList.remove('on'); });
+    api.renderFinished.on(() => { namePending = false; if (fitNames()) return; // drawn again with room for the part names
+      $('loading').hidden = true; ink = null; styleWords(); fitSurface(); placeFingers(); trackNotes(true); buildCounts(); placeTimeSigButtons(); drawLoop(); drawStartMark(); keepPlace(); xmap = null; if (!playing && state.layout === 'line') { setHalf(); centerOnTick(api.tickPosition || 0, false); }
       // A phone on its side: size the line to the screen, then bring it into view.
       fitPending = false;
       if (!fitToHeight() && shortLand.matches && state.layout === 'line' && !playing) revealSheet(false, true); });

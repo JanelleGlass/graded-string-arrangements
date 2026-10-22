@@ -270,8 +270,15 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   the current count in teal bold, no circles or pops. Held notes join their counts with a line
   (ties too, rests not). Dynamics sit below the count row. The counts are switched on and off by a
   Counting button in the strip ("Counting: On" or "Counting: Off", words only, no symbol), moved there from
-  beside the first count on 2026-10-16; switched off, the row keeps its room. The count-in overlay
-  is the same size, lighter.
+  beside the first count on 2026-10-16. Switched off, the row gives up its room and the lines of music
+  close up, with the dynamics back right under the notes; on Pages the line being read stays where it
+  is on the screen (Janelle, 2026-10-22; until then the row kept its room so nothing moved). The count-in
+  overlay is the same size, lighter.
+- Spacing between lines of music (Janelle asked for more lines on the screen, nothing overlapping,
+  2026-10-22): about two staff spaces of paper between one line's lowest notes or counts and the next
+  line's bar numbers (before, about four under the counts), more where a long part name written sideways
+  ("C Adv. bass line") needs it: the reader measures the names after drawing and, if two would touch,
+  draws again with just enough room.
 - Hover (mouse) or tap (touch) explains the clef, each sharp or flat in the key signature, the time
   signature and dynamics.
 - Full screen: a button at the end of the bottom strip, shown only where the browser allows it (Android,
