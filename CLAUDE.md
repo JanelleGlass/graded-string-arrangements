@@ -248,6 +248,17 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   folded the speakers away so students see only the eyes unless they want a mix. A sideways Hear
   tab with a "See & Hear" heading came first; she replaced it with the checkbox because eyes under
   "See & Hear" didn't say they play sound and the tab didn't say what it did.
+- The music on the screen keeps time with the speaker (Janelle asked, 2026-10-22: over Bluetooth, and with her iPad
+  mirrored to an LG TV, the sound came after the notes lit; Soundslice does this). The player reports a moment as
+  soon as it hands the sound to the browser, about a fifth of a second before even the device's own speaker plays
+  it (measured in Chromium: 0.22 s early before this), and Bluetooth or a TV adds more. So everything that moves with
+  the music (lit notes, cursor, sliding line, counts, count-in numbers) waits by what the browser reports: its own
+  buffering plus the speaker's delay (Safari from iOS 18.4, Chrome, Edge, Firefox; Safari's Private Browsing reports
+  no speaker delay). Only the picture waits: the sound, loops and count-ins are timed as before. A pause keeps the
+  beat last heard, and Play starts again there. In Play together a student's screen keeps time with the teacher's
+  speaker. No manual setting yet: if a speaker or TV reports its delay wrongly, a manual one like Soundslice's
+  "Audio latency" is the next step. alphaTab's .min.js shortens its own internal names, so the reader measures
+  through the browser's audio node and alphaTab's public events, never alphaTab's underscore names.
 - Metronome is one button that cycles Off → On → On with count-in → Count-in only.
 - Tap a note to choose where Play starts: a thin, pale ring around the note head until the music
   starts. No flag.

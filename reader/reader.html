@@ -1586,7 +1586,7 @@ body.following .host-only { display: none !important; }
     glideToTick(t, Math.min(LOOP_GLIDE_MS, rest - 120)); drawStartMark();
     api.countInVolume = countIn ? 1 : 0;
     clearTimers(); clearTimeout(loopGap);
-    if (conductor.hosting) conductSend({ type: 'play', startAt: clock() + rest, tick: t, speed: api.playbackSpeed, countIn, loop: true, range: rangeBars() });
+    if (conductor.hosting) conductSend({ type: 'play', startAt: clock() + rest, tick: t, speed: api.playbackSpeed, countIn, loop: true, range: rangeBars(), lag: Math.round(soundLag()) });
     setPlaying(true);
     loopGap = setTimeout(() => {
       loopGap = 0;
@@ -1618,7 +1618,7 @@ body.following .host-only { display: none !important; }
   // Where the music is now, by the clock between the player's reports. It never runs past the end of a loop:
   // a loop that goes straight round carries on from its start, one that stops (to count in again) stays at its end.
   function playedTick(now) {
-    const est = pos.tick + Math.min(now - pos.at, 400) * 0.016 * (pos.bpm || BASE_TEMPO);
+    const est = pos.tick + Math.max(0, Math.min(now - pos.at, 400)) * 0.016 * (pos.bpm || BASE_TEMPO);
     const r = loop && api.playbackRange;
     if (!r || est < r.endTick) return est;
     return api.isLooping ? r.startTick + (est - r.endTick) % Math.max(1, r.endTick - r.startTick) : r.endTick - 1;
@@ -1878,7 +1878,7 @@ body.following .host-only { display: none !important; }
     api.tickPosition = tick; markTick = tick; drawStartMark();
     centerOnTick(tick, true); revealSheet(true, true);
     const startAt = clock() + LEAD_MS;
-    conductSend({ type: 'play', startAt, tick, speed: api.playbackSpeed, countIn, loop: !!loop, range: rangeBars() });
+    conductSend({ type: 'play', startAt, tick, speed: api.playbackSpeed, countIn, loop: !!loop, range: rangeBars(), lag: Math.round(soundLag()) });
     $('playText').textContent = 'Starting';
     conductor.timers.push(setTimeout(() => { if (countIn) beginCountIn(); api.play(); }, LEAD_MS));
   }
@@ -1886,7 +1886,7 @@ body.following .host-only { display: none !important; }
   function hostSeek() {
     if (!conductor.hosting) return;
     const r = rangeBars();
-    conductSend({ type: 'seek', tick: Math.round(playing ? api.tickPosition : markTick), h: clock(), playing, range: r, loop: !!loop, countIn: countInSet() });
+    conductSend({ type: 'seek', tick: Math.round(playing ? api.tickPosition : markTick), h: clock(), playing, range: r, loop: !!loop, countIn: countInSet(), lag: Math.round(soundLag()) });
   }
   // Host: while playing, say where we are a couple of times a second.
   function hostReport() {
@@ -1895,6 +1895,9 @@ body.following .host-only { display: none !important; }
     conductSend({ type: 'pos', h: now, tick: playedTick(now) });
   }
 
+  // A follower's sound is off, so its music keeps time with the host's speaker: it runs this much behind the host's
+  // player (the host's speaker takes cmd.lag; this device's music waits soundLag() for a speaker it doesn't use).
+  const lagGap = (cmd) => (typeof cmd.lag === 'number' ? cmd.lag - soundLag() : 0);
   // Follower: apply a command from the host.
   function applyCommand(cmd, late) {
     if (!conductor.following) return;
@@ -1909,7 +1912,7 @@ body.following .host-only { display: none !important; }
       if (cmd.range) setLoop(cmd.range[0] - 1, cmd.range[1] - 1); else setLoop(null);
       if (playing) api.pause();
       api.tickPosition = cmd.tick; markTick = cmd.tick; drawStartMark();
-      const localStart = cmd.startAt - conductor.offset;
+      const localStart = cmd.startAt - conductor.offset + lagGap(cmd);
       glideToTick(cmd.tick, Math.max(0, Math.min(LOOP_GLIDE_MS, localStart - clock() - 80))); revealSheet(true, true);
       const countMs = cmd.countIn ? countInBeats(cmd.tick) * clickMs(barAtTick(cmd.tick), cmd.speed) : 0;
       const wait = localStart - clock();
@@ -1930,7 +1933,7 @@ body.following .host-only { display: none !important; }
     } else if (cmd.type === 'seek') {
       if (cmd.range) setLoop(cmd.range[0] - 1, cmd.range[1] - 1); else if (loop) setLoop(null);
       if (cmd.playing && playing) {
-        api.tickPosition = cmd.tick + (clock() - (cmd.h - conductor.offset)) * ticksPerMs(api.playbackSpeed, cmd.tick);
+        api.tickPosition = cmd.tick + (clock() - (cmd.h - conductor.offset) - lagGap(cmd)) * ticksPerMs(api.playbackSpeed, cmd.tick);
       } else {
         if (playing) api.pause();
         api.tickPosition = cmd.tick; markTick = cmd.tick; drawStartMark();
@@ -1959,7 +1962,8 @@ body.following .host-only { display: none !important; }
         const med = [...conductor.errs].sort((a, b) => a - b)[Math.floor(conductor.errs.length / 2)];
         if (Math.abs(med) > DRIFT_MS) {
           conductor.fixes = (conductor.fixes || 0) + 1;
-          api.tickPosition = Math.max(0, pos.tick + (now - pos.at) * rate - med * rate);
+          // Positions are what each device's speaker plays; a jump made now is heard a moment later.
+          api.tickPosition = Math.max(0, pos.tick + (now - pos.at) * rate - med * rate + soundLag() * rate);
           conductor.errs = []; conductor.lastFix = now;
         }
       }
@@ -2331,7 +2335,13 @@ body.following .host-only { display: none !important; }
     const mb = score.masterBars[bi];
     const perBar = mb.timeSignatureNumerator;
     const left = bi === 0 && pickupExtra ? perBar + pickupExtra : perBar;
-    counting = { left, perBar, timer: 0, beatMs: clickMs(bi, api.playbackSpeed || 1) };
+    counting = { left, perBar, timer: 0, beatMs: clickMs(bi, api.playbackSpeed || 1), made: left };
+  }
+  // The player keeps the count-in's click volume for the music; with "count-in only" (or when following), silence
+  // the metronome once the player has made the last count (going by the player, not the speaker, which is later).
+  function clicksMade(e) {
+    if (!counting || !(counting.made > 0)) return;
+    for (const ev of e.events) if (ev.isMetronome && --counting.made === 0 && api.metronomeVolume === 0) setTimeout(() => { if (api) api.metronomeVolume = 0; }, 150);
   }
   function flashCount(index) {
     const el = $('count'), num = $('countNum');
@@ -2345,12 +2355,7 @@ body.following .host-only { display: none !important; }
     const beatMs = counting.beatMs;
     const done = counting.left <= 0;
     counting.timer = setTimeout(endCountIn, done ? beatMs * 0.9 : beatMs * 1.6);
-    if (done) {
-      counting.finishing = true;
-      // The player keeps the count-in's click volume for the music; with "count-in only" (or when following),
-      // silence the metronome once the last count has sounded.
-      if (api.metronomeVolume === 0) setTimeout(() => { if (api) api.metronomeVolume = 0; }, 150);
-    }
+    if (done) counting.finishing = true;
   }
   function endCountIn() {
     if (counting) clearTimeout(counting.timer);
@@ -2371,6 +2376,72 @@ body.following .host-only { display: none !important; }
     $('playText').textContent = playing ? 'Pause' : 'Play';
     $('play').setAttribute('aria-label', playing ? 'Pause' : 'Play');
     $('playIcon').innerHTML = playing ? '<path d="M6 4.5h4.2v15H6zM13.8 4.5H18v15h-4.2z"/>' : '<path d="M7 4.5v15l13-7.5z"/>';
+  }
+
+  // ---- Waiting for the speaker ----
+  // The player says where it is the moment it hands a slice of sound (about a tenth of a second) to the browser,
+  // which holds it for a slice before playing it; then the speaker takes its own time: a few hundredths on the
+  // device itself, a fifth of a second or more over Bluetooth, longer over AirPlay or a TV. So what moves with the
+  // music (the lit notes, the cursor, the sliding line, the counts, the count-in numbers) waits that long, and keeps
+  // time with what is heard. The browser says how long its speaker takes (Safari from iOS 18.4, Chrome, Edge,
+  // Firefox). Only the picture waits: the sound, loops and count-ins run as before.
+  let slice = { ahead: 0, len: 0 }, sounding = false, speaker = 0;
+  const audioCtx = () => (api && api.player && api.player.output && api.player.output.context) || null;
+  const sliceMs = () => (slice.len || 4096 / ((audioCtx() || {}).sampleRate || 44100)) * 1000;
+  // From a position being reported to that moment being heard: the slice waits its turn, plays to its end, then
+  // goes through the speaker. Never more than 3 seconds, whatever a browser claims. Safari says what the speaker
+  // takes only while sound is going out, so the last answer is kept for the next Play.
+  function reportLag() {
+    const ctx = audioCtx();
+    if (!ctx) return 0;
+    if (ctx.outputLatency > 0) speaker = ctx.outputLatency;
+    const len = sliceMs(), ahead = slice.len ? slice.ahead * 1000 : len;
+    return Math.min(3000, ahead + len + ((ctx.baseLatency || 0) + speaker) * 1000);
+  }
+  // How long a sound the player makes now takes to be heard (it lands somewhere in a slice: half of one, on average).
+  const soundLag = () => Math.max(0, reportLag() - sliceMs() / 2);
+  function holdPictureForSound() {
+    const p = api.player, out = p && p.output;
+    if (!out) return;
+    // The browser's audio node says when each slice will play (alphaTab's own names are shortened in its .min.js).
+    const ctx = out.context;
+    if (ctx && typeof ctx.createScriptProcessor === 'function') {
+      const make = ctx.createScriptProcessor;
+      ctx.createScriptProcessor = function (...args) {
+        const node = make.apply(this, args);
+        node.addEventListener('audioprocess', (e) => {
+          if (e.playbackTime > 0) slice = { ahead: Math.max(0, e.playbackTime - ctx.currentTime), len: e.outputBuffer.duration };
+        });
+        return node;
+      };
+    }
+    // Each kind of report waits in its own line, in order. Paused or stopped, nothing waits: what was still waiting
+    // is dropped (so a pause keeps the beat last heard, and Play starts again from there), except a jump.
+    const lines = [];
+    const holdBack = (em, lag, made) => {
+      const fire = em.trigger.bind(em), q = { items: [], timer: 0 };
+      const pump = () => {
+        clearTimeout(q.timer); q.timer = 0;
+        while (q.items.length && q.items[0].due <= performance.now() + 2) fire(q.items.shift().e);
+        if (q.items.length) q.timer = setTimeout(pump, q.items[0].due - performance.now());
+      };
+      q.drop = () => { clearTimeout(q.timer); q.timer = 0; const jumps = q.items.filter(x => x.e && x.e.isSeek); q.items = []; jumps.forEach(x => fire(x.e)); };
+      em.trigger = (e) => {
+        if (made) made(e);
+        if (!sounding) { fire(e); return; }
+        q.items.push({ e, due: performance.now() + lag() });
+        if (!q.timer) pump();
+      };
+      lines.push(q);
+    };
+    holdBack(p.positionChanged, reportLag);
+    holdBack(p.midiEventsPlayed, soundLag, clicksMade);
+    const fireState = p.stateChanged.trigger.bind(p.stateChanged);
+    p.stateChanged.trigger = (e) => {
+      sounding = e.state === 1;
+      if (!sounding) lines.forEach(q => q.drop());
+      fireState(e);
+    };
   }
 
   // ---- Pulsing notes ----
@@ -2930,7 +3001,7 @@ body.following .host-only { display: none !important; }
         // Move the light to whatever is sounding now (nothing during the count-in) before any swell.
         let fresh = [];
         if (pulseOn()) {
-          fresh = setSounding(counting ? [] : soundingBeats(est));
+          fresh = setSounding(counting || now < pos.at ? [] : soundingBeats(est));
           if (!newCount) fresh.forEach(hold); // a note that starts between counts just lights up
         }
         if (key !== lastGrid) {
@@ -3370,7 +3441,7 @@ body.following .host-only { display: none !important; }
     } else {
       // Count-in over: ease from the first note into the even motion.
       if (L.counting) { L.counting = false; glide(0, 2500); }
-      L.disp += rate * dt;
+      if (now >= pos.at) L.disp += rate * dt; // not before the first note is heard
       const err = est - L.disp;
       if (Math.abs(err) > 480) {
         // A jump (loop back, seek): glide to the new spot instead of snapping.
@@ -3513,7 +3584,8 @@ body.following .host-only { display: none !important; }
 
     api = new alphaTab.AlphaTabApi($('sheet'), s);
     api.customScrollHandler = scroller;
-    window.reader = { api, score, conductor, xmap: () => xmap, line: () => lineState, at: () => playedTick(performance.now()) };
+    holdPictureForSound();
+    window.reader = { api, score, conductor, xmap: () => xmap, line: () => lineState, at: () => playedTick(performance.now()), lag: reportLag };
     api.error.on(() => fail('Something went wrong drawing the music. Reload the page to try again.'));
     api.renderStarted.on(() => { if (!fitPending) fitTries = 0; head = null; lineHead.classList.remove('on'); });
     api.renderFinished.on(() => { $('loading').hidden = true; ink = null; styleWords(); fitSurface(); placeFingers(); trackNotes(true); buildCounts(); placeTimeSigButtons(); drawLoop(); drawStartMark(); xmap = null; if (!playing && state.layout === 'line') { setHalf(); centerOnTick(api.tickPosition || 0, false); }
@@ -3562,7 +3634,8 @@ body.following .host-only { display: none !important; }
       const was = playing;
       playing = e.state === 1;
       setPlaying(playing);
-      if (playing && !was) { lastGrid = null; pos.at = performance.now(); requestAnimationFrame(gridTick); lineState = null; revealSheet(true, true); if (state.layout === 'line' && !lineRaf) lineRaf = requestAnimationFrame(lineFollow); }
+      // The first note reaches the speaker a moment after Play: until then the music waits (pos.at is that moment).
+      if (playing && !was) { lastGrid = null; pos.at = performance.now() + soundLag(); requestAnimationFrame(gridTick); lineState = null; revealSheet(true, true); if (state.layout === 'line' && !lineRaf) lineRaf = requestAnimationFrame(lineFollow); }
       if (!playing) endCountIn();
       if (!playing && e.stopped) { activeBeats = []; trackNotes(); clearNow(); }
       // Stopped or paused: frame the note Play will start from (the player settles on its spot a moment later).
