@@ -16,6 +16,8 @@ What it checks
      On pages every line names its parts, and scrolled down the size buttons stay at the top of the
      window. Along one long line, each part's name, clef and key signature (the key in force there,
      after every change of key) stay pinned at the left edge.
+     On pages every count sits under its own staff, clear of the music; with Counting off the lines of music sit
+     closer together, and switched on again they make room for the counts.
      Laptop: the Full screen button goes in and out of full screen. Phone (acting like an iPhone,
      which doesn't allow it): no Full screen button, and pinching the music makes it bigger and smaller.
      The Parts panel: the music runs a little under a tab at the right edge, which pulls the panel out over it, each part's eye
@@ -129,6 +131,26 @@ NAMED_LINES_JS = '''() => {
   const lines = new Set(reader.api.boundsLookup.staffSystems.map(s => Math.round(s.visualBounds.y))).size;
   return [drawn, lines * reader.api.tracks.length];
 }'''
+# Every count sits clear of the music: its numeral doesn't touch a staff line, note, stem, beam, bar number or word (a
+# count pushed into the next line of music would). Also the music's height, to see the lines close up without counts.
+COUNTS_CLEAR_JS = '''() => {
+  const surf = document.querySelector('#sheet .at-surface'), base = surf.getBoundingClientRect();
+  const ink = [];
+  const add = (r, what) => { if (r.width || r.height) ink.push({ x: r.left - base.left, r: r.right - base.left, y: r.top - base.top, b: r.bottom - base.top, what }); };
+  surf.querySelectorAll('svg rect, svg path, svg line, svg polygon').forEach(e => add(e.getBoundingClientRect(), e.tagName));
+  surf.querySelectorAll('svg text').forEach(t => { const x = (t.textContent || '').trim(), c = x.codePointAt(0);
+    if (!x || (c >= 0xE000 && c <= 0xF8FF) || t.parentElement.getAttribute('transform')?.includes('rotate')) return;
+    const r = t.getBoundingClientRect(), h = r.height * 0.2; add(new DOMRect(r.left, r.top + h, r.width, r.height - 2 * h), 'text ' + x); });
+  const hits = [];
+  const counts = [...document.querySelectorAll('.beat-count')].filter(e => e.textContent);
+  for (const el of counts) {
+    const sz = parseFloat(el.style.width), cx = parseFloat(el.style.left), top = parseFloat(el.style.top);
+    const g = { x: cx - sz * 0.22, r: cx + sz * 0.22, y: top + sz * 0.28, b: top + sz * 0.72 };
+    const e = ink.find(e => g.x < e.r - 0.5 && g.r > e.x + 0.5 && g.y < e.b - 0.5 && g.b > e.y + 0.5);
+    if (e) hits.push(`"${el.textContent}" at ${Math.round(cx)},${Math.round(top)} on ${e.what}`);
+  }
+  return { counts: counts.length, hits, h: Math.round(base.height) };
+}'''
 # How far the page is scrolled, and whether the size buttons and Line or Pages can still be tapped at the top.
 TOOLS_HELD_JS = '''() => {
   const ids = ['zoomOut', 'zoomIn', 'g-layout'].filter(id => document.getElementById(id).offsetParent);
@@ -223,9 +245,15 @@ async def song_checks(browser, base):
             check(said == 'Counting: On', f'{label}: the Counting button says so in words ("{said}")')
             await pg.click('#g-count')
             off = await pg.evaluate("() => document.getElementById('sheet').classList.contains('counts-off')")
+            await pg.wait_for_timeout(1500)
             await pg.click('#g-count')
-            on = await pg.evaluate("() => !document.getElementById('sheet').classList.contains('counts-off')")
+            try:  # the counts come back once the music is drawn again with their room
+                await pg.wait_for_function("() => !document.getElementById('sheet').classList.contains('counts-off')", timeout=10000)
+                on = True
+            except Exception:
+                on = False
             check(off and on, f'{label}: the Counting button in the strip hides and shows the counts')
+            await pg.wait_for_timeout(1000)
             # Nothing in the strip moves as labels change: each changing button keeps one width.
             widths = []
             for _ in range(5):
@@ -237,6 +265,16 @@ async def song_checks(browser, base):
                 paged = await pg.evaluate("() => !document.getElementById('sheet').classList.contains('line') && document.getElementById('g-layout').title")
                 named = await pg.evaluate(NAMED_LINES_JS)
                 check(named[0] > 1 and named[0] == named[1], f'{label}: on pages every line of music names its parts ({named[0]} names, {named[1]} wanted)')
+                laid = await pg.evaluate(COUNTS_CLEAR_JS)
+                check(laid['counts'] > 0 and not laid['hits'], f'{label}: on pages every count sits in its row under its own staff, clear of the music ({laid["hits"][:3]})')
+                await pg.click('#g-count'); await pg.wait_for_timeout(1500)
+                closer = await pg.evaluate(COUNTS_CLEAR_JS)
+                await pg.click('#g-count')
+                await pg.wait_for_function("() => !document.getElementById('sheet').classList.contains('counts-off')", timeout=10000)
+                await pg.wait_for_timeout(1000)
+                back = await pg.evaluate(COUNTS_CLEAR_JS)
+                check(closer['h'] < laid['h'] * 0.95 and abs(back['h'] - laid['h']) <= 2 and not back['hits'],
+                      f'{label}: with Counting off the lines of music sit closer together, and switched on again they make room for the counts ({laid["h"]}px, off {closer["h"]}px, on again {back["h"]}px)')
                 await pg.evaluate('() => window.scrollTo(0, document.documentElement.scrollHeight)'); await pg.wait_for_timeout(400)
                 held = await pg.evaluate(TOOLS_HELD_JS)
                 check(held[0] > 300 and held[1], f'{label}: scrolled down the pages, the size buttons and Line or Pages stay at the top of the window, ready to tap ({held})')
