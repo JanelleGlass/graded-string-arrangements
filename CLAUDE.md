@@ -63,7 +63,11 @@ Only after Janelle has checked the finished arrangement in the Music Arrangement
 1. Copy the finished file to `songs/<slug>/<slug>.xml` (slug: lowercase-with-dashes, e.g.
    `holy-holy-holy`). Copy only the finished arrangement (the 40-part file, with its Countermelody and Concert
    parts when it has them), nothing else from her folder. Convert it to LF line endings first: the files in her
-   folder are often CRLF, and the build fingerprints raw bytes.
+   folder are often CRLF, and the build fingerprints raw bytes. A solo piece goes on only when Janelle asks for that
+   piece (so far Morning Has Broken's two solo viola Variations, 2026-10-23): its XML only, as one line, with its part
+   renamed from `Viola` to `Viola — Solo` in the site copy so the build reads it, then colored and fingered with her
+   `add-colors-fingerings.py` (her solo files are plain, and the reader's finger looks need fingerings; that tool
+   writes CRLF, so convert to LF again). Its PDF stays private.
 2. Add the song to `songs.json` (title, category for the home card, collection, source line,
    `pdf_url` empty until there is a Payhip link).
 3. Run the build. It reads key, time, bars and the written tempo from the score, and stops unless the
