@@ -723,7 +723,8 @@ body.following .host-only { display: none !important; }
   const $ = (id) => document.getElementById(id);
   // A quarter note drawn as a shape, so it looks the same in every font
   const QN = '<svg class="qn" viewBox="0 0 10 24" aria-hidden="true"><ellipse cx="4.6" cy="19.2" rx="4.4" ry="3.1" transform="rotate(-22 4.6 19.2)"/><rect x="7.7" y="1" width="1.5" height="18.2"/></svg>';
-  const ZOOMS = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.15, 1.3, 1.5, 1.75];
+  // Below 0.3 (Janelle, 2026-10-23: smaller, to see more of the piece at once) the counts shrink with the music.
+  const ZOOMS = [0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.15, 1.3, 1.5, 1.75];
   const store = {
     get() { try { return JSON.parse(localStorage.getItem('what-child-is-this-reader') || '{}'); } catch { return {}; } },
     set(v) { try { localStorage.setItem('what-child-is-this-reader', JSON.stringify(v)); } catch {} },
@@ -2705,7 +2706,12 @@ body.following .host-only { display: none !important; }
   function clearCounts() { countLayer.replaceChildren(); countIndex = new Map(); countNow = new Map(); linkNow = new Map(); }
   function clearLinks(ti) { for (const ln of linkNow.get(ti) || []) ln.classList.remove('now'); linkNow.delete(ti); }
   function clearNow() { for (const el of countNow.values()) el.classList.remove('now', 'one'); countNow = new Map(); for (const ti of [...linkNow.keys()]) clearLinks(ti); }
-  const countSize = (scale) => (document.documentElement.classList.contains('small') ? Math.max(20, 9 * scale) : Math.max(26, 17 * scale));
+  // The counts keep a size that reads easily as the music gets smaller, down to the 0.3 size; smaller than that they
+  // shrink with the music, so they stay in proportion and don't crowd each other.
+  const countSize = (scale) => {
+    const small = document.documentElement.classList.contains('small'), least = (small ? 20 : 26) * Math.min(1, state.zoom / 0.3);
+    return Math.max(14, least, (small ? 9 : 17) * scale);
+  };
   // Room for the count row under the staff: the gap above it, the row, and a little below it (a dynamic moved under
   // the row uses the room alphaTab keeps for it). alphaTab multiplies paddings by the scale, so give it unscaled units.
   const countPad = (scale) => Math.round((countSize(scale) * 1.4 + 4) / scale);
