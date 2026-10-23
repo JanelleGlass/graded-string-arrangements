@@ -46,6 +46,12 @@ The test checks the Parts panel on the first 24-part and the first 40-part song 
 on the first 34-part song (or, with none, the 40-part song's score cut to 34 parts), and on the
 first piece with no levels (one line).
 
+The whole test takes about twelve minutes (eight songs, 2026-10-23), a little more with each song, and says how
+long it took. Run it with no time limit (a Claude session: in the background). A limit that stops it part-way (a
+`timeout`, or the 10-minute limit on one command) closes its browser, and Playwright then reports "Page crashed" or
+"Target crashed" in whatever step was running. That looks like the reader crashing, but it isn't: on 2026-10-23 three
+runs stopped that way at 9 min 50 s, in Joy to the World's Concert checks, and passed with no limit.
+
 The test needs Playwright once per computer: `python -m pip install playwright` then
 `python -m playwright install chromium`. To look at a page yourself: `python -m http.server 8000`
 in this folder, then http://localhost:8000/ .

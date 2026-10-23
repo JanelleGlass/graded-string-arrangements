@@ -2,6 +2,10 @@
 
     python3 tests/smoke.py
 
+It takes about twelve minutes, a little more with each song, and says how long at the end. Run it with no time limit:
+a limit that stops it part-way closes its browser, and Playwright then reports "Page crashed" or "Target crashed"
+in whatever step was running (the reader didn't crash; 2026-10-23).
+
 Needs Playwright for Python and its Chromium, once per computer:
     python3 -m pip install playwright
     python3 -m playwright install chromium
@@ -53,7 +57,7 @@ Offline options (only needed where the internet is filtered):
   ALPHATAB_JS=/path/to/alphaTab.min.js   serve alphaTab from a local copy instead of jsdelivr
   NO_WEBFONTS=1                           skip Google Fonts
 """
-import asyncio, json, os, re, sys, threading
+import asyncio, json, os, re, sys, threading, time
 from functools import partial
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
@@ -66,6 +70,9 @@ PREVIEW_HEAD = ('<!doctype html><html><head><meta charset=utf8><meta name=viewpo
                 '<style>body{margin:0;padding:0}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>'
                 '</head><body>\n')
 failures = []
+# Messages have signs like "−" that Windows can't write to a file in its own code page, so a run saved to a file
+# stopped there. Write them in UTF-8.
+sys.stdout.reconfigure(encoding='utf-8')
 
 
 def check(ok, what):
@@ -123,6 +130,25 @@ async def open_reader(ctx, url, errors, name, w=1366, h=860):
     await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
     await pg.wait_for_timeout(1000)
     return pg
+
+
+# Counts the reader's drawings of the music, so a step can wait until the music is drawn (with any second drawing the
+# reader starts itself, for room for the part names) instead of pausing a fixed time.
+DRAWS_JS = '''() => { if (window.__draws) return; window.__draws = { started: 0, done: 0, at: 0 };
+  reader.api.renderStarted.on(() => { __draws.started++; });
+  reader.api.renderFinished.on(() => { __draws.done++; __draws.at = performance.now(); }); }'''
+
+
+async def click_drawn(pg, sel):
+    """Click something that draws the music again (after DRAWS_JS), and wait until it is drawn. False if it never was."""
+    n = await pg.evaluate('() => __draws.done')
+    await pg.click(sel)
+    try:
+        await pg.wait_for_function('(n) => __draws.done > n && __draws.done >= __draws.started && performance.now() - __draws.at > 250',
+                                   arg=n, timeout=15000)
+        return True
+    except Exception:
+        return False
 
 
 # Pages: a part name beside every staff on every line (names drawn, and lines times parts on the page).
@@ -283,18 +309,18 @@ async def song_checks(browser, base):
                 # The smallest size (0.15x): the counts shrink with the music, still clear of it and of each other.
                 size_js = "() => ({ scale: reader.api.settings.display.scale, count: parseFloat((document.querySelector('.beat-count') || {}).style?.width) || 0 })"
                 normal = await pg.evaluate(size_js)
-                steps = 0
+                await pg.evaluate(DRAWS_JS)    # each step waits for the music to be drawn (about 0.3s), not a fixed 1s
+                steps, drawn = 0, True
                 while steps < 20 and not await pg.evaluate("() => document.getElementById('zoomOut').disabled"):
-                    await pg.click('#zoomOut'); await pg.wait_for_timeout(700); steps += 1
-                await pg.wait_for_timeout(1200)
+                    drawn = await click_drawn(pg, '#zoomOut') and drawn; steps += 1
                 least = await pg.evaluate(size_js)
                 tiny = await pg.evaluate(COUNTS_CLEAR_JS)
-                check(abs(least['scale'] / normal['scale'] - 0.15) < 0.01 and least['count'] < normal['count'] and tiny['counts'] > 0 and not tiny['hits'],
+                check(drawn and abs(least['scale'] / normal['scale'] - 0.15) < 0.01 and least['count'] < normal['count'] and tiny['counts'] > 0 and not tiny['hits'],
                       f'{label}: the − button goes down to 0.15x, the counts shrink with the music and stay clear of it '
-                      f'(size {normal["scale"]:.2f} to {least["scale"]:.2f}, counts {normal["count"]:.0f}px to {least["count"]:.0f}px, {tiny["hits"][:2]})')
+                      f'(size {normal["scale"]:.2f} to {least["scale"]:.2f}, counts {normal["count"]:.0f}px to {least["count"]:.0f}px, {tiny["hits"][:2]}'
+                      f'{"" if drawn else ", a step was never drawn"})')
                 for _ in range(steps):
-                    await pg.click('#zoomIn'); await pg.wait_for_timeout(300)
-                await pg.wait_for_timeout(1500)
+                    await click_drawn(pg, '#zoomIn')
                 await pg.click('#g-layout'); await pg.wait_for_timeout(1500)
                 lined =await pg.evaluate("() => document.getElementById('sheet').classList.contains('line') && document.getElementById('g-layout').title")
                 check(paged == 'Music: pages' and lined == 'Music: one long line', f'{label}: the music button switches between pages and one long line')
@@ -1057,6 +1083,7 @@ async def extras_song_checks(browser, base, slug, extra):
 
 
 async def main():
+    began = time.monotonic()
     base = serve()
     async with async_playwright() as p:
         browser = await p.chromium.launch(args=['--autoplay-policy=no-user-gesture-required'])
@@ -1070,7 +1097,8 @@ async def main():
         await preview_checks(browser, base)
         await app_checks(browser)
         await browser.close()
-    print()
+    took = round(time.monotonic() - began)
+    print(f'\nTook {took // 60} min {took % 60} s.')
     if failures:
         print(f'{len(failures)} check(s) failed:')
         for f in failures:
