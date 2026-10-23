@@ -17,7 +17,8 @@ What it checks
      window. Along one long line, each part's name, clef and key signature (the key in force there,
      after every change of key) stay pinned at the left edge.
      On pages every count sits under its own staff, clear of the music; with Counting off the lines of music sit
-     closer together, and switched on again they make room for the counts.
+     closer together, and switched on again they make room for the counts. At the smallest size (0.15x) the counts
+     shrink with the music and still sit clear of it.
      Laptop: the Full screen button goes in and out of full screen. Phone (acting like an iPhone,
      which doesn't allow it): no Full screen button, and pinching the music makes it bigger and smaller.
      The Parts panel: the music runs a little under a tab at the right edge, which pulls the panel out over it, each part's eye
@@ -279,8 +280,23 @@ async def song_checks(browser, base):
                 held = await pg.evaluate(TOOLS_HELD_JS)
                 check(held[0] > 300 and held[1], f'{label}: scrolled down the pages, the size buttons and Line or Pages stay at the top of the window, ready to tap ({held})')
                 await pg.evaluate('() => window.scrollTo(0, 0)')
+                # The smallest size (0.15x): the counts shrink with the music, still clear of it and of each other.
+                size_js = "() => ({ scale: reader.api.settings.display.scale, count: parseFloat((document.querySelector('.beat-count') || {}).style?.width) || 0 })"
+                normal = await pg.evaluate(size_js)
+                steps = 0
+                while steps < 20 and not await pg.evaluate("() => document.getElementById('zoomOut').disabled"):
+                    await pg.click('#zoomOut'); await pg.wait_for_timeout(700); steps += 1
+                await pg.wait_for_timeout(1200)
+                least = await pg.evaluate(size_js)
+                tiny = await pg.evaluate(COUNTS_CLEAR_JS)
+                check(abs(least['scale'] / normal['scale'] - 0.15) < 0.01 and least['count'] < normal['count'] and tiny['counts'] > 0 and not tiny['hits'],
+                      f'{label}: the − button goes down to 0.15x, the counts shrink with the music and stay clear of it '
+                      f'(size {normal["scale"]:.2f} to {least["scale"]:.2f}, counts {normal["count"]:.0f}px to {least["count"]:.0f}px, {tiny["hits"][:2]})')
+                for _ in range(steps):
+                    await pg.click('#zoomIn'); await pg.wait_for_timeout(300)
+                await pg.wait_for_timeout(1500)
                 await pg.click('#g-layout'); await pg.wait_for_timeout(1500)
-                lined = await pg.evaluate("() => document.getElementById('sheet').classList.contains('line') && document.getElementById('g-layout').title")
+                lined =await pg.evaluate("() => document.getElementById('sheet').classList.contains('line') && document.getElementById('g-layout').title")
                 check(paged == 'Music: pages' and lined == 'Music: one long line', f'{label}: the music button switches between pages and one long line')
             pinned = await pg.evaluate(LINE_HEAD_JS)
             check(pinned and all(p['on'] and p['clefs'] == p['staves'] and p['keys'] == p['want'] for p in pinned),

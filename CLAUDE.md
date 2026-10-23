@@ -144,7 +144,8 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
 - Everything stays in the same place so people can orient themselves: a choice that doesn't apply
   right now is greyed out in its place (a tap says why), never hidden, and a tap-to-change button
   keeps one width (its longest label) so nothing beside it shifts (Janelle, 2026-10-16).
-- The size of the music (− / +, 0.3x to 1.75x) and, on bigger screens, Line or Pages sit at the top
+- The size of the music (− / +, 0.15x to 1.75x; below 0.3x since 2026-10-23, so a whole piece fits on a laptop or
+  iPad screen, with the counts shrinking in proportion there) and, on bigger screens, Line or Pages sit at the top
   right of the music, in the band with the Strings key, so they never cover notes (moved there from
   the strip on 2026-10-16). The band always keeps its room, even with string colors off. Scrolling down
   the page, they stay at the top of the window, over the music (Janelle wanted them always in reach,
