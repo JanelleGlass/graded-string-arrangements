@@ -143,6 +143,7 @@ h1 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: c
 .top-tools { --tools-pad: 10px; position: absolute; right: calc(var(--tools-pad) + var(--tools-shift, 0px)); top: 5px; display: flex; align-items: center; gap: 8px; pointer-events: auto; transition: right 0.22s ease; }
 .top-tools .zoom-pill, .top-tools .fab-btn { height: 36px; }
 .top-tools .zoom-pill button { width: 36px; font-size: 20px; }
+.top-tools .fab-btn.round { min-width: 0; padding: 0; aspect-ratio: 1; } /* Print: a round button */
 /* Too little room between the Strings key and the open panel (a tablet held upright): the key and the buttons take
    their phone size. The band keeps its height, so the music doesn't move. */
 .sheet-wrap.tight .key { top: 12px; gap: 5px; padding: 3px 8px 3px 10px; }
@@ -228,7 +229,7 @@ hr.div { border: 0; border-top: 1px solid var(--line); margin: 0; }
 .ts-notes { font-family: "Segoe UI Symbol", "Apple Symbols", var(--font-display); font-size: 2.1rem; letter-spacing: 0.2em; color: var(--accent); line-height: 1; }
 
 /* Finger numbers drawn inside the note heads (SVG text added after each render) */
-#sheet text.fin { font-family: Figtree, "Segoe UI", Arial, sans-serif; font-weight: 800; pointer-events: none; }
+#sheet text.fin, #printOut text.fin { font-family: Figtree, "Segoe UI", Arial, sans-serif; font-weight: 800; pointer-events: none; }
 /* Count along: a small count under each staff that follows the music */
 .count-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; }
 /* Quiet by design: soft grey numbers (the "&"s too); the one being played just turns teal. No circles, no pop. */
@@ -434,6 +435,37 @@ body.following .host-only { display: none !important; }
 
 .foot { color: var(--muted); font-size: 0.84rem; max-width: 75ch; margin: 0; }
 
+/* Print: while the music is drawn for paper, a card covers the screen; the copy made for paper is all that prints */
+.print-cover { position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center; padding: 16px; background: var(--stand); }
+.print-cover[hidden] { display: none; }
+.print-card { display: grid; justify-items: center; gap: 14px; max-width: 24rem; padding: 20px 24px; text-align: center; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+.print-card p { margin: 0; font-family: var(--font-display); font-size: 1.3rem; font-weight: 600; line-height: 1.2; }
+.print-acts { display: flex; gap: 10px; }
+.print-acts[hidden] { display: none; }
+.print-acts button { border-radius: 999px; padding: 9px 20px; font-weight: 700; border: 1px solid var(--line); background: var(--stand); }
+.print-acts .print-go { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+#printOut { display: none; color: #121614; background: #FFFFFF; font-family: var(--font-body); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.pr-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 16px; margin-bottom: 4px; }
+.pr-parts { margin: 0; font-size: 10.5pt; font-weight: 600; }
+#printOut .key { position: static; justify-self: end; box-shadow: none; }
+.pr-title { grid-column: 1 / -1; margin: 4px 0 0; text-align: center; font-family: var(--font-display); font-size: 24pt; font-weight: 600; line-height: 1.1; }
+.pr-src { grid-column: 1 / -1; margin: 0; text-align: right; font-family: var(--font-display); font-size: 11pt; font-style: italic; }
+/* A line of music never splits across two sheets of paper */
+.pr-line { break-inside: avoid; }
+.pr-line svg { display: block; width: 100%; height: auto; overflow: visible; }
+.pr-count { font-family: var(--font-display); font-weight: 500; fill: #8A948F; }
+.pr-link { fill: #CDD4D1; }
+@media print {
+  @page { margin: 12mm; }
+  /* Printed from the browser's own menu with no copy for paper (one long line): the page as it is, without the buttons */
+  .fab, .fab-bar, .parts-tab, .drawer, .tools-dock, .count, .buy, .foot, .print-cover { display: none !important; }
+  .sheet { box-shadow: none; }
+  html.print-ready, html.print-ready body { background: #FFFFFF; }
+  html.print-ready body { margin: 0; padding: 0; }
+  html.print-ready body > :not(#printOut) { display: none !important; }
+  html.print-ready #printOut { display: block; }
+}
+
 @media (max-width: 720px) {
   .row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .row > .label { padding-top: 0; }
@@ -549,7 +581,7 @@ body.following .host-only { display: none !important; }
   <p class="err" id="err" role="alert"></p>
 
   <div class="sheet-wrap">
-    <div class="tools-dock"><div class="top-tools" id="topTools"><div class="zoom-pill" role="group" aria-label="Size of the music"><button type="button" id="zoomOut" aria-label="Smaller music" title="Smaller">−</button><button type="button" id="zoomIn" aria-label="Bigger music" title="Bigger">+</button></div><button class="fab-btn big-only cyc" id="g-layout" type="button"></button></div></div>
+    <div class="tools-dock"><div class="top-tools" id="topTools"><button class="fab-btn round host-only" id="printBtn" type="button" aria-label="Print the music" title="Print the music"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg></button><div class="zoom-pill" role="group" aria-label="Size of the music"><button type="button" id="zoomOut" aria-label="Smaller music" title="Smaller">−</button><button type="button" id="zoomIn" aria-label="Bigger music" title="Bigger">+</button></div><button class="fab-btn big-only cyc" id="g-layout" type="button"></button></div></div>
     <div class="key-dock"><div class="key" id="legend" role="note" aria-label="String colors"></div></div>
     <div class="sheet" id="sheet"></div>
     <div class="loading" id="loading">Setting out the music…</div>
@@ -612,6 +644,13 @@ body.following .host-only { display: none !important; }
   </div>
 </div>
 </div>
+<div class="print-cover" id="printCover" hidden>
+  <div class="print-card" role="status" aria-live="polite">
+    <p id="printMsg"></p>
+    <div class="print-acts" id="printActs" hidden><button class="print-go" id="printGo" type="button">Print</button><button id="printX" type="button">Not now</button></div>
+  </div>
+</div>
+<div id="printOut" aria-hidden="true"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/alphaTab.min.js"></script>
 <script>
@@ -826,7 +865,10 @@ body.following .host-only { display: none !important; }
   // (and the full id in partsFull) lets a reader from before the extra rows, such as an offline copy not yet updated,
   // keep the graded parts and drop only the extras. An id it doesn't know would read as the six levels and swap parts.
   const savedId = () => layout.startsWith('voices40+') ? 'voices40' : layout;
-  const save = () => store.set({ zoom: state.zoom, parts: savedId(), partsFull: layout, seen: state.seen, heard: state.heard, hearOpen: state.hearOpen, colorMode: state.colorMode, fingerMode: state.fingerMode, tempo: state.tempo, follow: state.follow, countBy: state.unit, fingers: state.fingers, counts: state.countAlong ? 'on' : 'off', layout: state.layout, letterMode: state.letterMode, lettersBig: state.letterModeBig, metro: state.metro });
+  // While the music is drawn for paper (Print), it is on pages for a moment; the saved choice stays the screen's.
+  let printing = null;
+  const onPaper = () => !!printing && printing.stage === 'paper'; // drawing the music for paper
+  const save = () => store.set({ zoom: state.zoom, parts: savedId(), partsFull: layout, seen: state.seen, heard: state.heard, hearOpen: state.hearOpen, colorMode: state.colorMode, fingerMode: state.fingerMode, tempo: state.tempo, follow: state.follow, countBy: state.unit, fingers: state.fingers, counts: state.countAlong ? 'on' : 'off', layout: printing ? printing.layout : state.layout, letterMode: state.letterMode, lettersBig: state.letterModeBig, metro: state.metro });
 
   // ---- Room reverb ----
   // alphaTab plays through Web Audio; route whatever it sends to the speakers through a small reverb bus.
@@ -2709,6 +2751,7 @@ body.following .host-only { display: none !important; }
   // The counts keep a size that reads easily as the music gets smaller, down to the 0.3 size; smaller than that they
   // shrink with the music, so they stay in proportion and don't crowd each other.
   const countSize = (scale) => {
+    if (onPaper()) return 17 * scale; // on paper, in proportion to the music
     const small = document.documentElement.classList.contains('small'), least = (small ? 20 : 26) * Math.min(1, state.zoom / 0.3);
     return Math.max(14, least, (small ? 9 : 17) * scale);
   };
@@ -3071,6 +3114,7 @@ body.following .host-only { display: none !important; }
   const shortLand = window.matchMedia('(max-height: 500px) and (orientation: landscape)');
   let fitScale = null, fitTries = 0, fitPending = false;
   function musicScale() {
+    if (onPaper()) return printScale();
     const s = fitScale && state.layout === 'line' && shortLand.matches ? fitScale : baseScale();
     return s * state.zoom;
   }
@@ -3151,8 +3195,8 @@ body.following .host-only { display: none !important; }
     const d = api.settings.display, narrow = window.innerWidth < 560, mid = window.innerWidth < 900;
     d.scale = musicScale();
     d.layoutMode = state.layout === 'line' ? alphaTab.LayoutMode.Horizontal : alphaTab.LayoutMode.Page;
-    d.padding = document.documentElement.classList.contains('small') ? [10, 2] : [10, 10];
-    d.stretchForce = BIG() && fingerSpot() !== 'inside' ? 1.35 : 1;
+    d.padding = document.documentElement.classList.contains('small') && !onPaper() ? [10, 2] : [10, 10];
+    d.stretchForce = (BIG() && fingerSpot() !== 'inside' ? 1.35 : 1) * (onPaper() ? 0.5 : 1);
     setSpacing(d);
     api.updateSettings();
   }
@@ -3627,6 +3671,130 @@ body.following .host-only { display: none !important; }
     $('fullSet').hidden = false;
   })();
 
+  // ---- Print ----
+  // The Print button (and Ctrl+P) prints the music as it is on the page: the parts on the page, with their string
+  // colors, what's on the notes and the counts. The music is drawn once more for paper (on pages, a sheet of paper
+  // wide, at a size that reads on a music stand) and copied a line of music at a time into a copy kept for paper, so
+  // the printer starts a new sheet between lines of music, never through one. Then it is drawn again for the screen.
+  const PRINT_W = 700;      // the music's width on paper in CSS pixels: A4 or Letter inside 12 mm margins
+  // A staff 14 mm high for one part (a student's); with more parts on the page (a duet, or a score for the teacher) a
+  // little smaller with each, so more than one line of music fits on a sheet.
+  const printScale = () => [1.5, 1.3, 1.2, 1.1][Math.min(4, shownIndexes().length) - 1];
+  let printTimer = 0, paperKey = null, printOpened = false;
+  // What the copy for paper shows; a copy made for other choices than the page has now is not printed.
+  const paperChoices = () => JSON.stringify([state.seen, state.colorMode, lookNow().id, state.countAlong]);
+  function showPrintCover(msg, ask) {
+    $('printCover').hidden = !msg;
+    $('printMsg').textContent = msg || '';
+    $('printActs').hidden = !ask;
+    if (ask) $('printGo').focus();
+  }
+  function printMusic() {
+    if (printing) return true;
+    if (!api || !api.boundsLookup || !score || conductor.following) return false;
+    if (!cancelLoopGap() && playing) { if (conductor.hosting) conductPlayPause(); else api.pause(); }
+    setPop(null);
+    printing = { layout: state.layout, y: window.scrollY, x: $('sheet').scrollLeft, stage: 'paper' };
+    showPrintCover('Getting the music ready to print…');
+    state.layout = 'page';
+    const sheet = $('sheet');
+    sheet.classList.remove('line'); sheet.scrollLeft = 0; sheet.style.width = PRINT_W + 'px';
+    nameRoom = { part: 0, line: 0 }; lastScrollKey = null;
+    applySize(); api.render();
+    return true;
+  }
+  // The pieces of the drawing, one for each line of music on pages (not alphaTab's "rendered by" signature).
+  const drawnPieces = () => [...($('sheet').querySelector('.at-surface')?.children || [])]
+    .filter(c => c.style.display !== 'none' && c.querySelector('svg') && !/rendered by alphaTab/.test(c.textContent || ''));
+  // Each time the music is drawn while printing (renderFinished): first for paper, then for the screen again.
+  function printStep() {
+    if (!printing) return;
+    if (printing.stage === 'paper') {
+      // Every line of music in first: the last pieces can arrive a moment after the drawing is reported done.
+      printing.waits = (printing.waits || 0) + 1;
+      if (drawnPieces().length < api.boundsLookup.staffSystems.length && printing.waits < 30) { printTimer = setTimeout(printStep, 100); return; }
+      makePaperCopy();
+      printing.stage = 'screen';
+      $('printMsg').textContent = 'Printing…';
+      printOpened = false;
+      try { window.print(); } catch {} // most browsers wait here until the print window closes
+      printing.opened = printOpened;
+      state.layout = printing.layout;
+      const sheet = $('sheet');
+      sheet.style.width = ''; sheet.classList.toggle('line', state.layout === 'line');
+      nameRoom = { part: 0, line: 0 }; lastScrollKey = null;
+      applySize(); api.render();
+      return;
+    }
+    window.scrollTo(0, printing.y);
+    if (state.layout === 'line') $('sheet').scrollLeft = printing.x;
+    const opened = printing.opened || printOpened;
+    printing = null;
+    // A browser that let a moment pass before printing may not print without a fresh tap: offer one.
+    showPrintCover(opened ? null : 'The music is ready to print.', !opened);
+  }
+  $('printBtn').addEventListener('click', printMusic);
+  $('printGo').addEventListener('click', () => { showPrintCover(null); window.print(); });
+  $('printX').addEventListener('click', () => showPrintCover(null));
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'p' && printMusic()) e.preventDefault();
+    else if (e.key === 'Escape' && !printing && !$('printCover').hidden) showPrintCover(null);
+  });
+  window.addEventListener('beforeprint', () => {
+    printOpened = true;
+    if (!printing) showPrintCover(null);
+    // The browser's own Print menu: on pages, a copy for paper of the music as drawn on the screen (one long line can't
+    // be cut into sheets, so then the page prints as it is, without the buttons).
+    if (!printing && paperKey !== paperChoices() && state.layout === 'page' && api && api.boundsLookup) makePaperCopy();
+    document.documentElement.classList.toggle('print-ready', paperKey === paperChoices());
+  });
+  // Each line of music becomes one picture: the music as drawn, with its counts and their lines drawn in with it, so
+  // the whole line grows or shrinks together to fit the paper.
+  function makePaperCopy() {
+    const out = $('printOut');
+    out.replaceChildren(paperHead());
+    const pieces = drawnPieces().sort((a, b) => parseFloat(a.style.top) - parseFloat(b.style.top));
+    const counts = state.countAlong ? [...countLayer.children].filter(el => el.textContent || el.classList.contains('count-link')) : [];
+    for (const piece of pieces) {
+      const top = parseFloat(piece.style.top) || 0, w = parseFloat(piece.style.width) || piece.offsetWidth, h = parseFloat(piece.style.height) || piece.offsetHeight;
+      const svg = document.createElementNS(SVG_NS, 'svg');
+      svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+      svg.setAttribute('class', 'at-surface at'); // alphaTab's own styles draw its music font
+      const music = piece.querySelector('svg').cloneNode(true);
+      music.querySelectorAll('.at-highlight').forEach(el => el.classList.remove('at-highlight'));
+      svg.append(music);
+      for (const el of counts) {
+        const y = parseFloat(el.style.top), eh = parseFloat(el.style.height), x = parseFloat(el.style.left), ew = parseFloat(el.style.width);
+        if (!(y + eh / 2 >= top && y + eh / 2 < top + h)) continue; // the counts under this line's staves
+        const mark = document.createElementNS(SVG_NS, el.classList.contains('count-link') ? 'rect' : 'text');
+        if (mark.tagName === 'rect') {
+          for (const [k, v] of Object.entries({ x, y: y - top, width: ew, height: eh, rx: eh / 2, class: 'pr-link' })) mark.setAttribute(k, v);
+        } else {
+          // A count is a square box centred on its spot (left is its middle), its number in the middle of the box.
+          for (const [k, v] of Object.entries({ x, y: y - top + eh / 2, 'font-size': parseFloat(el.style.fontSize), 'text-anchor': 'middle', 'dominant-baseline': 'central', class: 'pr-count' })) mark.setAttribute(k, v);
+          mark.textContent = el.textContent;
+        }
+        svg.append(mark);
+      }
+      const line = document.createElement('div');
+      line.className = 'pr-line';
+      line.append(svg);
+      out.append(line);
+    }
+    paperKey = paperChoices();
+    document.documentElement.classList.add('print-ready');
+  }
+  // Over the music on paper: the parts, the String colors key (when the notes have colors), the title and where the
+  // tune comes from.
+  function paperHead() {
+    const head = document.createElement('header'), el = (tag, cls, text) => { const e = document.createElement(tag); e.className = cls; e.textContent = text; return e; };
+    head.className = 'pr-head';
+    head.append(el('p', 'pr-parts', shownIndexes().map(ti => INSTRUMENTS[instOf(ti)] + ' — ' + ROWS[rowOf(ti)].name).join(' · ')));
+    if (!$('legend').hidden) { const key = $('legend').cloneNode(true); key.removeAttribute('id'); head.append(key); }
+    head.append(el('h1', 'pr-title', document.querySelector('.info-title').textContent), el('p', 'pr-src', document.querySelector('.info-src').textContent));
+    return head;
+  }
+
   // ---- Boot ----
   function fail(msg) { $('err').textContent = msg; $('loading').hidden = true; }
 
@@ -3689,12 +3857,14 @@ body.following .host-only { display: none !important; }
     holdPictureForSound();
     window.reader = { api, score, conductor, xmap: () => xmap, line: () => lineState, at: () => playedTick(performance.now()), lag: reportLag };
     api.error.on(() => fail('Something went wrong drawing the music. Reload the page to try again.'));
-    api.renderStarted.on(() => { if (!fitPending) fitTries = 0; if (!namePending) nameTries = 0; head = null; lineHead.classList.remove('on'); });
+    api.renderStarted.on(() => { if (!fitPending) fitTries = 0; if (!namePending) nameTries = 0; head = null; lineHead.classList.remove('on'); clearTimeout(printTimer); });
     api.renderFinished.on(() => { namePending = false; if (fitNames()) return; // drawn again with room for the part names
       $('loading').hidden = true; ink = null; styleWords(); fitSurface(); placeFingers(); trackNotes(true); buildCounts(); placeTimeSigButtons(); drawLoop(); drawStartMark(); keepPlace(); xmap = null; if (!playing && state.layout === 'line') { setHalf(); centerOnTick(api.tickPosition || 0, false); }
       // A phone on its side: size the line to the screen, then bring it into view.
       fitPending = false;
-      if (!fitToHeight() && shortLand.matches && state.layout === 'line' && !playing) revealSheet(false, true); });
+      if (!fitToHeight() && shortLand.matches && state.layout === 'line' && !playing) revealSheet(false, true);
+      // Printing: once the last pieces of the drawing are in (they arrive a moment after the render is reported done).
+      if (printing && !fitPending) printTimer = setTimeout(printStep, 60); });
     api.soundFontLoaded.on(() => { if (soundReady) { $('play').disabled = false; setPlaying(playing); } });
     api.activeBeatsChanged.on((e) => { activeBeats = e.activeBeats || []; trackNotes(); });
     api.playerPositionChanged.on((e) => { pos = { tick: e.currentTick, at: performance.now(), bpm: e.modifiedTempo || BASE_TEMPO * api.playbackSpeed }; });

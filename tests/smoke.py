@@ -47,6 +47,11 @@ What it checks
      isn't for greyed out in place (a tap says why), no group rule, the About box saying who it is for, a part taken
      off the page staying off after a reload, and (Twinkle Harmony) a choice saved when it was for viola and cello
      only moving to the same part.
+     Print (the first song, laptop and phone sizes): the button sits at the top beside the size buttons and the strip
+     keeps one row; it makes a copy for paper, a line of music at a time with its counts, under the parts, title and
+     Strings key, and only that prints, each line whole; the music on the screen comes back just as it was (line or
+     pages, size, place); Ctrl+P does the same; the browser's own Print menu prints the music as it is now on pages and
+     not a stale copy in one long line; and where the print window doesn't open by itself, a card offers a Print button.
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
      the teacher conducts, a student follows, and the student's music keeps up with the teacher's.
   4. The app layer: the browser can install the site, every file is saved after one visit, every song
@@ -709,6 +714,111 @@ async def one_line_checks(browser, base):
         await ctx.close()
 
 
+# Stands in for the browser's print window: counts the calls and fires the events a real one fires (or, with quiet,
+# none, like a browser that won't print without a fresh tap).
+PRINT_STUB_JS = '''(quiet) => { window.__prints = 0;
+  window.print = () => { __prints++; if (!quiet) { dispatchEvent(new Event('beforeprint')); dispatchEvent(new Event('afterprint')); } }; }'''
+PRINTED_JS = "(n) => __prints > n && document.getElementById('printCover').hidden"
+# The copy made for paper, and whether it is what prints.
+PAPER_JS = '''() => { const out = document.getElementById('printOut'), t = (s) => (out.querySelector(s) || {}).textContent;
+  return { lines: out.querySelectorAll('.pr-line > svg').length, music: out.querySelectorAll('.pr-line > svg > svg').length,
+           counts: out.querySelectorAll('.pr-count').length, parts: t('.pr-parts'), title: t('.pr-title'), key: !!out.querySelector('.key'),
+           ready: document.documentElement.classList.contains('print-ready') }; }'''
+# The screen as it is: how the music is laid out and drawn, and where it is scrolled to.
+SCREEN_JS = '''() => { const s = document.getElementById('sheet');
+  return { line: s.classList.contains('line'), size: reader.api.settings.display.scale, x: Math.round(s.scrollLeft), y: Math.round(window.scrollY) }; }'''
+# In print, only the copy for paper shows, a line of music never splits across two sheets, and it fits the paper.
+PRINT_VIEW_JS = '''() => { const out = document.getElementById('printOut'), lines = [...out.querySelectorAll('.pr-line')];
+  return { page: getComputedStyle(document.querySelector('.page')).display, out: getComputedStyle(out).display,
+           whole: lines.every(l => getComputedStyle(l).breakInside === 'avoid' && l.offsetHeight > 20),
+           fits: lines.every(l => l.getBoundingClientRect().right <= document.documentElement.clientWidth + 1) }; }'''
+
+
+async def print_checks(browser, base):
+    """Print: the music on the page drawn for paper, a line of music at a time, then the screen just as it was."""
+    song = SONGS[0]
+    slug = song['slug']
+    print(f'Print: {slug}')
+    for label, w, h in [('laptop', 1366, 860), ('phone landscape', 844, 390), ('small phone landscape', 667, 375)]:
+        ctx = await browser.new_context(device_scale_factor=1, service_workers='block')
+        await setup(ctx)
+        if label != 'laptop':  # like an iPhone: no Full screen button
+            await ctx.add_init_script("for (const k of ['fullscreenEnabled', 'webkitFullscreenEnabled']) Object.defineProperty(Document.prototype, k, { get: () => false });")
+        errors = []
+        pg = await open_reader(ctx, f'{base}/songs/{slug}/', errors, 'print', w, h)
+        # Beside the size buttons at the top, so the strip at the bottom keeps its one row on a phone.
+        where = await pg.evaluate("() => { const b = document.getElementById('printBtn'); return !!b.offsetParent && !!b.closest('#topTools'); }")
+        rows = await pg.evaluate("() => new Set([...document.querySelectorAll('#fabRow .fab-btn, #fabRow .play')].filter(e => e.offsetParent).map(e => Math.round(e.getBoundingClientRect().top))).size")
+        check(where and rows == 1, f'{label}: the Print button sits at the top beside the size buttons, and the strip stays one row ({rows} rows)')
+        await pg.evaluate(PRINT_STUB_JS, False)
+        # A small phone's line settles on its size at the next drawing after the first (as it always has): draw it again
+        # first (string colors round to where they were), so the size compared is the settled one.
+        await pg.evaluate(DRAWS_JS)
+        for _ in range(3):
+            await click_drawn(pg, '#g-colors')
+        await pg.evaluate("() => { const s = document.getElementById('sheet'); s.scrollLeft = s.scrollWidth / 3; }")
+        await pg.wait_for_timeout(300)
+        before = await pg.evaluate(SCREEN_JS)
+        await pg.click('#printBtn')
+        try:
+            await pg.wait_for_function(PRINTED_JS, arg=0, timeout=30000)
+            printed = True
+        except Exception:
+            printed = False
+        await pg.wait_for_timeout(300)
+        paper = await pg.evaluate(PAPER_JS)
+        check(printed and paper['ready'] and paper['lines'] > 1 and paper['music'] == paper['lines'] and paper['counts'] > 0
+              and paper['parts'] == 'Violin — Melody' and paper['title'] == song['title'] and paper['key'],
+              f'{label}: Print makes a copy for paper, a line of music at a time with its counts, under the parts, the title and the Strings key, and prints it ({paper})')
+        after = await pg.evaluate(SCREEN_JS)
+        check(after == before, f'{label}: then the music on the screen is just as it was (one long line, same size, same place: {before}, then {after})')
+        await pg.emulate_media(media='print')
+        view = await pg.evaluate(PRINT_VIEW_JS)
+        await pg.emulate_media(media='screen')
+        check(view['page'] == 'none' and view['out'] == 'block' and view['whole'] and view['fits'],
+              f'{label}: on paper only the music prints, each line of music whole and inside the paper ({view})')
+        if label != 'laptop':
+            check(not errors, f'{label}: no script errors' + (f': {errors[:3]}' if errors else ''))
+            await ctx.close()
+            continue
+        await pg.keyboard.press('Control+p')
+        try:
+            await pg.wait_for_function(PRINTED_JS, arg=1, timeout=30000)
+            keyed = True
+        except Exception:
+            keyed = False
+        check(keyed, 'Ctrl+P prints the same way')
+        # Pages, scrolled down: printing leaves the page where it was.
+        await pg.click('#g-layout'); await pg.wait_for_timeout(1500)
+        await pg.evaluate('() => window.scrollTo(0, 1500)'); await pg.wait_for_timeout(300)
+        before = await pg.evaluate(SCREEN_JS)
+        await pg.click('#printBtn')
+        await pg.wait_for_function(PRINTED_JS, arg=2, timeout=30000)
+        await pg.wait_for_timeout(300)
+        after = await pg.evaluate(SCREEN_JS)
+        check(after == before, f'on pages, printing leaves the music as it was, scrolled to the same place ({before}, then {after})')
+        # The browser's own Print menu after a change (Counting off): on pages, a fresh copy of the music as it is.
+        await pg.click('#g-count'); await pg.wait_for_timeout(1500)
+        await pg.evaluate("() => dispatchEvent(new Event('beforeprint'))")
+        menu = await pg.evaluate(PAPER_JS)
+        check(menu['ready'] and menu['lines'] > 1 and menu['counts'] == 0, f"the browser's own Print menu on pages prints the music as it is now (no counts: {menu['counts']})")
+        # In one long line it can't make one: the page prints as it is, not the copy made for other choices.
+        await pg.click('#g-layout'); await pg.wait_for_timeout(1500)
+        await pg.click('#g-count'); await pg.wait_for_timeout(1500)
+        await pg.evaluate("() => dispatchEvent(new Event('beforeprint'))")
+        check(not (await pg.evaluate(PAPER_JS))['ready'], "in one long line the browser's own Print menu doesn't print a copy made for other choices")
+        # A browser that doesn't open its print window after the music is drawn for paper: a card offers a fresh tap.
+        await pg.evaluate(PRINT_STUB_JS, True)
+        await pg.click('#printBtn')
+        await pg.wait_for_function("() => !document.getElementById('printActs').hidden", timeout=30000)
+        said = await pg.text_content('#printMsg')
+        await pg.click('#printGo')
+        check(said == 'The music is ready to print.' and await pg.evaluate('() => __prints') == 2 and await pg.evaluate("() => document.getElementById('printCover').hidden"),
+              f'where the print window doesn\'t open by itself, a card says the music is ready and its Print button prints ("{said}")')
+        check(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
+        await ctx.close()
+
+
 async def home_checks(browser, base):
     print('Home page')
     ctx = await browser.new_context()
@@ -1093,6 +1203,7 @@ async def main():
         await voices40_checks(browser, base)
         await voices_checks(browser, base)
         await one_line_checks(browser, base)
+        await print_checks(browser, base)
         await extras_checks(browser, base)
         await preview_checks(browser, base)
         await app_checks(browser)
