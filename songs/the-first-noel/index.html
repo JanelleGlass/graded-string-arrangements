@@ -3691,7 +3691,7 @@ body.following .host-only { display: none !important; }
   }
   function printMusic() {
     if (printing) return true;
-    if (!api || !api.boundsLookup || !score || conductor.following) return false;
+    if (!api || !api.boundsLookup || !score || conductor.following || $('printBtn').hidden) return false; // hidden in the Claude preview, which can't print
     if (!cancelLoopGap() && playing) { if (conductor.hosting) conductPlayPause(); else api.pause(); }
     setPop(null);
     printing = { layout: state.layout, y: window.scrollY, x: $('sheet').scrollLeft, stage: 'paper' };
