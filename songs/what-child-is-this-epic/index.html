@@ -857,10 +857,11 @@ body.following .host-only { display: none !important; }
     });
   } catch {}
   // Letter names: the setting for this kind of screen. Only one thing fits inside a note head, so with letter names
-  // on, the finger numbers go to the right of the notes; with them off, wherever the finger button says.
+  // on, the finger numbers go to the right of the notes; with them off, wherever the finger button says. On paper they
+  // always go to the right (Janelle, 2026-10-30): inside a printed note head they come out too small to read.
   const letterKey = () => (document.documentElement.classList.contains('small') ? 'letterMode' : 'letterModeBig');
   const lettersOn = () => state[letterKey()] !== 'off';
-  const fingerSpot = () => (lettersOn() ? 'right' : state.fingers);
+  const fingerSpot = () => (lettersOn() || onPaper() ? 'right' : state.fingers);
   // Extra rows come after the 40 graded parts, so the graded parts keep their numbers. Saving the layout as 'voices40'
   // (and the full id in partsFull) lets a reader from before the extra rows, such as an offline copy not yet updated,
   // keep the graded parts and drop only the extras. An id it doesn't know would read as the six levels and swap parts.

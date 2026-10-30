@@ -49,7 +49,7 @@ What it checks
      only moving to the same part.
      Print (the first song, laptop and phone sizes): the button sits at the top beside the size buttons and the strip
      keeps one row; it makes a copy for paper, a line of music at a time with its counts, under the parts, title and
-     Strings key, and only that prints, each line whole; the music on the screen comes back just as it was (line or
+     Strings key, finger numbers to the right of the notes, and only that prints, each line whole; the music on the screen comes back just as it was (line or
      pages, size, place); Ctrl+P does the same; the browser's own Print menu prints the music as it is now on pages and
      not a stale copy in one long line; and where the print window doesn't open by itself, a card offers a Print button.
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
@@ -719,11 +719,14 @@ async def one_line_checks(browser, base):
 PRINT_STUB_JS = '''(quiet) => { window.__prints = 0;
   window.print = () => { __prints++; if (!quiet) { dispatchEvent(new Event('beforeprint')); dispatchEvent(new Event('afterprint')); } }; }'''
 PRINTED_JS = "(n) => __prints > n && document.getElementById('printCover').hidden"
-# The copy made for paper, and whether it is what prints.
-PAPER_JS = '''() => { const out = document.getElementById('printOut'), t = (s) => (out.querySelector(s) || {}).textContent;
+# The copy made for paper, and whether it is what prints. Finger numbers: how many sit inside the note heads (centred
+# on them) and how many to the right (starting just after them).
+FINGERS_JS = '''(root) => { const f = [...root.querySelectorAll('text.fin')].filter(t => /^[0-4]/.test(t.textContent));
+  return { inside: f.filter(t => t.getAttribute('text-anchor') === 'middle').length, right: f.filter(t => t.getAttribute('text-anchor') === 'start').length }; }'''
+PAPER_JS = '''() => { const FINGERS = ''' + FINGERS_JS + '''; const out = document.getElementById('printOut'), t = (s) => (out.querySelector(s) || {}).textContent;
   return { lines: out.querySelectorAll('.pr-line > svg').length, music: out.querySelectorAll('.pr-line > svg > svg').length,
            counts: out.querySelectorAll('.pr-count').length, parts: t('.pr-parts'), title: t('.pr-title'), key: !!out.querySelector('.key'),
-           ready: document.documentElement.classList.contains('print-ready') }; }'''
+           ready: document.documentElement.classList.contains('print-ready'), fingers: FINGERS(out) }; }'''
 # The screen as it is: how the music is laid out and drawn, and where it is scrolled to.
 SCREEN_JS = '''() => { const s = document.getElementById('sheet');
   return { line: s.classList.contains('line'), size: reader.api.settings.display.scale, x: Math.round(s.scrollLeft), y: Math.round(window.scrollY) }; }'''
@@ -772,6 +775,11 @@ async def print_checks(browser, base):
               f'{label}: Print makes a copy for paper, a line of music at a time with its counts, under the parts, the title and the Strings key, and prints it ({paper})')
         after = await pg.evaluate(SCREEN_JS)
         check(after == before, f'{label}: then the music on the screen is just as it was (one long line, same size, same place: {before}, then {after})')
+        if label == 'laptop':
+            # A laptop starts on Fingers inside; on paper the finger numbers go to the right (Janelle, 2026-10-30).
+            screen = await pg.evaluate('() => (' + FINGERS_JS + ")(document.getElementById('sheet'))")
+            check(paper['fingers']['right'] > 0 and not paper['fingers']['inside'] and screen['inside'] > 0,
+                  f"on paper every finger number sits to the right of its note, while the screen keeps them inside (paper {paper['fingers']}, screen {screen})")
         await pg.emulate_media(media='print')
         view = await pg.evaluate(PRINT_VIEW_JS)
         await pg.emulate_media(media='screen')
