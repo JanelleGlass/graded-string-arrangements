@@ -92,7 +92,8 @@ Only after Janelle has checked the finished arrangement in the Music Arrangement
    font and sound files are already published there and are kept. The preview plays the
    four-level First Noel, so publish a copy of the reader with its two "six levels" lines (the
    meta description and the About box) worded as the build words them for a song in levels and voices; the
-   master reader keeps "six levels" because the build swaps those lines song by song.
+   master reader keeps "six levels" because the build swaps those lines song by song. In that copy the Print
+   button is `hidden` too: Claude's preview window can't open a print dialog.
 4. Push when Janelle says go.
 
 If a reader change touches one of the song-specific strings the build swaps out (title, About box
@@ -297,6 +298,18 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   to the home screen and opens without the address bar. The home page has a one-line tip saying how
   (it also says every piece then plays without the internet), with an "Install the app" button under
   it only where the browser can install in one tap.
+- Print (Janelle asked, 2026-10-29): a round printer button at the top right of the music, just left of − / + (not
+  in the strip: on an iPhone SE turned sideways the strip had no room left for it). Ctrl+P does the same. It prints
+  the music as it is on the page: the parts on the page, their string colors, what's on the notes (except that finger
+  numbers always go to the right of the notes on paper, where inside a note head they are too small to read: Janelle,
+  2026-10-30), the counts (or none), under a heading with the parts ("Violin — Melody"), the Strings key, the title and the source line. The music
+  is drawn once more for paper (pages, a sheet wide, a 14 mm staff for one part and a little smaller with each part
+  more, up to four, bars a little closer than on screen: four to a line in The First Noel), copied a line of music at a time into a copy kept for paper so a new sheet never cuts
+  through a line, then drawn again for the screen, which ends up just as it was. A card covers the screen meanwhile.
+  Where the print window doesn't open by itself, the card says "The music is ready to print." with a Print button.
+  The browser's own Print menu on pages prints the music as drawn on the screen; in one long line it prints the page
+  minus the buttons. Followers of the conductor don't see the button. Printing is free for now (Janelle, 2026-10-30,
+  with the Payhip PDFs still to come).
 - Pinch to zoom on touch screens: two fingers on the music make it bigger or smaller. The music grows
   and shrinks under the fingers, then settles on the nearest − / + size. A second finger cancels a tap
   or a press-and-hold; the browser's own page zoom is kept off the music.
