@@ -2639,6 +2639,7 @@ body.following .host-only { display: none !important; }
           if (halo) { t.setAttribute('stroke', '#FFFFFF'); t.setAttribute('stroke-width', (size * 0.22).toFixed(1)); t.setAttribute('paint-order', 'stroke'); t.setAttribute('stroke-linejoin', 'round'); }
           t.textContent = txt;
           put(t);
+          return t;
         };
         if (note.letter) {
           const hollow = h.glyph === '' || h.glyph === '';
@@ -2703,7 +2704,8 @@ body.following .host-only { display: none !important; }
             if (!flags.has(svg)) flags.set(svg, glyphsIn(svg, 0xE240, 0xE24F));
             const fl = flags.get(svg).filter(f => f.x >= h.x + h.w * 0.5 && f.x <= h.x + h.w * 1.6 && f.y < h.y && h.y - f.y < headH * 5);
             if (fl.length) right = Math.max(right, ...fl.map(f => f.x + f.w));
-            add(note.finger, right + gap, y, fs.toFixed(1), '#121614', 'start', true);
+            const t = add(note.finger, right + gap, y, fs.toFixed(1), '#121614', 'start', true);
+            if (onPaper()) t.dataset.beat = beat.id; // on paper the bar makes room for it (fingerCrowding)
           } else {
             const svg = group.ownerSVGElement;
             if (!accidentals.has(svg)) accidentals.set(svg, glyphsIn(svg, 0xE260, 0xE264));
@@ -3096,7 +3098,7 @@ body.following .host-only { display: none !important; }
   const shortLand = window.matchMedia('(max-height: 500px) and (orientation: landscape)');
   let fitScale = null, fitTries = 0, fitPending = false;
   function musicScale() {
-    if (onPaper()) return printScale();
+    if (onPaper()) return printing.size;
     const s = fitScale && state.layout === 'line' && shortLand.matches ? fitScale : baseScale();
     return s * state.zoom;
   }
@@ -3176,7 +3178,12 @@ body.following .host-only { display: none !important; }
     if (!api) return;
     const d = api.settings.display, narrow = window.innerWidth < 560, mid = window.innerWidth < 900;
     d.scale = musicScale();
-    d.layoutMode = state.layout === 'line' ? alphaTab.LayoutMode.Horizontal : alphaTab.LayoutMode.Page;
+    // On paper the music is first drawn in one long line, to measure each bar (measureBars), then on pages with the
+    // lines of music the print plans (planLines); the screen leaves the lines to alphaTab (0: automatic).
+    const planned = onPaper() && printing.pass === 'page' && !!printing.plan;
+    d.layoutMode = state.layout === 'line' || (onPaper() && printing.pass === 'natural') ? alphaTab.LayoutMode.Horizontal : alphaTab.LayoutMode.Page;
+    d.systemsLayoutMode = planned ? MODEL_LAYOUT : 0;
+    d.justifyLastSystem = planned;
     d.padding = document.documentElement.classList.contains('small') && !onPaper() ? [10, 2] : [10, 10];
     d.stretchForce = (BIG() && fingerSpot() !== 'inside' ? 1.35 : 1) * (onPaper() ? 0.5 : 1);
     setSpacing(d);
@@ -3658,10 +3665,21 @@ body.following .host-only { display: none !important; }
   // colors, what's on the notes and the counts. The music is drawn once more for paper (on pages, a sheet of paper
   // wide, at a size that reads on a music stand) and copied a line of music at a time into a copy kept for paper, so
   // the printer starts a new sheet between lines of music, never through one. Then it is drawn again for the screen.
+  // Each bar gets the room its finger numbers need (they sit to the right of the notes, and a note close behind would
+  // cover them: Janelle, 2026-11-02), the print chooses where the lines of music end, so each line is about as full as
+  // the next, and a last sheet with only a line or two on it is saved by printing the music a little smaller.
   const PRINT_W = 700;      // the music's width on paper in CSS pixels: A4 or Letter inside 12 mm margins
   // A staff 14 mm high for one part (a student's); with more parts on the page (a duet, or a score for the teacher) a
   // little smaller with each, so more than one line of music fits on a sheet.
   const printScale = () => [1.5, 1.3, 1.2, 1.1][Math.min(4, shownIndexes().length) - 1];
+  // A Letter sheet inside the 12 mm margins, in CSS pixels. A4 is a little narrower and taller, so what fits on Letter
+  // fits on A4.
+  const SHEET = { w: 725.3, h: 965.3 };
+  // A last sheet less than half full is saved by printing the music smaller, down to 80% of its size (Janelle,
+  // 2026-11-02: a second sheet only for a fair amount of music). Planned to fit 96% of a sheet, so a printer's own
+  // margins don't push a line over after all.
+  const LEFTOVER = 0.5, SMALLEST = 0.8, SNUG = 0.96;
+  const MODEL_LAYOUT = typeof alphaTab !== 'undefined' && alphaTab.SystemsLayoutMode ? alphaTab.SystemsLayoutMode.UseModelLayout : 1;
   let printTimer = 0, paperKey = null, printOpened = false;
   // What the copy for paper shows; a copy made for other choices than the page has now is not printed.
   const paperChoices = () => JSON.stringify([state.seen, state.colorMode, lookNow().id, state.countAlong]);
@@ -3676,7 +3694,9 @@ body.following .host-only { display: none !important; }
     if (!api || !api.boundsLookup || !score || conductor.following || $('printBtn').hidden) return false; // hidden in the Claude preview, which can't print
     if (!cancelLoopGap() && playing) { if (conductor.hosting) conductPlayPause(); else api.pause(); }
     setPop(null);
-    printing = { layout: state.layout, y: window.scrollY, x: $('sheet').scrollLeft, stage: 'paper' };
+    // First in one long line, to measure each bar ('natural'), then on pages ('page'), as often as the plan changes.
+    printing = { layout: state.layout, y: window.scrollY, x: $('sheet').scrollLeft, stage: 'paper', pass: 'natural',
+      base: printScale(), size: printScale(), bars: null, plan: null, slack: -2, fixes: 0, draws: 0 };
     showPrintCover('Getting the music ready to print…');
     state.layout = 'page';
     const sheet = $('sheet');
@@ -3694,8 +3714,11 @@ body.following .host-only { display: none !important; }
     if (printing.stage === 'paper') {
       // Every line of music in first: the last pieces can arrive a moment after the drawing is reported done.
       printing.waits = (printing.waits || 0) + 1;
-      if (drawnPieces().length < api.boundsLookup.staffSystems.length && printing.waits < 30) { printTimer = setTimeout(printStep, 100); return; }
+      if (printing.pass === 'page' && drawnPieces().length < api.boundsLookup.staffSystems.length && printing.waits < 30) { printTimer = setTimeout(printStep, 100); return; }
+      printing.waits = 0;
+      if (nextPaperDrawing()) return;
       makePaperCopy();
+      usePlan(null);
       printing.stage = 'screen';
       $('printMsg').textContent = 'Printing…';
       printOpened = false;
@@ -3714,6 +3737,227 @@ body.following .host-only { display: none !important; }
     printing = null;
     // A browser that let a moment pass before printing may not print without a fresh tap: offer one.
     showPrintCover(opened ? null : 'The music is ready to print.', !opened);
+  }
+  function drawPaper() {
+    printing.draws++;
+    usePlan(printing.plan);
+    applySize(); api.render();
+  }
+  // After each drawing for paper: draw it again (true) or print it (false). The long line gives each bar's width and
+  // the room its finger numbers need; the pages are then checked: no bar squeezed, every finger number clear of the
+  // next note, and no last sheet with only a little music on it.
+  function nextPaperDrawing() {
+    const p = printing;
+    if (p.pass === 'natural') {
+      p.bars = measureBars();
+      p.pass = 'page';
+      if (p.bars) p.plan = planLines(p.size);
+      drawPaper();
+      return true;
+    }
+    if (!p.plan || p.draws > 14) return false; // as alphaTab lays it out (or enough tries): print it
+    if (p.fixes < 3) {
+      // The plan's widths are measured from the long line: put right what the pages show.
+      const spans = barSpans(), b = p.bars, S = api.settings.display.scale, lines = [], ends = lineEnds(p.plan);
+      spans.forEach((s, i) => { if (!s) return; const l = lines[s.line] || (lines[s.line] = { need: 0, got: 0, over: 0, bars: 0 }); l.need += barWeight(i, ends.has(i)); l.got += s.width; l.over += b.over[i]; l.bars++; });
+      const staff = api.boundsLookup.staffSystems.map(sys => { const m = sys.bars, last = m[m.length - 1].realBounds; return (last.x + last.w - m[0].realBounds.x) / S; });
+      // What the clef and key at the start of a line take, as drawn (the lines after the first).
+      const starts = lines.map((l, k) => (k && l ? staff[k] - l.got - l.over : NaN)).filter(Number.isFinite);
+      if (starts.length) b.start = Math.max(...starts);
+      // A finger number still too close to the next note: that bar gets more room.
+      const crowded = fingerCrowding();
+      for (const [i, k] of crowded) if (spans[i]) b.need[i] = Math.max(b.need[i] * 1.05, spans[i].width * k * 1.02 / b.content[i]);
+      let plan = planLines(p.size);
+      // Still a line whose bars got less than they need (one bar alone can't be helped): plan narrower lines.
+      const short = Math.max(0, ...lines.map(l => (l && l.bars > 1 ? l.need - l.got : 0)));
+      if (short > 0.5 && plan.join() === p.plan.join()) { p.slack -= short + 0.5; plan = planLines(p.size); }
+      if (crowded.size || plan.join() !== p.plan.join()) { p.fixes++; p.plan = plan; drawPaper(); return true; }
+    }
+    // How many sheets of paper the music takes now, and how full the last one is.
+    if (p.head == null) p.head = paperHeadHeight();
+    const heights = drawnPieces().sort((a, c) => parseFloat(a.style.top) - parseFloat(c.style.top))
+      .map(el => parseFloat(el.style.height) * SHEET.w / (parseFloat(el.style.width) || PRINT_W));
+    if (p.final) return false;
+    if (p.sheets == null) {
+      // At the full size: as many sheets as it takes.
+      const now = sheetsFor(heights, p.head, SHEET.h);
+      Object.assign(p, { sheets: now.count, last: now.last, good: p.size });
+    } else {
+      // Smaller: kept if it saves a sheet with room to spare (how full its last sheet is, as it would print).
+      const snug = sheetsFor(heights, p.head, SHEET.h * SNUG), now = sheetsFor(heights, p.head, SHEET.h);
+      if (snug.count < p.sheets) Object.assign(p, { sheets: snug.count, last: now.count === snug.count ? now.last : 1, good: p.size });
+    }
+    // A last sheet with only a little music on it: smaller still, the largest size that looks like it saves it (each
+    // line's height goes with the size).
+    if (p.sheets > 1 && p.last < LEFTOVER && p.draws < 12) {
+      const perSize = heights.reduce((s, h) => s + h, 0) / heights.length / p.size;
+      for (let k = 1; k <= 8; k++) {
+        const z = Math.round(p.base * (1 - 0.025 * k) * 1000) / 1000;
+        if (z > p.size - 0.001 || z < p.base * SMALLEST - 0.001) continue;
+        const plan = planLines(z);
+        if (sheetsFor(new Array(plan.length).fill(perSize * z), p.head, SHEET.h * SNUG).count < p.sheets) {
+          p.size = z; p.plan = plan; p.fixes = 0;
+          drawPaper();
+          return true;
+        }
+      }
+    }
+    if (p.size === p.good) return false; // print it
+    // A size that didn't save a sheet: back to the last one that did (or the full size), and print that.
+    p.size = p.good; p.plan = planLines(p.good); p.fixes = 0; p.final = true;
+    drawPaper();
+    return true;
+  }
+  // Lines of music (their heights on paper) put on sheets as the browser does: a line that doesn't fit starts a new one.
+  function sheetsFor(heights, head, room) {
+    let count = 1, used = head;
+    for (const h of heights) { if (used + h > room) { count++; used = h; } else used += h; }
+    return { count, last: used / SHEET.h };
+  }
+  function paperHeadHeight() {
+    const out = $('printOut'), head = paperHead();
+    out.replaceChildren(head); paperKey = null;
+    out.style.cssText = `display: block; position: absolute; left: -10000px; top: 0; width: ${SHEET.w}px; visibility: hidden`;
+    const h = head.getBoundingClientRect().height + (parseFloat(getComputedStyle(head).marginBottom) || 0);
+    out.style.cssText = '';
+    return h;
+  }
+  // Where a bar's notes start and end as drawn, in pixels (the part of the bar that stretches).
+  function beatSpan(mb) {
+    const beats = mb.bars.flatMap(b => b.beats);
+    if (!beats.length) return null;
+    const x0 = Math.min(...beats.map(b => b.realBounds.x)), x1 = Math.max(...beats.map(b => b.realBounds.x + b.realBounds.w));
+    return { x0, x1 };
+  }
+  function barSpans() {
+    const S = api.settings.display.scale, out = [];
+    api.boundsLookup.staffSystems.forEach((sys, line) => { for (const mb of sys.bars) { const s = beatSpan(mb); if (s) out[mb.index] = { width: (s.x1 - s.x0) / S, line }; } });
+    return out;
+  }
+  // From the music drawn in one long line, in alphaTab's units (the same at every size): each bar's notes and its
+  // fixed part (bar lines, and for the first bar the clef, key and time), what a line's start adds (clef and key), the
+  // part names' room at the left, the room each bar's finger numbers need, and how wide a bar must be to end a line
+  // with its words (a tempo, "cresc.") inside it.
+  function measureBars() {
+    const L = api.boundsLookup, S = api.settings.display.scale, n = score.masterBars.length;
+    const sys = L && L.staffSystems[0];
+    if (!sys) return null;
+    const content = new Array(n).fill(0), over = new Array(n).fill(0), words = new Array(n).fill(0);
+    for (const mb of sys.bars) {
+      const s = beatSpan(mb);
+      if (!s || mb.index >= n) continue;
+      content[mb.index] = (s.x1 - s.x0) / S;
+      over[mb.index] = Math.max(0, mb.realBounds.w - (s.x1 - s.x0)) / S;
+    }
+    const first = sys.bars.find(mb => mb.index === 0), firstNotes = first && beatSpan(first);
+    if (!firstNotes || content.some(c => !(c > 0))) return null;
+    const surf = $('sheet').querySelector('.at-surface'), sr = surf.getBoundingClientRect();
+    // The time signature's figures before the first note: a line after the first starts without them.
+    let timeW = 0;
+    const figures = [];
+    for (const g of surf.querySelectorAll('svg g.at')) {
+      const t = g.querySelector(':scope > text'), c = t ? t.textContent.codePointAt(0) : 0;
+      if (!(c >= 0xE080 && c <= 0xE09F)) continue;
+      const r = t.getBoundingClientRect(), x = r.left - sr.left;
+      if (x >= first.realBounds.x && x < firstNotes.x0) figures.push([x, r.right - sr.left]);
+    }
+    if (figures.length) timeW = (Math.max(...figures.map(f => f[1])) - Math.min(...figures.map(f => f[0]))) / S;
+    // Words over or under a bar, measured from the bar's start.
+    for (const t of surf.querySelectorAll('svg text')) {
+      if (t.classList.contains('fin') || t.closest('g.at') || t.closest('g[transform*="rotate"]')) continue;
+      const r = t.getBoundingClientRect();
+      if (!r.width) continue;
+      const x0 = r.left - sr.left, x1 = r.right - sr.left;
+      const mb = sys.bars.find(m => x0 >= m.realBounds.x - 1 && x0 < m.realBounds.x + m.realBounds.w);
+      if (mb && mb.index < n) words[mb.index] = Math.max(words[mb.index], (x1 - mb.realBounds.x) / S + 2);
+    }
+    const usual = [...over.slice(1)].sort((a, c) => a - c)[Math.floor((n - 1) / 2)] || 0;
+    const need = new Array(n).fill(1);
+    for (const [i, k] of fingerCrowding()) need[i] = Math.min(2.5, k * 1.02);
+    return { content, over, need, words, names: (first.realBounds.x - sys.realBounds.x) / S, start: Math.max(0, over[0] - usual - timeW), width: $('sheet').clientWidth };
+  }
+  // How wide a bar's notes are planned, in alphaTab's units: the room its finger numbers need, and at the end of a line
+  // room for its words too.
+  function barWeight(i, ends) {
+    const b = printing.bars, w = b.content[i] * b.need[i];
+    return ends ? Math.max(w, b.words[i] - b.over[i]) : w;
+  }
+  const lineEnds = (counts) => { const ends = new Set(); let k = -1; for (const c of counts) ends.add(k += c); return ends; };
+  // Where the lines of music end, at this size: as few lines as fit, each about as full as the next (the last one too),
+  // every bar with the room it needs. Returns the number of bars on each line.
+  function planLines(size) {
+    const b = printing.bars, n = b.content.length;
+    const room = (b.width - 20) / size - b.names + printing.slack; // the staff's width (alphaTab keeps 10 pixels each side)
+    const best = [{ lines: 0, cost: 0, from: -1 }];
+    for (let j = 1; j <= n; j++) {
+      let pick = null, used = 0;
+      for (let i = j - 1; i >= 0; i--) {
+        used += (i === j - 1 ? barWeight(i, true) : barWeight(i, false)) + b.over[i];
+        const total = used + (i ? b.start : 0);
+        if (total > room && i < j - 1) break;
+        const spare = Math.max(0, room - total) / room, prev = best[i];
+        const line = { lines: prev.lines + 1, cost: prev.cost + spare * spare, from: i };
+        if (!pick || line.lines < pick.lines || (line.lines === pick.lines && line.cost < pick.cost)) pick = line;
+      }
+      best[j] = pick;
+    }
+    const counts = [];
+    for (let j = n; j > 0; j = best[j].from) counts.unshift(j - best[j].from);
+    return counts;
+  }
+  // Hands the plan to alphaTab: how many bars on each line and how wide each bar is next to the others on its line.
+  // null puts back what the score had, so the screen lays out the music as always.
+  let modelLayout = null;
+  function usePlan(counts) {
+    if (!score) return;
+    if (!modelLayout) modelLayout = { systems: score.systemsLayout, def: score.defaultSystemsLayout, tracks: score.tracks.map(t => [t.systemsLayout, t.defaultSystemsLayout]) };
+    const plan = counts && printing && printing.bars ? counts : null, ends = plan ? lineEnds(plan) : null;
+    score.systemsLayout = plan ? plan.slice() : modelLayout.systems;
+    score.defaultSystemsLayout = plan ? plan[plan.length - 1] : modelLayout.def;
+    score.tracks.forEach((t, k) => { t.systemsLayout = plan ? plan.slice() : modelLayout.tracks[k][0]; t.defaultSystemsLayout = plan ? plan[plan.length - 1] : modelLayout.tracks[k][1]; });
+    score.masterBars.forEach((mb, i) => {
+      const w = plan ? barWeight(i, ends.has(i)) : 1;
+      mb.displayScale = w;
+      for (const t of score.tracks) for (const st of t.staves) if (st.bars[i]) st.bars[i].displayScale = w;
+    });
+  }
+  // How much more room each bar's finger numbers need (bar index -> how many times wider its notes must spread) for
+  // every number to the right of a note to clear the next note head, stem, sharp or flat, rest or bar line.
+  function fingerCrowding() {
+    const need = new Map(), L = api.boundsLookup;
+    if (!L || !score) return need;
+    const beats = new Map();
+    for (const ti of shownIndexes()) for (const bar of score.tracks[ti].staves[0].bars) for (const v of bar.voices) for (const b of v.beats) beats.set(String(b.id), b);
+    for (const svg of $('sheet').querySelectorAll('.at-surface svg')) {
+      const fins = svg.querySelectorAll('text.fin[data-beat]');
+      if (!fins.length) continue;
+      const ink = [];
+      for (const g of svg.querySelectorAll('g.at')) {
+        const t = g.querySelector(':scope > text'), c = t ? t.textContent.codePointAt(0) : 0;
+        // How far above and below its middle each kind reaches, for its width: note heads, sharps and flats, rests.
+        const half = c >= 0xE0A0 && c <= 0xE0FF ? 0.42 : c >= 0xE260 && c <= 0xE26F ? 1.4 : c >= 0xE4E0 && c <= 0xE4FF ? 1 : 0;
+        const m = half && /translate\(([-\d.]+)[ ,]+([-\d.]+)\)/.exec(g.getAttribute('transform') || '');
+        if (!m) continue;
+        const x = +m[1], y = +m[2], w = t.getBBox().width;
+        ink.push({ x, r: x + w, t: y - w * half, b: y + w * half });
+      }
+      for (const r of svg.querySelectorAll('rect')) { // stems and bar lines
+        const x = +r.getAttribute('x'), y = +r.getAttribute('y'), w = +r.getAttribute('width'), h = +r.getAttribute('height');
+        if (w < h / 8) ink.push({ x, r: x + w, t: y, b: y + h });
+      }
+      for (const f of fins) {
+        // The number's figure and its white edge, with a little paper after it.
+        const fs = +f.getAttribute('font-size'), x = +f.getAttribute('x'), y = +f.getAttribute('y');
+        const box = { x, r: x + f.getComputedTextLength() + fs * 0.15, t: y - fs * 0.72, b: y + fs * 0.05 };
+        // A corner just touching a note a step higher or lower doesn't count: the numbers' white edge keeps them apart.
+        let over = 0;
+        for (const o of ink) if (o.r > box.x + 0.5 && Math.min(o.b, box.b) - Math.max(o.t, box.t) > fs * 0.12) over = Math.max(over, box.r - o.x);
+        const beat = over > 0.5 && beats.get(f.dataset.beat), bb = beat && L.findBeat(beat);
+        if (!bb || !(bb.realBounds.w > 0)) continue;
+        const i = beat.voice.bar.index, k = (bb.realBounds.w + over) / bb.realBounds.w;        need.set(i, Math.max(need.get(i) || 1, k));
+      }
+    }
+    return need;
   }
   $('printBtn').addEventListener('click', printMusic);
   $('printGo').addEventListener('click', () => { showPrintCover(null); window.print(); });

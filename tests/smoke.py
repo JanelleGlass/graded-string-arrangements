@@ -49,9 +49,10 @@ What it checks
      only moving to the same part.
      Print (the first song, laptop and phone sizes): the button sits at the top beside the size buttons and the strip
      keeps one row; it makes a copy for paper, a line of music at a time with its counts, under the parts, title and
-     Strings key, finger numbers to the right of the notes, and only that prints, each line whole; the music on the screen comes back just as it was (line or
+     Strings key, finger numbers to the right of the notes, every one clear of the next note, and only that prints, each line whole; the music on the screen comes back just as it was (line or
      pages, size, place); Ctrl+P does the same; the browser's own Print menu prints the music as it is now on pages and
      not a stale copy in one long line; and where the print window doesn't open by itself, a card offers a Print button.
+     Joy to the World's violin melody, which used to leave one line on a second sheet, prints on one sheet.
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
      the teacher conducts, a student follows, and the student's music keeps up with the teacher's.
   4. The app layer: the browser can install the site, every file is saved after one visit, every song
@@ -730,6 +731,32 @@ PAPER_JS = '''() => { const FINGERS = ''' + FINGERS_JS + '''; const out = docume
 # The screen as it is: how the music is laid out and drawn, and where it is scrolled to.
 SCREEN_JS = '''() => { const s = document.getElementById('sheet');
   return { line: s.classList.contains('line'), size: reader.api.settings.display.scale, x: Math.round(s.scrollLeft), y: Math.round(window.scrollY) }; }'''
+# On paper, every finger number to the right of a note is clear of the next note head, stem, sharp or flat, rest and bar
+# line (a corner just touching a note a step higher or lower doesn't count). Run with the copy for paper showing (print
+# media); returns the numbers checked and those that touch something.
+FINGERS_CLEAR_JS = '''() => { const touching = []; let checked = 0;
+  for (const svg of document.querySelectorAll('#printOut .pr-line > svg > svg')) {
+    const ink = [];
+    for (const g of svg.querySelectorAll('g.at')) { const t = g.querySelector(':scope > text'), c = t ? t.textContent.codePointAt(0) : 0;
+      const half = c >= 0xE0A0 && c <= 0xE0FF ? 0.42 : c >= 0xE260 && c <= 0xE26F ? 1.4 : c >= 0xE4E0 && c <= 0xE4FF ? 1 : 0;
+      const m = half && /translate\\(([-\\d.]+)[ ,]+([-\\d.]+)\\)/.exec(g.getAttribute('transform') || ''); if (!m) continue;
+      const w = t.getBBox().width; ink.push({ x: +m[1], r: +m[1] + w, t: +m[2] - w * half, b: +m[2] + w * half }); }
+    for (const r of svg.querySelectorAll('rect')) { const x = +r.getAttribute('x'), y = +r.getAttribute('y'), w = +r.getAttribute('width'), h = +r.getAttribute('height');
+      if (w < h / 8) ink.push({ x, r: x + w, t: y, b: y + h }); }
+    for (const f of svg.querySelectorAll('text.fin')) {
+      if (f.getAttribute('text-anchor') !== 'start' || !/[0-4]/.test(f.textContent)) continue;
+      checked++;
+      const fs = +f.getAttribute('font-size'), x = +f.getAttribute('x'), y = +f.getAttribute('y');
+      const box = { x, r: x + f.getComputedTextLength() + fs * 0.11, t: y - fs * 0.72, b: y + fs * 0.05 };
+      if (ink.some(o => o.x < box.r - 0.3 && o.r > box.x + 0.5 && Math.min(o.b, box.b) - Math.max(o.t, box.t) > fs * 0.12)) touching.push(f.textContent);
+    } }
+  return { checked, touching }; }'''
+# How many sheets of Letter paper the print takes (Chromium's own PDF of the print).
+async def sheets_printed(pg):
+    pdf = await pg.pdf(format='Letter', prefer_css_page_size=True, print_background=True)
+    return len(re.findall(rb'/Type\s*/Page(?![a-zA-Z])', pdf))
+
+
 # In print, only the copy for paper shows, a line of music never splits across two sheets, and it fits the paper.
 PRINT_VIEW_JS = '''() => { const out = document.getElementById('printOut'), lines = [...out.querySelectorAll('.pr-line')];
   return { page: getComputedStyle(document.querySelector('.page')).display, out: getComputedStyle(out).display,
@@ -782,9 +809,12 @@ async def print_checks(browser, base):
                   f"on paper every finger number sits to the right of its note, while the screen keeps them inside (paper {paper['fingers']}, screen {screen})")
         await pg.emulate_media(media='print')
         view = await pg.evaluate(PRINT_VIEW_JS)
+        clear = await pg.evaluate(FINGERS_CLEAR_JS)
         await pg.emulate_media(media='screen')
         check(view['page'] == 'none' and view['out'] == 'block' and view['whole'] and view['fits'],
               f'{label}: on paper only the music prints, each line of music whole and inside the paper ({view})')
+        check(clear['checked'] > 0 and not clear['touching'],
+              f"{label}: on paper every finger number is clear of the next note ({clear['checked']} checked, touching: {clear['touching'][:6]})")
         if label != 'laptop':
             check(not errors, f'{label}: no script errors' + (f': {errors[:3]}' if errors else ''))
             await ctx.close()
@@ -823,6 +853,27 @@ async def print_checks(browser, base):
         await pg.click('#printGo')
         check(said == 'The music is ready to print.' and await pg.evaluate('() => __prints') == 2 and await pg.evaluate("() => document.getElementById('printCover').hidden"),
               f'where the print window doesn\'t open by itself, a card says the music is ready and its Print button prints ("{said}")')
+        check(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
+        await ctx.close()
+    # Joy to the World's violin melody left one line of music on a second sheet, with finger numbers under the next notes
+    # in its sixteenths (Janelle, 2026-11-02): now a little smaller, it fits on one sheet, every number clear.
+    if any(s['slug'] == 'joy-to-the-world' for s in SONGS):
+        print('Print: joy-to-the-world')
+        ctx = await browser.new_context(device_scale_factor=1, service_workers='block')
+        await setup(ctx)
+        errors = []
+        pg = await open_reader(ctx, f'{base}/songs/joy-to-the-world/', errors, 'print joy')
+        await pg.evaluate(PRINT_STUB_JS, False)
+        await pg.click('#printBtn')
+        await pg.wait_for_function(PRINTED_JS, arg=0, timeout=30000)
+        await pg.wait_for_timeout(300)
+        paper = await pg.evaluate(PAPER_JS)
+        await pg.emulate_media(media='print')
+        clear = await pg.evaluate(FINGERS_CLEAR_JS)
+        sheets = await sheets_printed(pg)
+        await pg.emulate_media(media='screen')
+        check(paper['parts'] == 'Violin — Melody' and sheets == 1 and clear['checked'] > 0 and not clear['touching'],
+              f"the violin melody prints on one sheet of Letter paper ({sheets}), every finger number clear ({clear['checked']} checked, touching: {clear['touching'][:6]})")
         check(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
         await ctx.close()
 
