@@ -3781,9 +3781,9 @@ body.following .host-only { display: none !important; }
   // cover them: Janelle, 2026-11-02), the print chooses where the lines of music end, so each line is about as full as
   // the next, and a last sheet with only a line or two on it is saved by printing the music a little smaller.
   const PRINT_W = 700;      // the music's width on paper in CSS pixels: A4 or Letter inside 12 mm margins
-  // A staff 14 mm high for one part (a student's); with more parts on the page (a duet, or a score for the teacher) a
-  // little smaller with each, so more than one line of music fits on a sheet.
-  const printScale = () => [1.5, 1.3, 1.2, 1.1][Math.min(4, shownIndexes().length) - 1];
+  // A staff 14 mm high for one part (a student's); with more staves on the page (a duet, a score for the teacher, or
+  // the Piano's two staves) a little smaller with each, so more than one line of music fits on a sheet.
+  const printScale = () => [1.5, 1.3, 1.2, 1.1][Math.min(4, shownIndexes().reduce((n, ti) => n + (score.tracks[ti].staves.length || 1), 0)) - 1];
   // A Letter sheet inside the 12 mm margins, in CSS pixels. A4 is a little narrower and taller, so what fits on Letter
   // fits on A4.
   const SHEET = { w: 725.3, h: 965.3 };
