@@ -25,6 +25,8 @@ scan or a stale entry gets noticed). The build also stops if the score's parts a
 layouts the reader knows, in BUILD-SPEC order, and says which one it read:
   levels and voices, 40 parts: level by level; Melody, Inner, Bass Line in each; then violin-viola-cello-bass
   the same 40 then a Countermelody on violin and viola (42 parts), and/or a Concert part on each (42 or 44 parts)
+  any of those 40, 42 or 44 then a part named "Piano" (41 to 45 parts; Silent Night, 2026-11-02): the hymn on two
+    staves; its page also loads the piano sound (assets/soundfont/piano-generaluser-sf2.b64.txt, tools/sf2_subset.py)
   levels and voices with no cello or bass Inner, 34 parts (built 2026-10-16): the same, Inner on violin and viola
   six tiers, 24 parts (songs built before 2026-10-16): level by level, violin-viola-cello-bass in each
   one line, 1 to 4 parts (a piece with no levels, such as Twinkle Harmony): the same line's name on each of its
@@ -52,6 +54,7 @@ SW_TEMPLATE = ROOT / 'tools' / 'sw_template.js'
 MANIFEST = ROOT / 'manifest.webmanifest'
 FONT = 'assets/font/Bravura.woff2'
 SOUNDFONT = 'assets/soundfont/strings-generaluser-sf2.b64.txt'
+PIANO_SOUNDFONT = 'assets/soundfont/piano-generaluser-sf2.b64.txt'  # loaded only by a page with a Piano part
 ALPHATAB = 'https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/alphaTab.min.js'
 # Kept offline besides the pages, scores, font, sounds and reader: the small files the pages ask for.
 APP_FILES = ['app/app.js', 'manifest.webmanifest', 'assets/icon.svg', 'assets/apple-touch-icon.png',
@@ -207,8 +210,18 @@ def one_line(names):
     return 'one line for ' + and_list([INSTRUMENTS[i].lower() for i in insts])
 
 
+PIANO = ', and piano'
+
+
 def part_layout(slug, names):
-    """Which of the reader's layouts the score's parts are in. Stops the build if they're in none."""
+    """Which of the reader's layouts the score's parts are in. Stops the build if they're in none.
+    A part named "Piano" may come last, after 40, 42 or 44 parts in levels and voices (", and piano")."""
+    if len(names) > 1 and names[-1].strip() == 'Piano':
+        base = part_layout(slug, names[:-1])
+        if not base.startswith('levels and voices') or base == 'levels and voices, no cello or bass Inner':
+            fail(f'{slug}: a Piano part goes after 40, 42 or 44 parts in levels and voices; the parts before it are {base}')
+        return base + PIANO
+
     def wrong(want):
         for i, (name, (inst, label)) in enumerate(zip(names, want)):
             m = PART_NAME.match(name.strip())
@@ -261,9 +274,13 @@ def song_page(reader, song, facts, app, revs):
     head = replace(head, '</style>', HOME_LINK_CSS + '</style>')
 
     b = body
+    piano = facts['layout'].endswith(PIANO)
+    extras = EXTRAS.get(facts['layout'].removesuffix(PIANO), '')
+    if piano:
+        extras += ', and a piano part' if extras else ', plus a piano part'
     b = replace(b, t['lede'], t['lede'] if facts['layout'] == 'six tiers' else f'One line, {one}.' if one else
                 'Four levels for violin, viola, cello and bass, each with a melody, an inner part and a bass line'
-                + EXTRAS.get(facts['layout'], '') + '.')
+                + extras + '.')
     b = replace(b, f">{t['title']}<span class=\"info-i\"", f">{e(song['title'])}<span class=\"info-i\"")
     b = replace(b, f"<p class=\"info-title\">{t['title']}</p>", f"<p class=\"info-title\">{e(song['title'])}</p>")
     b = replace(b, f"<p class=\"eyebrow\">{t['collection']}</p>", f"<p class=\"eyebrow\">{e(song.get('collection', ''))}</p>")
@@ -280,6 +297,10 @@ def song_page(reader, song, facts, app, revs):
     b = replace(b, "const FONT_URL = 'font/Bravura.woff2';", f"const FONT_URL = '../../{FONT}?v={revs['font']}';")
     b = replace(b, "const SOUNDFONT_URL = 'soundfont/strings-generaluser-sf2.b64.txt';",
                 f"const SOUNDFONT_URL = '../../{SOUNDFONT}?v={revs['soundfont']}';")
+    b = replace(b, "const PIANO_SOUNDFONT_URL = '';",
+                f"const PIANO_SOUNDFONT_URL = '../../{PIANO_SOUNDFONT}?v={revs['piano']}';" if piano else "const PIANO_SOUNDFONT_URL = '';")
+    if piano:
+        b = replace(b, 'The string sounds come from the GeneralUser GS', 'The string and piano sounds come from the GeneralUser GS')
     pdf = song.get('pdf_url', '')
     if "'" in pdf or '\\' in pdf:
         fail(f"{slug}: pdf_url can't contain quotes or backslashes")
@@ -346,6 +367,8 @@ def main():
     if reader.count(ALPHATAB) != 1:
         fail(f'reader.html no longer loads {ALPHATAB}; update ALPHATAB in tools/build_site.py')
     shared = {'font': fingerprint(ROOT / FONT), 'soundfont': fingerprint(ROOT / SOUNDFONT)}
+    if (ROOT / PIANO_SOUNDFONT).exists():
+        shared['piano'] = fingerprint(ROOT / PIANO_SOUNDFONT)
     app_rev = fingerprint(ROOT / 'app/app.js')
     offline = {f: fingerprint(ROOT / f) for f in APP_FILES}
     offline[f"{FONT}?v={shared['font']}"] = shared['font']
@@ -371,6 +394,10 @@ def main():
             if k in s and str(s[k]) != str(got[k]):
                 fail(f'{slug}: songs.json says {k} = {s[k]!r} but the score says {got[k]!r}')
         facts[slug] = {**got, **{k: s[k] for k in ('key', 'time', 'bars') if k in s}}
+        if got['layout'].endswith(PIANO):  # the piano sound goes in the offline copy once a song needs it
+            if 'piano' not in shared:
+                fail(f'{slug} has a Piano part but {PIANO_SOUNDFONT} is missing (make it with tools/sf2_subset.py)')
+            offline[f"{PIANO_SOUNDFONT}?v={shared['piano']}"] = shared['piano']
         score_rev = fingerprint(score)
         page = song_page(reader, s, facts[slug], app_script('../../', app_rev), {**shared, 'score': score_rev})
         (ROOT / 'songs' / slug / 'index.html').write_text(page, encoding='utf-8', newline='\n')
