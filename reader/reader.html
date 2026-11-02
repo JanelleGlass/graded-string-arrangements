@@ -804,8 +804,9 @@ body.following .host-only { display: none !important; }
     // The beat is always shown the same way: pulsing notes, with the counts under the notes matching the notes.
     follow: 'pulse',
     unit: 0,
-    // Finger numbers go inside the notes, to their right or to their left (Janelle, 2026-11-02: left, to compare).
-    fingers: saved.fingers === 'right' || saved.fingers === 'left' ? saved.fingers : 'inside',
+    // Finger numbers go inside the notes or to their left (Janelle chose the left over the right, 2026-11-02: on the
+    // right a dotted note's dot could read as a 0 beside the number). A choice saved as the right becomes the left.
+    fingers: saved.fingers === 'right' || saved.fingers === 'left' ? 'left' : 'inside',
     // The counts under the notes: on unless switched off with the Counting switch beside them.
     countAlong: saved.counts !== 'off',
     layout: saved.layout === 'page' ? 'page' : 'line',
@@ -843,7 +844,7 @@ body.following .host-only { display: none !important; }
   // left of the notes when the page shows them there, otherwise to the right.
   const letterKey = () => (document.documentElement.classList.contains('small') ? 'letterMode' : 'letterModeBig');
   const lettersOn = () => state[letterKey()] !== 'off';
-  const fingerSpot = () => (lettersOn() ? 'right' : onPaper() ? (state.fingers === 'left' ? 'left' : 'right') : state.fingers);
+  const fingerSpot = () => (lettersOn() || onPaper() ? 'left' : state.fingers);
   // Extra rows come after the 40 graded parts, so the graded parts keep their numbers. Saving the layout as 'voices40'
   // (and the full id in partsFull) lets a reader from before the extra rows, such as an offline copy not yet updated,
   // keep the graded parts and drop only the extras. An id it doesn't know would read as the six levels and swap parts.
@@ -922,18 +923,17 @@ body.following .host-only { display: none !important; }
   const GREY = '#B5BEBA';
   const dotsIco = (on) => '<svg class="cyc-ico" viewBox="0 0 26 12" style="width:26px;height:12px" aria-hidden="true">' +
     ['#F0B000', '#DC2626', '#1D4ED8', '#15803D'].map((c, i) => `<circle cx="${4 + i * 6}" cy="6" r="3.3" fill="${on ? c : GREY}"/>`).join('') + '</svg>';
-  // What's on the notes: one button stepping through six looks. Only one thing fits inside a note head, so with note
-  // names the finger numbers go to the right.
+  // What's on the notes: one button stepping through five looks. Only one thing fits inside a note head, so with note
+  // names the finger numbers go to the left.
   const LOOKS = [
     { id: 'fin-in', word: 'Fingers inside', say: 'finger numbers inside the notes', names: false, fingers: true, spot: 'inside' },
-    { id: 'fin-right', word: 'Fingers to the right', say: 'finger numbers to the right of the notes', names: false, fingers: true, spot: 'right' },
     { id: 'fin-left', word: 'Fingers to the left', say: 'finger numbers to the left of the notes', names: false, fingers: true, spot: 'left' },
-    { id: 'names-fin', word: 'Note names and fingers', say: 'note names inside the notes, finger numbers to the right', names: true, fingers: true },
+    { id: 'names-fin', word: 'Note names and fingers', say: 'note names inside the notes, finger numbers to the left', names: true, fingers: true },
     { id: 'names', word: 'Note names', say: 'note names inside the notes', names: true, fingers: false },
     { id: 'plain', word: 'Plain notes', say: 'nothing on the notes', names: false, fingers: false },
   ];
   const lookNow = () => LOOKS.find(l => l.id === (lettersOn() ? (state.fingerMode !== 'off' ? 'names-fin' : 'names')
-    : state.fingerMode === 'off' ? 'plain' : state.fingers === 'right' ? 'fin-right' : state.fingers === 'left' ? 'fin-left' : 'fin-in'));
+    : state.fingerMode === 'off' ? 'plain' : state.fingers === 'left' ? 'fin-left' : 'fin-in'));
   function setLook(l) {
     state[letterKey()] = l.names ? 'all' : 'off';
     state.fingerMode = l.fingers ? 'all' : 'off';
@@ -944,12 +944,12 @@ body.following .host-only { display: none !important; }
   const lookIco = (l) => {
     const t = (x, ch, fill, size) => `<text x="${x}" y="15.2" text-anchor="middle" font-size="${size}" font-weight="800" fill="${fill}" font-family="Figtree, Arial, sans-serif">${ch}</text>`;
     const inside = l.names ? 'A' : l.fingers && l.spot === 'inside' ? '1' : '';
-    const right = l.fingers && (l.names || l.spot === 'right'), left = l.fingers && !l.names && l.spot === 'left';
+    const left = l.fingers && (l.names || l.spot === 'left');
     const head = l.names || l.fingers ? '#1D4ED8' : '#17201C';
     // The picture is cut close around what it shows, so the words sit the same distance from it in every look.
-    const w = right || left ? 25 : 17;
+    const w = left ? 25 : 17;
     return `<svg class="cyc-ico" viewBox="${left ? -4 : 4} 0 ${w} 20" style="width:${w * 0.95}px;height:19px" aria-hidden="true"><ellipse cx="13" cy="12" rx="7.6" ry="5.4" transform="rotate(-20 13 12)" fill="${head}"/>` +
-      (inside ? t(13, inside, '#fff', 8.5) : '') + (right ? t(25, '1', '#17201C', 9.5) : '') + (left ? t(1, '1', '#17201C', 9.5) : '') + '</svg>';
+      (inside ? t(13, inside, '#fff', 8.5) : '') + (left ? t(1, '1', '#17201C', 9.5) : '') + '</svg>';
   };
   // One long line (a staff running off to the right) or pages (lines of music stacked on a page).
   const layoutIco = (layout) => `<svg class="cyc-ico" viewBox="0 0 28 18" style="width:26px;height:17px" aria-hidden="true">` + (layout === 'line'

@@ -15,7 +15,7 @@ What it checks
      no script errors.
   2. Every song page, at laptop and phone-landscape size: the score loads with all parts,
      notes are drawn, Play moves the music forward, nothing scrolls sideways, no script errors.
-     The page settings are separate buttons in the strip; On the note steps through its six looks,
+     The page settings are separate buttons in the strip; On the note steps through its five looks,
      each drawn as it says; on a laptop the music button switches between pages and one long line.
      On pages every line names its parts, and scrolled down the size buttons stay at the top of the
      window. Along one long line, each part's name, clef and key signature (the key in force there,
@@ -49,8 +49,7 @@ What it checks
      only moving to the same part.
      Print (the first song, laptop and phone sizes): the button sits at the top beside the size buttons and the strip
      keeps one row; it makes a copy for paper, a line of music at a time with its counts, under the parts, title and
-     Strings key, finger numbers to the right of the notes (to the left with Fingers to the left), every one clear of
-     the next note (or the note before), and only that prints, each line whole; the music on the screen comes back just as it was (line or
+     Strings key, finger numbers to the left of the notes, every one clear of the note before, and only that prints, each line whole; the music on the screen comes back just as it was (line or
      pages, size, place); Ctrl+P does the same; the browser's own Print menu prints the music as it is now on pages and
      not a stale copy in one long line; and where the print window doesn't open by itself, a card offers a Print button.
      Joy to the World's violin melody, which used to leave one line on a second sheet, prints on one sheet.
@@ -249,34 +248,34 @@ async def song_checks(browser, base):
             above = await pg.evaluate("() => document.getElementById('topTools').getBoundingClientRect().bottom <= document.querySelector('#sheet .at-surface').getBoundingClientRect().top + 1")
             want_top = ['zoomOut', 'zoomIn', 'g-layout'] if label == 'laptop' else ['zoomOut', 'zoomIn']
             check(top == want_top and above, f'{label}: the size buttons{" and Line/Pages" if label == "laptop" else ""} sit at the top, above the music ({top})')
-            # On the note: one button steps through six looks. Laptops start on finger numbers inside the notes, phones
-            # on note names with finger numbers to the right. Each look draws what it says, at the same size, finger
-            # numbers beside the notes on the side it says.
+            # On the note: one button steps through five looks. Laptops start on finger numbers inside the notes, phones
+            # on note names with finger numbers to the left. Each look draws what it says, at the same size, finger
+            # numbers inside the notes or to their left.
             look_js = '''() => { const fin = [...document.querySelectorAll('#sheet text.fin')].map(t => t.textContent);
               return { look: document.querySelector('#g-look .now .word').textContent, head: document.querySelector('#g-look .now ellipse').getAttribute('fill'),
                        off: (r => (r.left + r.right) / 2)(document.querySelector('#g-look .now').getBoundingClientRect()) - (r => (r.left + r.right) / 2)(document.getElementById('g-look').getBoundingClientRect()), names: fin.some(x => /^[A-G]/.test(x)),
                        fingers: fin.some(x => /^[0-4]/.test(x)), size: reader.api.settings.display.scale,
                        sides: [...new Set([...document.querySelectorAll('#sheet text.fin')].filter(t => /^[0-4↑↓]/.test(t.textContent)).map(t => t.getAttribute('text-anchor')))].sort() }; }'''
             seen = [await pg.evaluate(look_js)]
-            for _ in range(6):
+            for _ in range(5):
                 await pg.click('#g-look'); await pg.wait_for_timeout(2200)
                 seen.append(await pg.evaluate(look_js))
-            order = ['Fingers inside', 'Fingers to the right', 'Fingers to the left', 'Note names and fingers', 'Note names', 'Plain notes']
-            first = 0 if label == 'laptop' else 3
-            want_looks = [order[(first + k) % 6] for k in range(7)]
-            check([x['look'] for x in seen] == want_looks, f'{label}: the On the note button steps through the six looks ({[x["look"] for x in seen]})')
+            order = ['Fingers inside', 'Fingers to the left', 'Note names and fingers', 'Note names', 'Plain notes']
+            first = 0 if label == 'laptop' else 2
+            want_looks = [order[(first + k) % 5] for k in range(6)]
+            check([x['look'] for x in seen] == want_looks, f'{label}: the On the note button steps through the five looks ({[x["look"] for x in seen]})')
             drawn = {x['look']: (x['names'], x['fingers']) for x in seen}
-            check(drawn == {'Fingers inside': (False, True), 'Fingers to the right': (False, True), 'Fingers to the left': (False, True),
+            check(drawn == {'Fingers inside': (False, True), 'Fingers to the left': (False, True),
                             'Note names and fingers': (True, True), 'Note names': (True, False), 'Plain notes': (False, False)}, f'{label}: each look draws what it says ({drawn})')
             sides = {x['look']: x['sides'] for x in seen if x['fingers']}
-            check(sides == {'Fingers inside': ['middle'], 'Fingers to the right': ['start'], 'Fingers to the left': ['end'], 'Note names and fingers': ['start']},
-                  f'{label}: finger numbers sit inside the notes, to their right or to their left, as the look says ({sides})')
+            check(sides == {'Fingers inside': ['middle'], 'Fingers to the left': ['end'], 'Note names and fingers': ['end']},
+                  f'{label}: finger numbers sit inside the notes or to their left, as the look says ({sides})')
             heads = {x['look']: x['head'] for x in seen}
             check(all(h == ('#17201C' if k == 'Plain notes' else '#1D4ED8') for k, h in heads.items()), f'{label}: the note head on the button is black for Plain notes, blue otherwise ({heads})')
             offs = {x['look']: round(x['off'], 1) for x in seen}
             check(all(abs(o) <= 1 for o in offs.values()), f'{label}: each look sits in the middle of the On the note button ({offs})')
             sizes = {x['look']: x['size'] for x in seen}
-            check(len(set(sizes.values())) == 1, f'{label}: the music stays the same size for all six looks ({sizes})')
+            check(len(set(sizes.values())) == 1, f'{label}: the music stays the same size for all five looks ({sizes})')
             if label != 'laptop':
                 for _ in range(3): await pg.click('#g-look')  # back to where a phone starts
                 await pg.wait_for_timeout(1500)
@@ -817,10 +816,11 @@ async def print_checks(browser, base):
         after = await pg.evaluate(SCREEN_JS)
         check(after == before, f'{label}: then the music on the screen is just as it was (one long line, same size, same place: {before}, then {after})')
         if label == 'laptop':
-            # A laptop starts on Fingers inside; on paper the finger numbers go to the right (Janelle, 2026-10-30).
+            # A laptop starts on Fingers inside; on paper the finger numbers go beside the notes, to the left (Janelle,
+            # 2026-10-30 and 2026-11-02).
             screen = await pg.evaluate('() => (' + FINGERS_JS + ")(document.getElementById('sheet'))")
-            check(paper['fingers']['right'] > 0 and not paper['fingers']['inside'] and not paper['fingers']['left'] and screen['inside'] > 0,
-                  f"on paper every finger number sits to the right of its note, while the screen keeps them inside (paper {paper['fingers']}, screen {screen})")
+            check(paper['fingers']['left'] > 0 and not paper['fingers']['inside'] and not paper['fingers']['right'] and screen['inside'] > 0,
+                  f"on paper every finger number sits to the left of its note, while the screen keeps them inside (paper {paper['fingers']}, screen {screen})")
         await pg.emulate_media(media='print')
         view = await pg.evaluate(PRINT_VIEW_JS)
         clear = await pg.evaluate(FINGERS_CLEAR_JS)
