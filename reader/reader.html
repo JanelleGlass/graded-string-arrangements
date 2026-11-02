@@ -2736,6 +2736,9 @@ body.following .host-only { display: none !important; }
   function fitLeftRoom() {
     const where = onPaper() ? 'paper' : 'screen';
     if (leftRoom[where] || !BIG() || fingerSpot() !== 'left' || !score) return false;
+    // Not on a phone's screen: the fingerings make a line a little taller, and a phone fits its line to the screen's
+    // height, so the music would shrink a step (the Epic, 2.4 to 2.3) and stop being one size for every look.
+    if (where === 'screen' && document.documentElement.classList.contains('small')) return false;
     leftRoom[where] = true;
     const beats = new Map();
     for (const ti of shownIndexes()) for (const bar of score.tracks[ti].staves[0].bars) for (const v of bar.voices) for (const b of v.beats) beats.set(String(b.id), b);
