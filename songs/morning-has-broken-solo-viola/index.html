@@ -2269,7 +2269,11 @@ body.following .host-only { display: none !important; }
     if (count) {
       const list = [...order.slice(0, count)].map(l => l + (n > 0 ? '♯' : '♭'));
       const name = (minor ? MINOR : MAJOR)[n];
-      tip.append(para(`Key of ${name} ${minor ? 'minor' : 'major'}: ${count} ${n > 0 ? 'sharp' : 'flat'}${count === 1 ? '' : 's'} (${list.join(', ')}).`, 'sym-note'));
+      // alphaTab keeps only major or minor; a church mode is named by the build in the About box ("A Dorian", Drunken Sailor)
+      const about = ([...document.querySelectorAll('.info-facts dt')].find(d => d.textContent === 'Key')?.nextElementSibling?.textContent || '').trim();
+      const modal = /^[A-G](-sharp|-flat)? (Dorian|Phrygian|Lydian|Mixolydian|Locrian)$/.test(about);
+      const keyName = modal ? about.replace('-sharp', '♯').replace('-flat', '♭') : `${name} ${minor ? 'minor' : 'major'}`;
+      tip.append(para(`Key of ${keyName}: ${count} ${n > 0 ? 'sharp' : 'flat'}${count === 1 ? '' : 's'} (${list.join(', ')}).`, 'sym-note'));
     }
   }
   const DYN_CODES = { 0xE520: 'p', 0xE521: 'm', 0xE522: 'f', 0xE523: 'r', 0xE524: 's', 0xE525: 'z', 0xE526: 'n', 0xE527: 'pppppp', 0xE528: 'ppppp', 0xE529: 'pppp', 0xE52A: 'ppp', 0xE52B: 'pp', 0xE52C: 'mp', 0xE52D: 'mf', 0xE52E: 'pf', 0xE52F: 'ff', 0xE530: 'fff', 0xE531: 'ffff', 0xE532: 'fffff', 0xE533: 'ffffff', 0xE534: 'fp', 0xE535: 'fz', 0xE536: 'sf', 0xE537: 'sfp', 0xE538: 'sfpp', 0xE539: 'sfz', 0xE53A: 'sfzp', 0xE53B: 'sffz', 0xE53C: 'rf', 0xE53D: 'rfz' };
