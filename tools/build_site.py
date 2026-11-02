@@ -17,7 +17,8 @@ Writes
 The app layer (offline copy, install button, iPhone sound) lives in app/app.js and sw.js, apart from
 the reader. The home-screen app file is manifest.webmanifest, with its icons in assets/.
 
-Key, time signature, bar count and the written tempo are read from the score (key, time and
+Key, time signature, bar count and the written tempo are read from the score (a key whose <mode> is a church mode
+is named for it, "A Dorian"; key, time and
 bars can be given in songs.json too; if one disagrees with the score, the build stops so a bad
 scan or a stale entry gets noticed). The build also stops if the score's parts aren't one of the
 layouts the reader knows, in BUILD-SPEC order, and says which one it read:
@@ -70,6 +71,9 @@ MAJOR = {-7: 'C-flat', -6: 'G-flat', -5: 'D-flat', -4: 'A-flat', -3: 'E-flat', -
          0: 'C', 1: 'G', 2: 'D', 3: 'A', 4: 'E', 5: 'B', 6: 'F-sharp', 7: 'C-sharp'}
 MINOR = {-7: 'A-flat', -6: 'E-flat', -5: 'B-flat', -4: 'F', -3: 'C', -2: 'G', -1: 'D',
          0: 'A', 1: 'E', 2: 'B', 3: 'F-sharp', 4: 'C-sharp', 5: 'G-sharp', 6: 'D-sharp', 7: 'A-sharp'}
+# A score whose key names a church mode (<mode>dorian</mode>) is named for it: the mode's tonic is the major key's tonic
+# moved this many fifths (one sharp in Dorian is A Dorian, not G major).  Major and minor are named as before.
+MODE_STEP = {'dorian': 2, 'phrygian': 4, 'lydian': -1, 'mixolydian': 1, 'locrian': 5}
 
 HEAD = '''<!doctype html>
 <html lang="en">
@@ -126,8 +130,12 @@ def read_score(path):
         fifths = m.findtext('attributes/key/fifths')
         if fifths is not None:
             mode = (m.findtext('attributes/key/mode') or mode).strip()
-            names = MINOR if mode == 'minor' else MAJOR
-            k = f"{names[int(fifths)]} {'minor' if mode == 'minor' else 'major'}"
+            f = int(fifths)
+            if mode in MODE_STEP and -7 <= f + MODE_STEP[mode] <= 7:      # a church mode: Drunken Sailor's A Dorian
+                k = f"{MAJOR[f + MODE_STEP[mode]]} {mode.capitalize()}"
+            else:
+                names = MINOR if mode == 'minor' else MAJOR
+                k = f"{names[f]} {'minor' if mode == 'minor' else 'major'}"
             if k not in keys:
                 keys.append(k)
         beats = m.findtext('attributes/time/beats')
