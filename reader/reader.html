@@ -804,8 +804,8 @@ body.following .host-only { display: none !important; }
     // The beat is always shown the same way: pulsing notes, with the counts under the notes matching the notes.
     follow: 'pulse',
     unit: 0,
-    // Finger numbers go inside the notes or to their right (left of the notes, saved before, becomes right).
-    fingers: saved.fingers === 'right' || saved.fingers === 'left' ? 'right' : 'inside',
+    // Finger numbers go inside the notes, to their right or to their left (Janelle, 2026-11-02: left, to compare).
+    fingers: saved.fingers === 'right' || saved.fingers === 'left' ? saved.fingers : 'inside',
     // The counts under the notes: on unless switched off with the Counting switch beside them.
     countAlong: saved.counts !== 'off',
     layout: saved.layout === 'page' ? 'page' : 'line',
@@ -839,10 +839,11 @@ body.following .host-only { display: none !important; }
   } catch {}
   // Letter names: the setting for this kind of screen. Only one thing fits inside a note head, so with letter names
   // on, the finger numbers go to the right of the notes; with them off, wherever the finger button says. On paper they
-  // always go to the right (Janelle, 2026-10-30): inside a printed note head they come out too small to read.
+  // go beside the notes (Janelle, 2026-10-30): inside a printed note head they come out too small to read. To the
+  // left of the notes when the page shows them there, otherwise to the right.
   const letterKey = () => (document.documentElement.classList.contains('small') ? 'letterMode' : 'letterModeBig');
   const lettersOn = () => state[letterKey()] !== 'off';
-  const fingerSpot = () => (lettersOn() || onPaper() ? 'right' : state.fingers);
+  const fingerSpot = () => (lettersOn() ? 'right' : onPaper() ? (state.fingers === 'left' ? 'left' : 'right') : state.fingers);
   // Extra rows come after the 40 graded parts, so the graded parts keep their numbers. Saving the layout as 'voices40'
   // (and the full id in partsFull) lets a reader from before the extra rows, such as an offline copy not yet updated,
   // keep the graded parts and drop only the extras. An id it doesn't know would read as the six levels and swap parts.
@@ -921,33 +922,34 @@ body.following .host-only { display: none !important; }
   const GREY = '#B5BEBA';
   const dotsIco = (on) => '<svg class="cyc-ico" viewBox="0 0 26 12" style="width:26px;height:12px" aria-hidden="true">' +
     ['#F0B000', '#DC2626', '#1D4ED8', '#15803D'].map((c, i) => `<circle cx="${4 + i * 6}" cy="6" r="3.3" fill="${on ? c : GREY}"/>`).join('') + '</svg>';
-  // What's on the notes: one button stepping through five looks. Only one thing fits inside a note head, so with note
+  // What's on the notes: one button stepping through six looks. Only one thing fits inside a note head, so with note
   // names the finger numbers go to the right.
   const LOOKS = [
     { id: 'fin-in', word: 'Fingers inside', say: 'finger numbers inside the notes', names: false, fingers: true, spot: 'inside' },
     { id: 'fin-right', word: 'Fingers to the right', say: 'finger numbers to the right of the notes', names: false, fingers: true, spot: 'right' },
+    { id: 'fin-left', word: 'Fingers to the left', say: 'finger numbers to the left of the notes', names: false, fingers: true, spot: 'left' },
     { id: 'names-fin', word: 'Note names and fingers', say: 'note names inside the notes, finger numbers to the right', names: true, fingers: true },
     { id: 'names', word: 'Note names', say: 'note names inside the notes', names: true, fingers: false },
     { id: 'plain', word: 'Plain notes', say: 'nothing on the notes', names: false, fingers: false },
   ];
   const lookNow = () => LOOKS.find(l => l.id === (lettersOn() ? (state.fingerMode !== 'off' ? 'names-fin' : 'names')
-    : state.fingerMode === 'off' ? 'plain' : state.fingers === 'right' ? 'fin-right' : 'fin-in'));
+    : state.fingerMode === 'off' ? 'plain' : state.fingers === 'right' ? 'fin-right' : state.fingers === 'left' ? 'fin-left' : 'fin-in'));
   function setLook(l) {
     state[letterKey()] = l.names ? 'all' : 'off';
     state.fingerMode = l.fingers ? 'all' : 'off';
     if (l.spot) state.fingers = l.spot;
   }
-  // A note head showing the look: a "1" inside it or to its right, an "A" inside it, both, or neither (then black, like
+  // A note head showing the look: a "1" inside it or beside it, an "A" inside it, both, or neither (then black, like
   // a plain note).
   const lookIco = (l) => {
     const t = (x, ch, fill, size) => `<text x="${x}" y="15.2" text-anchor="middle" font-size="${size}" font-weight="800" fill="${fill}" font-family="Figtree, Arial, sans-serif">${ch}</text>`;
     const inside = l.names ? 'A' : l.fingers && l.spot === 'inside' ? '1' : '';
-    const right = l.fingers && (l.names || l.spot === 'right');
+    const right = l.fingers && (l.names || l.spot === 'right'), left = l.fingers && !l.names && l.spot === 'left';
     const head = l.names || l.fingers ? '#1D4ED8' : '#17201C';
     // The picture is cut close around what it shows, so the words sit the same distance from it in every look.
-    const w = right ? 25 : 17;
-    return `<svg class="cyc-ico" viewBox="4 0 ${w} 20" style="width:${w * 0.95}px;height:19px" aria-hidden="true"><ellipse cx="13" cy="12" rx="7.6" ry="5.4" transform="rotate(-20 13 12)" fill="${head}"/>` +
-      (inside ? t(13, inside, '#fff', 8.5) : '') + (right ? t(25, '1', '#17201C', 9.5) : '') + '</svg>';
+    const w = right || left ? 25 : 17;
+    return `<svg class="cyc-ico" viewBox="${left ? -4 : 4} 0 ${w} 20" style="width:${w * 0.95}px;height:19px" aria-hidden="true"><ellipse cx="13" cy="12" rx="7.6" ry="5.4" transform="rotate(-20 13 12)" fill="${head}"/>` +
+      (inside ? t(13, inside, '#fff', 8.5) : '') + (right ? t(25, '1', '#17201C', 9.5) : '') + (left ? t(1, '1', '#17201C', 9.5) : '') + '</svg>';
   };
   // One long line (a staff running off to the right) or pages (lines of music stacked on a page).
   const layoutIco = (layout) => `<svg class="cyc-ico" viewBox="0 0 28 18" style="width:26px;height:17px" aria-hidden="true">` + (layout === 'line'
@@ -1380,6 +1382,7 @@ body.following .host-only { display: none !important; }
     return names.length ? ' (' + names.join(' and ') + ' parts have no ' + what + ')' : '';
   }
   function applyMarks() {
+    leftRoom = { screen: false, paper: false, onPaper: [] };
     score.tracks.forEach((track, ti) => {
       const partMarks = marks[ti] || [];
       const seenColor = new Set(), seenFinger = new Set(), seenLetter = new Set();
@@ -1388,6 +1391,7 @@ body.following .host-only { display: none !important; }
         const lined = barMarks.length === notes.length;
         notes.forEach(({ beat, note }, k) => {
           note.leftHandFinger = M().Fingers.Unknown;
+          note.rightHandFinger = M().Fingers.Unknown;
           const mk = lined ? barMarks[k] : null;
           // "First time only": mark a pitch the first time it is played on that string / with that finger in this part.
           const pitch = note.realValue ?? note.octave * 12 + note.tone;
@@ -2613,6 +2617,8 @@ body.following .host-only { display: none !important; }
     if (!BIG()) return;
     const mode = fingerSpot();
     const sheet = $('sheet');
+    // alphaTab's own fingerings (asked for only to keep room before a note, see applyMarks) are not shown.
+    for (const t of sheet.querySelectorAll('g.at > text')) { const c = t.textContent.codePointAt(0); if (c >= 0xED10 && c <= 0xED2F) t.parentNode.style.display = 'none'; }
     const NS = 'http://www.w3.org/2000/svg';
     const accidentals = new Map(); // per SVG: sharps, flats and naturals, to keep a left-hand number clear of them
     const flags = new Map();
@@ -2705,18 +2711,62 @@ body.following .host-only { display: none !important; }
             const fl = flags.get(svg).filter(f => f.x >= h.x + h.w * 0.5 && f.x <= h.x + h.w * 1.6 && f.y < h.y && h.y - f.y < headH * 5);
             if (fl.length) right = Math.max(right, ...fl.map(f => f.x + f.w));
             const t = add(note.finger, right + gap, y, fs.toFixed(1), '#121614', 'start', true);
-            if (onPaper()) t.dataset.beat = beat.id; // on paper the bar makes room for it (fingerCrowding)
+            t.dataset.beat = beat.id; t.dataset.note = note.index; // on paper the bar makes room for it (fingerCrowding)
           } else {
             const svg = group.ownerSVGElement;
             if (!accidentals.has(svg)) accidentals.set(svg, glyphsIn(svg, 0xE260, 0xE264));
             const acc = accidentals.get(svg).filter(a => a.x + a.w <= h.x + 1 && a.x + a.w > h.x - h.w * 0.7 && Math.abs(a.y - h.y) < headH * 1.6);
             const left = acc.length ? Math.min(...acc.map(a => a.x)) : h.x;
-            add(note.finger, left - gap, y, fs.toFixed(1), '#121614', 'end', true);
+            const t = add(note.finger, left - gap, y, fs.toFixed(1), '#121614', 'end', true);
+            t.dataset.beat = beat.id; t.dataset.note = note.index;
           }
         }
         }
       }
     }
+  }
+  // Fingers to the left: a number on a bar's first note sits in the room after the bar line, which no spreading
+  // changes: a high note's number can run into the bar number ("13" and a 1 read as 131), an arrow and a number into
+  // the bar line. alphaTab keeps room before a note for fingerings of its own, so those notes ask for two (never drawn:
+  // placeFingers hides them) and the number goes in their place. Found once after the marks change (the same at every
+  // size and layout); returns true when it started a new drawing.
+  // Paper has less room after a bar line than the screen, so it is checked on its own; what paper asked for is undone
+  // after printing (onPaper), so the screen comes back as it was.
+  let leftRoom = { screen: false, paper: false, onPaper: [] };
+  function fitLeftRoom() {
+    const where = onPaper() ? 'paper' : 'screen';
+    if (leftRoom[where] || !BIG() || fingerSpot() !== 'left' || !score) return false;
+    leftRoom[where] = true;
+    const beats = new Map();
+    for (const ti of shownIndexes()) for (const bar of score.tracks[ti].staves[0].bars) for (const v of bar.voices) for (const b of v.beats) beats.set(String(b.id), b);
+    const crowded = [];
+    for (const svg of $('sheet').querySelectorAll('.at-surface svg')) {
+      const ink = [];
+      for (const r of svg.querySelectorAll('rect')) { // bar lines
+        const x = +r.getAttribute('x'), y = +r.getAttribute('y'), w = +r.getAttribute('width'), h = +r.getAttribute('height');
+        if (w < h / 8) ink.push({ x, r: x + w, t: y, b: y + h });
+      }
+      for (const t of svg.querySelectorAll(':scope > text:not(.fin)')) { // bar numbers (not the room after them), and a little paper
+        const n = t.textContent.trim();
+        if (!/^\d+$/.test(n)) continue;
+        const b = t.getBBox();
+        ink.push({ x: b.x, r: b.x + t.getSubStringLength(0, n.length) + b.height * 0.35, t: b.y, b: b.y + b.height });
+      }
+      for (const f of svg.querySelectorAll('text.fin[data-beat]')) {
+        const beat = beats.get(f.dataset.beat), note = beat && beat.notes[+f.dataset.note];
+        if (f.getAttribute('text-anchor') !== 'end' || !note || beat.index !== 0 || note.leftHandFinger !== M().Fingers.Unknown) continue;
+        const fs = +f.getAttribute('font-size'), x = +f.getAttribute('x'), y = +f.getAttribute('y');
+        const box = { x: x - f.getComputedTextLength() - fs * 0.15, r: x, t: y - fs * 0.72, b: y + fs * 0.05 };
+        if (ink.some(o => o.x < box.r - 0.5 && o.r > box.x && Math.min(o.b, box.b) - Math.max(o.t, box.t) > fs * 0.12)) crowded.push(note);
+      }
+    }
+    if (!crowded.length) return false;
+    // Their width goes with the marks asked for: "4" and "i" for a number, "4" and the wide "m" with an arrow too.
+    const F = M().Fingers;
+    for (const note of crowded) { note.leftHandFinger = F.LittleFinger; note.rightHandFinger = /[↑↓]/.test(note.finger) ? F.MiddleFinger : F.IndexFinger; }
+    if (where === 'paper') leftRoom.onPaper.push(...crowded);
+    api.render();
+    return true;
   }
   function noteColor(note) {
     const c = note.style && note.style.colors.get(alphaTab.model.NoteSubElement.StandardNotationNoteHead);
@@ -3695,6 +3745,7 @@ body.following .host-only { display: none !important; }
     if (!cancelLoopGap() && playing) { if (conductor.hosting) conductPlayPause(); else api.pause(); }
     setPop(null);
     // First in one long line, to measure each bar ('natural'), then on pages ('page'), as often as the plan changes.
+    leftRoom.paper = false;
     printing = { layout: state.layout, y: window.scrollY, x: $('sheet').scrollLeft, stage: 'paper', pass: 'natural',
       base: printScale(), size: printScale(), bars: null, plan: null, slack: -2, fixes: 0, draws: 0 };
     showPrintCover('Getting the music ready to print…');
@@ -3719,6 +3770,7 @@ body.following .host-only { display: none !important; }
       if (nextPaperDrawing()) return;
       makePaperCopy();
       usePlan(null);
+      for (const note of leftRoom.onPaper.splice(0)) note.leftHandFinger = note.rightHandFinger = M().Fingers.Unknown;
       printing.stage = 'screen';
       $('printMsg').textContent = 'Printing…';
       printOpened = false;
@@ -3922,7 +3974,9 @@ body.following .host-only { display: none !important; }
     });
   }
   // How much more room each bar's finger numbers need (bar index -> how many times wider its notes must spread) for
-  // every number to the right of a note to clear the next note head, stem, sharp or flat, rest or bar line.
+  // every number beside a note to clear the next note (or, to the left, the note before): its head, stem, dot, flag,
+  // sharp or flat, a rest or a bar line. A number on the left of a bar's first note sits in the bar's fixed room after
+  // the bar line, which no spreading changes, so it counts only where the bar's notes can spread.
   function fingerCrowding() {
     const need = new Map(), L = api.boundsLookup;
     if (!L || !score) return need;
@@ -3934,27 +3988,38 @@ body.following .host-only { display: none !important; }
       const ink = [];
       for (const g of svg.querySelectorAll('g.at')) {
         const t = g.querySelector(':scope > text'), c = t ? t.textContent.codePointAt(0) : 0;
-        // How far above and below its middle each kind reaches, for its width: note heads, sharps and flats, rests.
-        const half = c >= 0xE0A0 && c <= 0xE0FF ? 0.42 : c >= 0xE260 && c <= 0xE26F ? 1.4 : c >= 0xE4E0 && c <= 0xE4FF ? 1 : 0;
-        const m = half && /translate\(([-\d.]+)[ ,]+([-\d.]+)\)/.exec(g.getAttribute('transform') || '');
+        // How far above and below its middle each kind reaches, for its width: note heads, sharps and flats, rests,
+        // dots; a flag hangs down from the top of its stem (or rises from the bottom), about three times its width.
+        const flag = c >= 0xE240 && c <= 0xE24F ? (c % 2 ? -3 : 3) : 0;
+        const half = c >= 0xE0A0 && c <= 0xE0FF ? 0.42 : c >= 0xE260 && c <= 0xE26F ? 1.4 : c >= 0xE4E0 && c <= 0xE4FF ? 1 : c === 0xE1E7 ? 0.5 : 0;
+        const m = (half || flag) && /translate\(([-\d.]+)[ ,]+([-\d.]+)\)/.exec(g.getAttribute('transform') || '');
         if (!m) continue;
         const x = +m[1], y = +m[2], w = t.getBBox().width;
-        ink.push({ x, r: x + w, t: y - w * half, b: y + w * half });
+        ink.push(flag ? { x, r: x + w, t: Math.min(y, y + w * flag), b: Math.max(y, y + w * flag) } : { x, r: x + w, t: y - w * half, b: y + w * half });
       }
       for (const r of svg.querySelectorAll('rect')) { // stems and bar lines
         const x = +r.getAttribute('x'), y = +r.getAttribute('y'), w = +r.getAttribute('width'), h = +r.getAttribute('height');
         if (w < h / 8) ink.push({ x, r: x + w, t: y, b: y + h });
       }
       for (const f of fins) {
-        // The number's figure and its white edge, with a little paper after it.
-        const fs = +f.getAttribute('font-size'), x = +f.getAttribute('x'), y = +f.getAttribute('y');
-        const box = { x, r: x + f.getComputedTextLength() + fs * 0.15, t: y - fs * 0.72, b: y + fs * 0.05 };
+        // The number's figure and its white edge, with a little paper beside it.
+        const fs = +f.getAttribute('font-size'), x = +f.getAttribute('x'), y = +f.getAttribute('y'), len = f.getComputedTextLength();
+        const left = f.getAttribute('text-anchor') === 'end';
+        const box = left ? { x: x - len - fs * 0.15, r: x, t: y - fs * 0.72, b: y + fs * 0.05 } : { x, r: x + len + fs * 0.15, t: y - fs * 0.72, b: y + fs * 0.05 };
         // A corner just touching a note a step higher or lower doesn't count: the numbers' white edge keeps them apart.
         let over = 0;
-        for (const o of ink) if (o.r > box.x + 0.5 && Math.min(o.b, box.b) - Math.max(o.t, box.t) > fs * 0.12) over = Math.max(over, box.r - o.x);
-        const beat = over > 0.5 && beats.get(f.dataset.beat), bb = beat && L.findBeat(beat);
+        for (const o of ink) {
+          if (Math.min(o.b, box.b) - Math.max(o.t, box.t) <= fs * 0.12) continue;
+          if (left) { if (o.x < box.r - 0.5) over = Math.max(over, o.r - box.x); }
+          else if (o.r > box.x + 0.5) over = Math.max(over, box.r - o.x);
+        }
+        const beat = over > 0.5 && beats.get(f.dataset.beat);
+        if (!beat) continue;
+        // The room that spreads: after this note (right), or between the note before and this one (left).
+        const room = left ? beat.index > 0 && beat.voice.beats[beat.index - 1] : beat, bb = room && L.findBeat(room);
         if (!bb || !(bb.realBounds.w > 0)) continue;
-        const i = beat.voice.bar.index, k = (bb.realBounds.w + over) / bb.realBounds.w;        need.set(i, Math.max(need.get(i) || 1, k));
+        const i = beat.voice.bar.index, k = (bb.realBounds.w + over) / bb.realBounds.w;
+        need.set(i, Math.max(need.get(i) || 1, k));
       }
     }
     return need;
@@ -4085,7 +4150,7 @@ body.following .host-only { display: none !important; }
     api.error.on(() => fail('Something went wrong drawing the music. Reload the page to try again.'));
     api.renderStarted.on(() => { if (!fitPending) fitTries = 0; if (!namePending) nameTries = 0; head = null; lineHead.classList.remove('on'); clearTimeout(printTimer); });
     api.renderFinished.on(() => { namePending = false; if (fitNames()) return; // drawn again with room for the part names
-      $('loading').hidden = true; ink = null; styleWords(); fitSurface(); placeFingers(); trackNotes(true); buildCounts(); placeTimeSigButtons(); drawLoop(); drawStartMark(); keepPlace(); xmap = null; if (!playing && state.layout === 'line') { setHalf(); centerOnTick(api.tickPosition || 0, false); }
+      $('loading').hidden = true; ink = null; styleWords(); fitSurface(); placeFingers(); if (fitLeftRoom()) return; trackNotes(true); buildCounts(); placeTimeSigButtons(); drawLoop(); drawStartMark(); keepPlace(); xmap = null; if (!playing && state.layout === 'line') { setHalf(); centerOnTick(api.tickPosition || 0, false); }
       // A phone on its side: size the line to the screen, then bring it into view.
       fitPending = false;
       if (!fitToHeight() && shortLand.matches && state.layout === 'line' && !playing) revealSheet(false, true);
