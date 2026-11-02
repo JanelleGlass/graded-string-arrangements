@@ -106,5 +106,23 @@
     "collection": "",
     "source": "Bunessan, traditional Gaelic melody",
     "pdf_url": ""
+  },
+  {
+    "slug": "drunken-sailor",
+    "title": "Drunken Sailor",
+    "section": "Other",
+    "category": "Sea Shanty",
+    "collection": "Sea Shanties",
+    "source": "Traditional sea shanty",
+    "pdf_url": ""
+  },
+  {
+    "slug": "the-wellerman",
+    "title": "The Wellerman",
+    "section": "Other",
+    "category": "Sea Shanty",
+    "collection": "Sea Shanties",
+    "source": "New Zealand whaling song, collected by Neil Colquhoun",
+    "pdf_url": ""
   }
 ]
