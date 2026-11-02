@@ -345,7 +345,14 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   sheets fill as a browser fills them (a line that doesn't fit starts a new sheet). It takes about 0.3 to 1.5 seconds.
   Where the print window doesn't open by itself, the card says "The music is ready to print." with a Print button.
   The browser's own Print menu on pages prints the music as drawn on the screen; in one long line it prints the page
-  minus the buttons. Followers of the conductor don't see the button. Printing is free for now (Janelle, 2026-10-30,
+  minus the buttons. Followers of the conductor don't see the button.
+  Download PDF (Janelle asked, 2026-11-02): a round download button just right of Print. It makes the same copy for
+  paper, then, with the screen back as it was, draws each sheet as a picture (200 dots an inch, JPEG, about 300 KB a
+  sheet) and writes them into a PDF in the browser (no library, no print window), saved as "<title> - <parts>.pdf"
+  (plain letters: Chrome names a file "download" if its name has a long dash). Letter in the US, Canada and the other
+  Letter countries (from the browser's language), A4 elsewhere. The music's pictures carry their own lettering (the
+  music font, and the page's Google Fonts, from the offline copy without internet), since a picture can't use the
+  page's fonts. Where it fails, the card says to print and choose Save as PDF. Hidden in the Claude preview, like Print. Printing is free for now (Janelle, 2026-10-30,
   with the Payhip PDFs still to come).
 - Pinch to zoom on touch screens: two fingers on the music make it bigger or smaller. The music grows
   and shrinks under the fingers, then settles on the nearest − / + size. A second finger cancels a tap

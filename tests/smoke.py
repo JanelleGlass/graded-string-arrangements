@@ -57,6 +57,7 @@ What it checks
      pages, size, place); Ctrl+P does the same; the browser's own Print menu prints the music as it is now on pages and
      not a stale copy in one long line; and where the print window doesn't open by itself, a card offers a Print button.
      Joy to the World's violin melody, which used to leave one line on a second sheet, prints on one sheet.
+     Download PDF saves the same sheet as a PDF file, named for the song and its parts, without a print window.
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
      the teacher conducts, a student follows, and the student's music keeps up with the teacher's.
   4. The app layer: the browser can install the site, every file is saved after one visit, every song
@@ -907,6 +908,17 @@ async def print_checks(browser, base):
         await pg.emulate_media(media='screen')
         check(paper['parts'] == 'Violin — Melody' and sheets == 1 and clear['checked'] > 0 and not clear['touching'],
               f"the violin melody prints on one sheet of Letter paper ({sheets}), every finger number clear ({clear['checked']} checked, touching: {clear['touching'][:6]})")
+        # Download PDF (Janelle, 2026-11-02): the same sheets saved as a file, no print window; the screen as it was.
+        before = await pg.evaluate(SCREEN_JS)
+        async with pg.expect_download(timeout=60000) as info:
+            await pg.click('#pdfBtn')
+        dl = await info.value
+        pdf = Path(await dl.path()).read_bytes()
+        await pg.wait_for_function("() => document.getElementById('printCover').hidden", timeout=30000)
+        pages = len(re.findall(rb'/Type\s*/Page(?![a-zA-Z])', pdf))
+        after = await pg.evaluate(SCREEN_JS)
+        check(pdf.startswith(b'%PDF') and pages == 1 and dl.suggested_filename == 'Joy to the World - Violin - Melody.pdf' and after == before,
+              f'Download PDF saves the music as a PDF of one sheet ("{dl.suggested_filename}", {pages} sheet(s), {len(pdf) // 1024} KB), and the screen is as it was')
         check(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
         await ctx.close()
 
