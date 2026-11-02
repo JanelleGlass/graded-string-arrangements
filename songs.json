@@ -2,7 +2,8 @@
   {
     "slug": "the-first-noel",
     "title": "The First Noel",
-    "category": "Christmas",
+    "section": "Christmas",
+    "category": "",
     "collection": "Christmas Collection",
     "source": "Traditional English carol",
     "pdf_url": ""
@@ -10,7 +11,8 @@
   {
     "slug": "what-child-is-this",
     "title": "What Child Is This",
-    "category": "Christmas",
+    "section": "Christmas",
+    "category": "",
     "collection": "Christmas Collection",
     "source": "Greensleeves, traditional English tune",
     "pdf_url": ""
@@ -18,7 +20,8 @@
   {
     "slug": "what-child-is-this-epic",
     "title": "What Child Is This — Epic",
-    "category": "Christmas",
+    "section": "Christmas",
+    "category": "",
     "collection": "Christmas Collection",
     "source": "Greensleeves, traditional English tune",
     "pdf_url": ""
@@ -26,7 +29,8 @@
   {
     "slug": "joy-to-the-world",
     "title": "Joy to the World",
-    "category": "Christmas",
+    "section": "Christmas",
+    "category": "",
     "collection": "Christmas Collection",
     "source": "Antioch, arranged by Lowell Mason from Handel",
     "pdf_url": ""
@@ -34,7 +38,8 @@
   {
     "slug": "the-birthday-of-a-king",
     "title": "The Birthday of a King",
-    "category": "Christmas",
+    "section": "Christmas",
+    "category": "",
     "collection": "Christmas Collection",
     "source": "William Harold Neidlinger, 1890",
     "pdf_url": ""
@@ -42,7 +47,8 @@
   {
     "slug": "silent-night",
     "title": "Silent Night",
-    "category": "Christmas",
+    "section": "Christmas",
+    "category": "",
     "collection": "Christmas Collection",
     "source": "Franz Xaver Gruber, 1818",
     "pdf_url": ""
@@ -50,7 +56,8 @@
   {
     "slug": "silent-night-b-flat",
     "title": "Silent Night — in B-flat",
-    "category": "Christmas",
+    "section": "Christmas",
+    "category": "",
     "collection": "Christmas Collection",
     "source": "Franz Xaver Gruber, 1818",
     "pdf_url": ""
@@ -58,7 +65,8 @@
   {
     "slug": "count-your-blessings",
     "title": "Count Your Blessings",
-    "category": "Hymn",
+    "section": "Hymns",
+    "category": "",
     "collection": "",
     "source": "Edwin O. Excell, 1897",
     "pdf_url": ""
@@ -66,7 +74,8 @@
   {
     "slug": "morning-has-broken",
     "title": "Morning Has Broken",
-    "category": "Hymn",
+    "section": "Hymns",
+    "category": "",
     "collection": "",
     "source": "Bunessan, traditional Gaelic melody",
     "pdf_url": ""
@@ -74,6 +83,7 @@
   {
     "slug": "twinkle-harmony",
     "title": "Twinkle Harmony",
+    "section": "Other",
     "category": "Beginner",
     "collection": "",
     "source": "Harmony to Twinkle, Twinkle, Little Star",
@@ -82,6 +92,7 @@
   {
     "slug": "morning-has-broken-solo-viola",
     "title": "Morning Has Broken — Solo Viola Variations",
+    "section": "Solos",
     "category": "Hymn",
     "collection": "",
     "source": "Bunessan, traditional Gaelic melody",
@@ -90,6 +101,7 @@
   {
     "slug": "morning-has-broken-solo-viola-modulating",
     "title": "Morning Has Broken — Modulating Solo Viola Variations",
+    "section": "Solos",
     "category": "Hymn",
     "collection": "",
     "source": "Bunessan, traditional Gaelic melody",
@@ -98,6 +110,7 @@
   {
     "slug": "drunken-sailor",
     "title": "Drunken Sailor",
+    "section": "Other",
     "category": "Sea Shanty",
     "collection": "Sea Shanties",
     "source": "Traditional sea shanty",
@@ -106,6 +119,7 @@
   {
     "slug": "the-wellerman",
     "title": "The Wellerman",
+    "section": "Other",
     "category": "Sea Shanty",
     "collection": "Sea Shanties",
     "source": "New Zealand whaling song, collected by Neil Colquhoun",

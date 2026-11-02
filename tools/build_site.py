@@ -9,8 +9,9 @@ Reads
 
 Writes
   songs/<slug>/index.html      the reader for that song
-  index.html                   only the song cards between <!-- songs:start --> and <!-- songs:end -->,
-                               and the app script between <!-- app:start --> and <!-- app:end -->
+  index.html                   only the tabs and song sections (a heading and its cards) between
+                               <!-- songs:start --> and <!-- songs:end -->, and the app script between
+                               <!-- app:start --> and <!-- app:end -->
   sw.js                        the offline copy (from tools/sw_template.js): every page and file the site
                                needs, each with a fingerprint, so a change reaches copies already on phones
 
@@ -34,7 +35,10 @@ layouts the reader knows, in BUILD-SPEC order, and says which one it read:
 songs.json fields
   slug        folder and file name, lowercase-with-dashes ("holy-holy-holy")
   title       shown on the page and the home card
-  category    small label on the home card ("Christmas", "Hymn")
+  section     the heading the card sits under on the home page: one of SECTIONS below, which also sets their
+              order (Janelle, 2026-11-02); within a section, cards keep their songs.json order
+  category    small label on the home card ("Beginner"), or "" for none; left empty where it would only
+              repeat the section heading ("Christmas" under Christmas)
   collection  small label in the song's About box ("Christmas Collection")
   source      one line on where the tune comes from ("Traditional English carol")
   pdf_url     Payhip (or other) link for the printable parts; "" = no Buy button
@@ -55,6 +59,8 @@ ALPHATAB = 'https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/alphaTab
 # Kept offline besides the pages, scores, font, sounds and reader: the small files the pages ask for.
 APP_FILES = ['app/app.js', 'manifest.webmanifest', 'assets/icon.svg', 'assets/apple-touch-icon.png',
              'assets/icon-192.png', 'assets/icon-512.png', 'assets/icon-maskable-512.png']
+# The home page's sections, in page order. A section with no songs is left off the page.
+SECTIONS = ['Christmas', 'Hymns', 'Solos', 'Other']
 
 # The reader is written for The First Noel (that is what the Claude preview plays).
 # These are the song-specific strings in it; each must appear exactly the stated number of times.
@@ -309,19 +315,39 @@ def song_page(reader, song, facts, app, revs):
     return HEAD + app + head + '\n</head>\n<body>\n' + b.lstrip('\n') + '\n</body>\n</html>\n'
 
 
-def home_cards(songs, facts):
+def section_id(name):
+    """A section's short name for the page address ("Hymns" -> "hymns", as in .../#hymns)."""
+    return re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
+
+
+def home_sections(songs, facts):
+    """The home page's song list: a row of tabs (All songs, then one for each section), then a heading for each
+    section with its cards. The script at the end of index.html shows the chosen tab's section (Janelle, 2026-11-02)."""
     e = html.escape
-    out = []
-    for s in songs:
-        f = facts[s['slug']]
-        line = ' · '.join(x for x in [s.get('source', ''), f['key'], f['time']] if x)
-        out.append(
-            f'      <a class="song" href="songs/{s["slug"]}/">\n'
-            f'        <span class="eyebrow">{e(s.get("category", ""))}</span>\n'
-            f'        <h3>{e(s["title"])}</h3>\n'
-            f'        <p>{e(line)}</p>\n'
-            f'        <span class="go">Open and play along →</span>\n'
-            f'      </a>\n')
+    names = [n for n in SECTIONS if any(s['section'] == n for s in songs)]
+    out = ['  <div class="tabs" role="group" aria-label="Songs to show">\n'
+           '    <button type="button" data-section="all" aria-pressed="true">All songs</button>\n']
+    out += [f'    <button type="button" data-section="{section_id(n)}" aria-pressed="false">{e(n)}</button>\n' for n in names]
+    out.append('  </div>\n\n')
+    for name in names:
+        group = [s for s in songs if s['section'] == name]
+        sid = section_id(name)
+        out.append(f'  <section data-section="{sid}" aria-labelledby="h-{sid}">\n'
+                   f'    <h2 id="h-{sid}">{e(name)}</h2>\n'
+                   f'    <div class="songs">\n')
+        for s in group:
+            f = facts[s['slug']]
+            line = ' · '.join(x for x in [s.get('source', ''), f['key'], f['time']] if x)
+            label = s.get('category', '')
+            out.append(
+                f'      <a class="song" href="songs/{s["slug"]}/">\n'
+                + (f'        <span class="eyebrow">{e(label)}</span>\n' if label else '') +
+                f'        <h3>{e(s["title"])}</h3>\n'
+                f'        <p>{e(line)}</p>\n'
+                f'        <span class="go">Open and play along →</span>\n'
+                f'      </a>\n')
+        out.append('    </div>\n'
+                   '  </section>\n\n')
     return ''.join(out)
 
 
@@ -356,6 +382,9 @@ def main():
         seen.add(slug)
         if not s.get('title'):
             fail(f'{slug}: no title')
+        if s.get('section') not in SECTIONS:
+            fail(f"{slug}: section {s.get('section')!r} isn't one of the home page's sections "
+                 f"({', '.join(SECTIONS)}); add a new one to SECTIONS in tools/build_site.py")
         score = ROOT / 'songs' / slug / f'{slug}.xml'
         if not score.exists():
             fail(f'{slug}: score not found at {score.relative_to(ROOT)}')
@@ -382,12 +411,12 @@ def main():
             print(f"  tempo changes: {' -> '.join(map(str, got['tempos']))} (tempo control shows a percentage)")
 
     home = (ROOT / 'index.html').read_text(encoding='utf-8')
-    a, z = '<!-- songs:start', '      <!-- songs:end -->'
+    a, z = '<!-- songs:start', '  <!-- songs:end -->'
     if home.count(a) != 1 or home.count(z) != 1:
         fail('index.html: song list markers missing')
     i = home.index('\n', home.index(a)) + 1
     j = home.index(z)
-    home = home[:i] + home_cards(songs, facts) + home[j:]
+    home = home[:i] + home_sections(songs, facts) + home[j:]
     a, z = '<!-- app:start', '<!-- app:end -->'
     if home.count(a) != 1 or home.count(z) != 1:
         fail('index.html: app script markers missing from <head>')
