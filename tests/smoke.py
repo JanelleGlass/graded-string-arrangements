@@ -53,9 +53,10 @@ What it checks
      only moving to the same part.
      Print (the first song, laptop and phone sizes): the button sits at the top beside the size buttons and the strip
      keeps one row; it makes a copy for paper, a line of music at a time with its counts, under the parts, title and
-     Strings key, finger numbers to the right of the notes, and only that prints, each line whole; the music on the screen comes back just as it was (line or
+     Strings key, finger numbers to the left of the notes, every one clear of the note before, and only that prints, each line whole; the music on the screen comes back just as it was (line or
      pages, size, place); Ctrl+P does the same; the browser's own Print menu prints the music as it is now on pages and
      not a stale copy in one long line; and where the print window doesn't open by itself, a card offers a Print button.
+     Joy to the World's violin melody, which used to leave one line on a second sheet, prints on one sheet.
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
      the teacher conducts, a student follows, and the student's music keeps up with the teacher's.
   4. The app layer: the browser can install the site, every file is saved after one visit, every song
@@ -254,22 +255,27 @@ async def song_checks(browser, base):
             want_top = ['zoomOut', 'zoomIn', 'g-layout'] if label == 'laptop' else ['zoomOut', 'zoomIn']
             check(top == want_top and above, f'{label}: the size buttons{" and Line/Pages" if label == "laptop" else ""} sit at the top, above the music ({top})')
             # On the note: one button steps through five looks. Laptops start on finger numbers inside the notes, phones
-            # on note names with finger numbers to the right. Each look draws what it says, at the same size.
+            # on note names with finger numbers to the left. Each look draws what it says, at the same size, finger
+            # numbers inside the notes or to their left.
             look_js = '''() => { const fin = [...document.querySelectorAll('#sheet text.fin')].map(t => t.textContent);
               return { look: document.querySelector('#g-look .now .word').textContent, head: document.querySelector('#g-look .now ellipse').getAttribute('fill'),
                        off: (r => (r.left + r.right) / 2)(document.querySelector('#g-look .now').getBoundingClientRect()) - (r => (r.left + r.right) / 2)(document.getElementById('g-look').getBoundingClientRect()), names: fin.some(x => /^[A-G]/.test(x)),
-                       fingers: fin.some(x => /^[0-4]/.test(x)), size: reader.api.settings.display.scale }; }'''
+                       fingers: fin.some(x => /^[0-4]/.test(x)), size: reader.api.settings.display.scale,
+                       sides: [...new Set([...document.querySelectorAll('#sheet text.fin')].filter(t => /^[0-4↑↓]/.test(t.textContent)).map(t => t.getAttribute('text-anchor')))].sort() }; }'''
             seen = [await pg.evaluate(look_js)]
             for _ in range(5):
                 await pg.click('#g-look'); await pg.wait_for_timeout(2200)
                 seen.append(await pg.evaluate(look_js))
-            order = ['Fingers inside', 'Fingers to the right', 'Note names and fingers', 'Note names', 'Plain notes']
+            order = ['Fingers inside', 'Fingers to the left', 'Note names and fingers', 'Note names', 'Plain notes']
             first = 0 if label == 'laptop' else 2
             want_looks = [order[(first + k) % 5] for k in range(6)]
             check([x['look'] for x in seen] == want_looks, f'{label}: the On the note button steps through the five looks ({[x["look"] for x in seen]})')
             drawn = {x['look']: (x['names'], x['fingers']) for x in seen}
-            check(drawn == {'Fingers inside': (False, True), 'Fingers to the right': (False, True), 'Note names and fingers': (True, True),
-                            'Note names': (True, False), 'Plain notes': (False, False)}, f'{label}: each look draws what it says ({drawn})')
+            check(drawn == {'Fingers inside': (False, True), 'Fingers to the left': (False, True),
+                            'Note names and fingers': (True, True), 'Note names': (True, False), 'Plain notes': (False, False)}, f'{label}: each look draws what it says ({drawn})')
+            sides = {x['look']: x['sides'] for x in seen if x['fingers']}
+            check(sides == {'Fingers inside': ['middle'], 'Fingers to the left': ['end'], 'Note names and fingers': ['end']},
+                  f'{label}: finger numbers sit inside the notes or to their left, as the look says ({sides})')
             heads = {x['look']: x['head'] for x in seen}
             check(all(h == ('#17201C' if k == 'Plain notes' else '#1D4ED8') for k, h in heads.items()), f'{label}: the note head on the button is black for Plain notes, blue otherwise ({heads})')
             offs = {x['look']: round(x['off'], 1) for x in seen}
@@ -728,7 +734,8 @@ PRINTED_JS = "(n) => __prints > n && document.getElementById('printCover').hidde
 # The copy made for paper, and whether it is what prints. Finger numbers: how many sit inside the note heads (centred
 # on them) and how many to the right (starting just after them).
 FINGERS_JS = '''(root) => { const f = [...root.querySelectorAll('text.fin')].filter(t => /^[0-4]/.test(t.textContent));
-  return { inside: f.filter(t => t.getAttribute('text-anchor') === 'middle').length, right: f.filter(t => t.getAttribute('text-anchor') === 'start').length }; }'''
+  return { inside: f.filter(t => t.getAttribute('text-anchor') === 'middle').length, right: f.filter(t => t.getAttribute('text-anchor') === 'start').length,
+           left: f.filter(t => t.getAttribute('text-anchor') === 'end').length }; }'''
 PAPER_JS = '''() => { const FINGERS = ''' + FINGERS_JS + '''; const out = document.getElementById('printOut'), t = (s) => (out.querySelector(s) || {}).textContent;
   return { lines: out.querySelectorAll('.pr-line > svg').length, music: out.querySelectorAll('.pr-line > svg > svg').length,
            counts: out.querySelectorAll('.pr-count').length, parts: t('.pr-parts'), title: t('.pr-title'), key: !!out.querySelector('.key'),
@@ -736,6 +743,39 @@ PAPER_JS = '''() => { const FINGERS = ''' + FINGERS_JS + '''; const out = docume
 # The screen as it is: how the music is laid out and drawn, and where it is scrolled to.
 SCREEN_JS = '''() => { const s = document.getElementById('sheet');
   return { line: s.classList.contains('line'), size: reader.api.settings.display.scale, x: Math.round(s.scrollLeft), y: Math.round(window.scrollY) }; }'''
+# On paper, every finger number beside a note is clear of the next note (to the right) or the note before (to the left):
+# its head, stem, dot, flag, sharp or flat, a rest or a bar line (a corner just touching a note a step higher or lower
+# doesn't count). Run with the copy for paper showing (print media); returns the numbers checked and those that touch
+# something.
+FINGERS_CLEAR_JS = '''() => { const touching = []; let checked = 0;
+  for (const svg of document.querySelectorAll('#printOut .pr-line > svg > svg')) {
+    const ink = [];
+    for (const g of svg.querySelectorAll('g.at')) { const t = g.querySelector(':scope > text'), c = t ? t.textContent.codePointAt(0) : 0;
+      const flag = c >= 0xE240 && c <= 0xE24F ? (c % 2 ? -3 : 3) : 0;
+      const half = c >= 0xE0A0 && c <= 0xE0FF ? 0.42 : c >= 0xE260 && c <= 0xE26F ? 1.4 : c >= 0xE4E0 && c <= 0xE4FF ? 1 : c === 0xE1E7 ? 0.5 : 0;
+      const m = (half || flag) && /translate\\(([-\\d.]+)[ ,]+([-\\d.]+)\\)/.exec(g.getAttribute('transform') || ''); if (!m) continue;
+      const x = +m[1], y = +m[2], w = t.getBBox().width;
+      ink.push(flag ? { x, r: x + w, t: Math.min(y, y + w * flag), b: Math.max(y, y + w * flag) } : { x, r: x + w, t: y - w * half, b: y + w * half }); }
+    for (const r of svg.querySelectorAll('rect')) { const x = +r.getAttribute('x'), y = +r.getAttribute('y'), w = +r.getAttribute('width'), h = +r.getAttribute('height');
+      if (w < h / 8) ink.push({ x, r: x + w, t: y, b: y + h }); }
+    // Bar numbers, with a little paper after them, so a number beside a bar's first note doesn't read as part of one.
+    for (const t of svg.querySelectorAll(':scope > text:not(.fin)')) { const n = t.textContent.trim(); if (!/^\\d+$/.test(n)) continue;
+      const b = t.getBBox(); ink.push({ x: b.x, r: b.x + t.getSubStringLength(0, n.length) + b.height * 0.3, t: b.y, b: b.y + b.height }); }
+    for (const f of svg.querySelectorAll('text.fin')) {
+      const side = f.getAttribute('text-anchor');
+      if ((side !== 'start' && side !== 'end') || !/[0-4]/.test(f.textContent)) continue;
+      checked++;
+      const fs = +f.getAttribute('font-size'), x = +f.getAttribute('x'), y = +f.getAttribute('y'), len = f.getComputedTextLength();
+      const box = side === 'end' ? { x: x - len - fs * 0.11, r: x, t: y - fs * 0.72, b: y + fs * 0.05 } : { x, r: x + len + fs * 0.11, t: y - fs * 0.72, b: y + fs * 0.05 };
+      if (ink.some(o => o.x < box.r - 0.3 && o.r > box.x + 0.3 && Math.min(o.b, box.b) - Math.max(o.t, box.t) > fs * 0.12)) touching.push(f.textContent);
+    } }
+  return { checked, touching }; }'''
+# How many sheets of Letter paper the print takes (Chromium's own PDF of the print).
+async def sheets_printed(pg):
+    pdf = await pg.pdf(format='Letter', prefer_css_page_size=True, print_background=True)
+    return len(re.findall(rb'/Type\s*/Page(?![a-zA-Z])', pdf))
+
+
 # In print, only the copy for paper shows, a line of music never splits across two sheets, and it fits the paper.
 PRINT_VIEW_JS = '''() => { const out = document.getElementById('printOut'), lines = [...out.querySelectorAll('.pr-line')];
   return { page: getComputedStyle(document.querySelector('.page')).display, out: getComputedStyle(out).display,
@@ -782,15 +822,19 @@ async def print_checks(browser, base):
         after = await pg.evaluate(SCREEN_JS)
         check(after == before, f'{label}: then the music on the screen is just as it was (one long line, same size, same place: {before}, then {after})')
         if label == 'laptop':
-            # A laptop starts on Fingers inside; on paper the finger numbers go to the right (Janelle, 2026-10-30).
+            # A laptop starts on Fingers inside; on paper the finger numbers go beside the notes, to the left (Janelle,
+            # 2026-10-30 and 2026-11-02).
             screen = await pg.evaluate('() => (' + FINGERS_JS + ")(document.getElementById('sheet'))")
-            check(paper['fingers']['right'] > 0 and not paper['fingers']['inside'] and screen['inside'] > 0,
-                  f"on paper every finger number sits to the right of its note, while the screen keeps them inside (paper {paper['fingers']}, screen {screen})")
+            check(paper['fingers']['left'] > 0 and not paper['fingers']['inside'] and not paper['fingers']['right'] and screen['inside'] > 0,
+                  f"on paper every finger number sits to the left of its note, while the screen keeps them inside (paper {paper['fingers']}, screen {screen})")
         await pg.emulate_media(media='print')
         view = await pg.evaluate(PRINT_VIEW_JS)
+        clear = await pg.evaluate(FINGERS_CLEAR_JS)
         await pg.emulate_media(media='screen')
         check(view['page'] == 'none' and view['out'] == 'block' and view['whole'] and view['fits'],
               f'{label}: on paper only the music prints, each line of music whole and inside the paper ({view})')
+        check(clear['checked'] > 0 and not clear['touching'],
+              f"{label}: on paper every finger number is clear of the next note ({clear['checked']} checked, touching: {clear['touching'][:6]})")
         if label != 'laptop':
             check(not errors, f'{label}: no script errors' + (f': {errors[:3]}' if errors else ''))
             await ctx.close()
@@ -829,6 +873,40 @@ async def print_checks(browser, base):
         await pg.click('#printGo')
         check(said == 'The music is ready to print.' and await pg.evaluate('() => __prints') == 2 and await pg.evaluate("() => document.getElementById('printCover').hidden"),
               f'where the print window doesn\'t open by itself, a card says the music is ready and its Print button prints ("{said}")')
+        # Fingers to the left on the page: on paper too, every number clear of the note before (Janelle, 2026-11-02).
+        await pg.evaluate(PRINT_STUB_JS, False)
+        while (await pg.text_content('#g-look .now .word')).strip() != 'Fingers to the left':
+            await pg.click('#g-look'); await pg.wait_for_timeout(1500)
+        await pg.click('#printBtn')
+        await pg.wait_for_function(PRINTED_JS, arg=0, timeout=30000)
+        await pg.wait_for_timeout(300)
+        paper = await pg.evaluate(PAPER_JS)
+        await pg.emulate_media(media='print')
+        clear = await pg.evaluate(FINGERS_CLEAR_JS)
+        await pg.emulate_media(media='screen')
+        check(paper['fingers']['left'] > 0 and not paper['fingers']['right'] and not paper['fingers']['inside'] and not clear['touching'],
+              f"with Fingers to the left on the page, on paper every finger number sits to the left of its note, clear of the note before ({paper['fingers']}, touching: {clear['touching'][:6]})")
+        check(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
+        await ctx.close()
+    # Joy to the World's violin melody left one line of music on a second sheet, with finger numbers under the next notes
+    # in its sixteenths (Janelle, 2026-11-02): now a little smaller, it fits on one sheet, every number clear.
+    if any(s['slug'] == 'joy-to-the-world' for s in SONGS):
+        print('Print: joy-to-the-world')
+        ctx = await browser.new_context(device_scale_factor=1, service_workers='block')
+        await setup(ctx)
+        errors = []
+        pg = await open_reader(ctx, f'{base}/songs/joy-to-the-world/', errors, 'print joy')
+        await pg.evaluate(PRINT_STUB_JS, False)
+        await pg.click('#printBtn')
+        await pg.wait_for_function(PRINTED_JS, arg=0, timeout=30000)
+        await pg.wait_for_timeout(300)
+        paper = await pg.evaluate(PAPER_JS)
+        await pg.emulate_media(media='print')
+        clear = await pg.evaluate(FINGERS_CLEAR_JS)
+        sheets = await sheets_printed(pg)
+        await pg.emulate_media(media='screen')
+        check(paper['parts'] == 'Violin — Melody' and sheets == 1 and clear['checked'] > 0 and not clear['touching'],
+              f"the violin melody prints on one sheet of Letter paper ({sheets}), every finger number clear ({clear['checked']} checked, touching: {clear['touching'][:6]})")
         check(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
         await ctx.close()
 

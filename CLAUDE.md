@@ -177,10 +177,19 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
 - What's drawn on the page has no panel: each setting is its own tap-to-change button in the strip,
   stepping through its choices and showing a toast, the same buttons on every screen: string colors
   (All, 1st, Off), On the note, and Counting (on, off). On the note steps through five looks, each
-  label saying what's on the notes: "Fingers inside" → "Fingers to the right" → "Note names and
-  fingers" (names inside, numbers to the right, since only one thing fits inside a note head) →
-  "Note names" → "Plain notes". Finger numbers and note names show on every note (no "first time
-  only"). The music stays the same size for all five looks, Plain notes too. Phones start on
+  label saying what's on the notes: "Fingers inside" → "Fingers to the left" →
+  "Note names and fingers" (names inside, numbers to the left, since only one thing fits inside a note head) →
+  "Note names" → "Plain notes". Numbers beside a note go on its left (Janelle chose it on 2026-11-02 after comparing
+  "Fingers to the right" and "Fingers to the left" side by side: on the right a dotted note's dot could read as a 0
+  beside the number, or look busy; a choice saved as the right becomes the left). A number goes before the note's
+  sharp or flat. A bar's first
+  note has only the fixed room after the bar line, so a high note's number ran into the bar number ("13" and a 1 read
+  as 131) and an arrow onto the bar line: after drawing, the reader finds those notes and asks alphaTab for two
+  fingerings of its own there ("4" and "i", or the wider "m" with an arrow), which keeps room before the note; they
+  are never shown (placeFingers hides them) and the number goes in their place. Paper has less of that room than the
+  screen, so it is checked again for paper and undone after printing. Not on a phone's screen: the fingerings make
+  the line a little taller and a phone fits its line to the screen's height, so the music shrank a step for one look. Finger numbers and note names show on every note (no "first time
+  only"). The music stays the same size for all six looks, Plain notes too. Phones start on
   "Note names and fingers", laptops on "Fingers inside" (note names kept separately for each).
   Each look's little note head and words sit together in the middle of the button (black head for
   Plain notes, blue otherwise).
@@ -319,11 +328,21 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
 - Print (Janelle asked, 2026-10-29): a round printer button at the top right of the music, just left of − / + (not
   in the strip: on an iPhone SE turned sideways the strip had no room left for it). Ctrl+P does the same. It prints
   the music as it is on the page: the parts on the page, their string colors, what's on the notes (except that finger
-  numbers always go to the right of the notes on paper, where inside a note head they are too small to read: Janelle,
-  2026-10-30), the counts (or none), under a heading with the parts ("Violin — Melody"), the Strings key, the title and the source line. The music
+  numbers never go inside the notes on paper, where they are too small to read: Janelle, 2026-10-30; they go to the
+  left of the notes), the counts (or none), under a heading with the parts ("Violin — Melody"), the Strings key, the title and the source line. The music
   is drawn once more for paper (pages, a sheet wide, a 14 mm staff for one part and a little smaller with each part
-  more, up to four, bars a little closer than on screen: four to a line in The First Noel), copied a line of music at a time into a copy kept for paper so a new sheet never cuts
+  more, up to four, bars a little closer than on screen), copied a line of music at a time into a copy kept for paper so a new sheet never cuts
   through a line, then drawn again for the screen, which ends up just as it was. A card covers the screen meanwhile.
+  Since 2026-11-02 (Janelle: finger numbers covered by the next note, and one bar left over on a second sheet): each bar
+  gets the room its finger numbers need (from the note before; a bar's first note has the fixed room after the bar
+  line, see the On the note entry), measured from the music drawn first in one long line (alphaTab spaces a bar's
+  notes all alike, so a bar with a sixteenth and "↓2" spreads as a whole: What Child Is This's violin melody takes 10
+  lines instead of 7, still two sheets). The print chooses where the lines end (alphaTab's model layout: bars per line
+  and each bar's share), as few lines as fit, each about as full as the next, the last line full width too, and a bar
+  ending a line is wide enough for its words ("Allargando" was cut off). A last sheet less than half full is saved by
+  printing the music smaller, down to 80% of its size, again while the new last sheet is under half full (Joy to the
+  World: one sheet, was two; Morning Has Broken: three, was five). Planned for Letter (A4 is taller) with 4% to spare;
+  sheets fill as a browser fills them (a line that doesn't fit starts a new sheet). It takes about 0.3 to 1.5 seconds.
   Where the print window doesn't open by itself, the card says "The music is ready to print." with a Print button.
   The browser's own Print menu on pages prints the music as drawn on the screen; in one long line it prints the page
   minus the buttons. Followers of the conductor don't see the button. Printing is free for now (Janelle, 2026-10-30,
