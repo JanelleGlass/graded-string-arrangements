@@ -44,6 +44,11 @@ h1 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: c
 .strings { display: inline-flex; gap: 6px; margin-top: 4px; }
 .strings i { width: 26px; height: 18px; border-radius: 50%; transform: rotate(-18deg); display: inline-block; }
 h2 { margin: 0 0 14px; font-family: var(--font-display); font-weight: 600; font-size: 1.7rem; }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: -12px; }
+.tabs button { font: inherit; font-size: 0.95rem; font-weight: 700; line-height: 1.2; color: var(--ink); background: var(--paper); border: 1.5px solid var(--line); border-radius: 999px; padding: 8px 18px; cursor: pointer; transition: border-color 0.15s, color 0.15s; }
+.tabs button:hover { border-color: var(--accent); color: var(--accent); }
+.tabs button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.tabs button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .songs { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 16px; }
 .song { display: grid; gap: 6px; padding: 20px 22px 22px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); text-decoration: none; transition: transform 0.15s, border-color 0.15s; }
 .song:hover { border-color: var(--accent); transform: translateY(-2px); }
@@ -76,7 +81,9 @@ h2 { margin: 0 0 14px; font-family: var(--font-display); font-weight: 600; font-
 .voices .what { color: var(--muted); font-size: 0.92rem; }
 footer { color: var(--muted); font-size: 0.84rem; border-top: 1px solid var(--line); padding-top: 18px; max-width: 46rem; }
 footer p { margin: 0 0 6px; }
-@media (max-width: 560px) { .wrap { padding: 32px 18px 44px; gap: 32px; } .lede { font-size: 1.02rem; } }
+@media (max-width: 560px) { .wrap { padding: 32px 18px 44px; gap: 32px; } .lede { font-size: 1.02rem; } 
+  .tabs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; margin-bottom: -8px; }
+  .tabs button { padding: 8px 6px; font-size: 0.9rem; } }
 </style>
 </head>
 <body>
@@ -88,8 +95,16 @@ footer p { margin: 0 0 6px; }
     <span class="strings" aria-hidden="true"><i style="background:var(--str-e)"></i><i style="background:var(--str-a)"></i><i style="background:var(--str-d)"></i><i style="background:var(--str-g)"></i><i style="background:var(--str-c)"></i></span>
   </header>
 
-  <!-- songs:start (filled in by tools/build_site.py from songs.json: a section for each heading, its cards in songs.json order; edits here are overwritten) -->
-  <section aria-labelledby="h-christmas">
+  <!-- songs:start (filled in by tools/build_site.py from songs.json: the tabs, then a section for each heading, its cards in songs.json order; edits here are overwritten) -->
+  <div class="tabs" role="group" aria-label="Songs to show">
+    <button type="button" data-section="all" aria-pressed="true">All songs</button>
+    <button type="button" data-section="christmas" aria-pressed="false">Christmas</button>
+    <button type="button" data-section="hymns" aria-pressed="false">Hymns</button>
+    <button type="button" data-section="solos" aria-pressed="false">Solos</button>
+    <button type="button" data-section="other" aria-pressed="false">Other</button>
+  </div>
+
+  <section data-section="christmas" aria-labelledby="h-christmas">
     <h2 id="h-christmas">Christmas</h2>
     <div class="songs">
       <a class="song" href="songs/the-first-noel/">
@@ -130,7 +145,7 @@ footer p { margin: 0 0 6px; }
     </div>
   </section>
 
-  <section aria-labelledby="h-hymns">
+  <section data-section="hymns" aria-labelledby="h-hymns">
     <h2 id="h-hymns">Hymns</h2>
     <div class="songs">
       <a class="song" href="songs/count-your-blessings/">
@@ -146,7 +161,7 @@ footer p { margin: 0 0 6px; }
     </div>
   </section>
 
-  <section aria-labelledby="h-solos">
+  <section data-section="solos" aria-labelledby="h-solos">
     <h2 id="h-solos">Solos</h2>
     <div class="songs">
       <a class="song" href="songs/morning-has-broken-solo-viola/">
@@ -164,7 +179,7 @@ footer p { margin: 0 0 6px; }
     </div>
   </section>
 
-  <section aria-labelledby="h-other">
+  <section data-section="other" aria-labelledby="h-other">
     <h2 id="h-other">Other</h2>
     <div class="songs">
       <a class="song" href="songs/twinkle-harmony/">
@@ -212,5 +227,23 @@ footer p { margin: 0 0 6px; }
     <p>Music drawn and played with alphaTab (alphatab.net) · Bravura music font (SIL Open Font License) · string sounds from the GeneralUser GS sound bank by S. Christian Collins.</p>
   </footer>
 </div>
+<script>
+// The tabs over the song list: All songs, or one section (Christmas, Hymns...). The address remembers the tab
+// (.../#hymns), so a link can open on it and Back from a song comes back to it; choosing a tab replaces the
+// address rather than adding to the history, so Back still leaves the page.
+(() => {
+  const tabs = [...document.querySelectorAll('.tabs button')];
+  const sections = [...document.querySelectorAll('section[data-section]')];
+  const show = (name, fromAddress) => {
+    if (!tabs.some(t => t.dataset.section === name)) name = 'all';
+    for (const t of tabs) t.setAttribute('aria-pressed', String(t.dataset.section === name));
+    for (const s of sections) s.hidden = name !== 'all' && s.dataset.section !== name;
+    if (!fromAddress) history.replaceState(history.state, '', name === 'all' ? location.pathname + location.search : '#' + name);
+  };
+  for (const t of tabs) t.addEventListener('click', () => show(t.dataset.section));
+  addEventListener('hashchange', () => show(location.hash.slice(1), true));
+  show(location.hash.slice(1), true);
+})();
+</script>
 </body>
 </html>

@@ -9,8 +9,9 @@ Reads
 
 Writes
   songs/<slug>/index.html      the reader for that song
-  index.html                   only the song sections (a heading and its cards) between <!-- songs:start -->
-                               and <!-- songs:end -->, and the app script between <!-- app:start --> and <!-- app:end -->
+  index.html                   only the tabs and song sections (a heading and its cards) between
+                               <!-- songs:start --> and <!-- songs:end -->, and the app script between
+                               <!-- app:start --> and <!-- app:end -->
   sw.js                        the offline copy (from tools/sw_template.js): every page and file the site
                                needs, each with a fingerprint, so a change reaches copies already on phones
 
@@ -285,17 +286,25 @@ def song_page(reader, song, facts, app, revs):
     return HEAD + app + head + '\n</head>\n<body>\n' + b.lstrip('\n') + '\n</body>\n</html>\n'
 
 
+def section_id(name):
+    """A section's short name for the page address ("Hymns" -> "hymns", as in .../#hymns)."""
+    return re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
+
+
 def home_sections(songs, facts):
-    """The home page's song list: a heading for each section, then its cards."""
+    """The home page's song list: a row of tabs (All songs, then one for each section), then a heading for each
+    section with its cards. The script at the end of index.html shows the chosen tab's section (Janelle, 2026-11-02)."""
     e = html.escape
-    out = []
-    for name in SECTIONS:
+    names = [n for n in SECTIONS if any(s['section'] == n for s in songs)]
+    out = ['  <div class="tabs" role="group" aria-label="Songs to show">\n'
+           '    <button type="button" data-section="all" aria-pressed="true">All songs</button>\n']
+    out += [f'    <button type="button" data-section="{section_id(n)}" aria-pressed="false">{e(n)}</button>\n' for n in names]
+    out.append('  </div>\n\n')
+    for name in names:
         group = [s for s in songs if s['section'] == name]
-        if not group:
-            continue
-        hid = 'h-' + re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
-        out.append(f'  <section aria-labelledby="{hid}">\n'
-                   f'    <h2 id="{hid}">{e(name)}</h2>\n'
+        sid = section_id(name)
+        out.append(f'  <section data-section="{sid}" aria-labelledby="h-{sid}">\n'
+                   f'    <h2 id="h-{sid}">{e(name)}</h2>\n'
                    f'    <div class="songs">\n')
         for s in group:
             f = facts[s['slug']]

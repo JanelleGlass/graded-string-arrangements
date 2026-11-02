@@ -12,7 +12,8 @@ Needs Playwright for Python and its Chromium, once per computer:
 
 What it checks
   1. Home page: a card for every song in songs.json, each under its section's heading (Christmas, Hymns, Solos,
-     Other, in that order), the home-screen app file and icons load, no script errors.
+     Other, in that order); the tabs over them (All songs, then one per section) each show only their section, a
+     link with #hymns opens on that tab; the home-screen app file and icons load, no script errors.
   2. Every song page, at laptop and phone-landscape size: the score loads with all parts,
      notes are drawn, Play moves the music forward, nothing scrolls sideways, no script errors.
      The page settings are separate buttons in the strip; On the note steps through its five looks,
@@ -72,7 +73,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SONGS = json.loads((ROOT / 'songs.json').read_text(encoding='utf-8'))
 PARTS = {s['slug']: (ROOT / 'songs' / s['slug'] / f"{s['slug']}.xml").read_text(encoding='utf-8').count('<score-part ') for s in SONGS}
 sys.path.insert(0, str(ROOT / 'tools'))
-from build_site import SECTIONS  # the home page's sections, in page order
+from build_site import SECTIONS, section_id  # the home page's sections, in page order, and their short names
 PREVIEW_HEAD = ('<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1">'
                 '<style>body{margin:0;padding:0}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>'
                 '</head><body>\n')
@@ -849,6 +850,29 @@ async def home_checks(browser, base):
     heads = await pg.evaluate("() => [...document.querySelectorAll('section h2')].map(h => h.textContent)")
     want = [x for x in SECTIONS if any(s.get('section') == x for s in SONGS)]
     check(heads[:len(want)] == want, f'sections in order: {heads[:len(want)]}')
+    # Tabs over the list (Janelle, 2026-11-02): All songs, then one for each section. A tab shows only its section's
+    # cards and puts it in the address (#hymns), so a link opens on that tab; All songs shows every card again.
+    tabs = await pg.evaluate("() => [...document.querySelectorAll('.tabs button')].map(b => b.textContent)")
+    check(tabs == ['All songs', *want], f'tabs: {tabs}')
+    state = """() => ({ shown: [...document.querySelectorAll('a.song')].filter(a => a.offsetParent).map(a => a.getAttribute('href')),
+      on: [...document.querySelectorAll('.tabs [aria-pressed=true]')].map(b => b.textContent), hash: location.hash })"""
+    for name in want:
+        await pg.click(f'.tabs button:text-is("{name}")')
+        got = await pg.evaluate(state)
+        expect = [f"songs/{s['slug']}/" for s in SONGS if s.get('section') == name]
+        check(got['shown'] == expect and got['on'] == [name] and got['hash'] == '#' + section_id(name),
+              f"{name} tab shows only its {len(expect)} piece(s) ({len(got['shown'])} shown, {got['on']}, {got['hash']!r})")
+    await pg.click('.tabs button:text-is("All songs")')
+    got = await pg.evaluate(state)
+    check(len(got['shown']) == len(SONGS) and got['on'] == ['All songs'] and got['hash'] == '',
+          f"All songs shows all {len(SONGS)} again ({len(got['shown'])} shown, {got['hash']!r})")
+    if len(want) > 1:
+        linked = await ctx.new_page()
+        await linked.goto(f'{base}/#{section_id(want[1])}')
+        got = await linked.evaluate(state)
+        check(got['on'] == [want[1]] and len(got['shown']) == sum(s.get('section') == want[1] for s in SONGS),
+              f"a link to #{section_id(want[1])} opens on the {want[1]} tab ({got['on']}, {len(got['shown'])} shown)")
+        await linked.close()
     # Added to a phone's home screen, the site opens like an app (no address bar): the app file and its icons load.
     app = await pg.evaluate("""async () => {
       const link = document.querySelector('link[rel=manifest]'), touch = document.querySelector('link[rel=apple-touch-icon]');
