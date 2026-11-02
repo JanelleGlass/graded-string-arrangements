@@ -11,8 +11,8 @@ Needs Playwright for Python and its Chromium, once per computer:
     python3 -m playwright install chromium
 
 What it checks
-  1. Home page: a card for every song in songs.json, the home-screen app file and icons load,
-     no script errors.
+  1. Home page: a card for every song in songs.json, each under its section's heading (Christmas, Hymns, Solos,
+     Other, in that order), the home-screen app file and icons load, no script errors.
   2. Every song page, at laptop and phone-landscape size: the score loads with all parts,
      notes are drawn, Play moves the music forward, nothing scrolls sideways, no script errors.
      The page settings are separate buttons in the strip; On the note steps through its five looks,
@@ -71,6 +71,8 @@ from playwright.async_api import async_playwright
 ROOT = Path(__file__).resolve().parent.parent
 SONGS = json.loads((ROOT / 'songs.json').read_text(encoding='utf-8'))
 PARTS = {s['slug']: (ROOT / 'songs' / s['slug'] / f"{s['slug']}.xml").read_text(encoding='utf-8').count('<score-part ') for s in SONGS}
+sys.path.insert(0, str(ROOT / 'tools'))
+from build_site import SECTIONS  # the home page's sections, in page order
 PREVIEW_HEAD = ('<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1">'
                 '<style>body{margin:0;padding:0}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>'
                 '</head><body>\n')
@@ -839,6 +841,14 @@ async def home_checks(browser, base):
     for s in SONGS:
         check(f"songs/{s['slug']}/" in links, f"card for {s['title']}")
     check(len(links) == len(SONGS), f'{len(links)} cards for {len(SONGS)} songs')
+    # The cards sit in sections (Christmas, Hymns, Solos, Other), each under its heading, in the build's order.
+    under = await pg.evaluate("""() => Object.fromEntries([...document.querySelectorAll('a.song')].map(a =>
+      [a.getAttribute('href'), a.closest('section')?.querySelector('h2')?.textContent || '']))""")
+    wrong = [s['title'] for s in SONGS if under.get(f"songs/{s['slug']}/") != s.get('section')]
+    check(not wrong, 'every card sits under its section heading' + (f': not {wrong}' if wrong else ''))
+    heads = await pg.evaluate("() => [...document.querySelectorAll('section h2')].map(h => h.textContent)")
+    want = [x for x in SECTIONS if any(s.get('section') == x for s in SONGS)]
+    check(heads[:len(want)] == want, f'sections in order: {heads[:len(want)]}')
     # Added to a phone's home screen, the site opens like an app (no address bar): the app file and its icons load.
     app = await pg.evaluate("""async () => {
       const link = document.querySelector('link[rel=manifest]'), touch = document.querySelector('link[rel=apple-touch-icon]');
