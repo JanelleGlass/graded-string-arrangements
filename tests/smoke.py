@@ -42,7 +42,10 @@ What it checks
      song. Tapping a note rings that note: where a Concert part's two voices start a note together (alone and with a
      part shown above it), and where a note sits over the other voice's rest. Choices are saved as the graded 40
      ('voices40', which a reader from before the extra rows knows) with the full layout beside it, and a second
-     visit shows the same parts. A piece with no levels (one line on some or all instruments, such as Twinkle
+     visit shows the same parts. Songs with a Piano part last (Silent Night): a Piano row at the bottom with one eye
+     across the instrument columns, the piano shown and played on its own, two staves named "Pno" inside the music's
+     left edge, no string colours (String colors says so), the piano sound loaded with the strings, the About box
+     naming it, and the choices saved with the full layout. A piece with no levels (one line on some or all instruments, such as Twinkle
      Harmony): a first visit shows the first part, one row named for the line under a Part heading, any instrument it
      isn't for greyed out in place (a tap says why), no group rule, the About box saying who it is for, a part taken
      off the page staying off after a reload, and (Twinkle Harmony) a choice saved when it was for viola and cello
@@ -1200,6 +1203,65 @@ async def extras_song_checks(browser, base, slug, extra):
         await ctx.close()
 
 
+async def piano_checks(browser, base):
+    """A song whose last part is a Piano (the hymn on two staves; Silent Night, 2026-11-02): one row, one eye."""
+    import xml.etree.ElementTree as ET
+    def last_name(slug):
+        return ET.parse(ROOT / 'songs' / slug / f'{slug}.xml').getroot().find('part-list').findall('score-part')[-1].findtext('part-name').strip()
+    slug = next((s['slug'] for s in SONGS if last_name(s['slug']) == 'Piano'), None)
+    if not slug:
+        print('Parts panel, piano part: no such song, skipped')
+        return
+    n = PARTS[slug]
+    ck = lambda ok, what: check(ok, f'{slug}: {what}')
+    print(f'Parts panel, piano part ({n} parts): {slug}')
+    for label, w, h in [('laptop', 1366, 860), ('phone landscape', 844, 390)]:
+        ctx = await browser.new_context(device_scale_factor=1, service_workers='block')
+        await setup(ctx)
+        errors, sounds = [], []
+        ctx.on('requestfinished', lambda r: sounds.append(r.url.split('/')[-1].split('?')[0]) if '/soundfont/' in r.url else None)
+        pg = await open_reader(ctx, f'{base}/songs/{slug}/', errors, slug, w, h)
+        pg.on('console', lambda m: errors.append(f'{slug}: {m.text}') if m.type == 'error' else None)
+        await pg.evaluate(SPY_JS)
+        await pg.click('#g-parts'); await pg.wait_for_timeout(600)
+        names = await pg.evaluate("() => [...document.querySelectorAll('#mixParts .mix-name')].map(n => [...n.children].find(c => c.offsetParent && !c.classList.contains('lvl-same')).textContent)")
+        ck(names[-1] == 'Piano' and names[:10] == (VOICE_ROWS if label == 'laptop' else names[:10]), f'{label}: the Piano row comes last ({names[10:]})')
+        r = len(names) - 1
+        eyes = await pg.evaluate(f"() => [...document.querySelectorAll('#mixParts .tog.see')].filter(b => b.offsetParent && b.id.startsWith('see-{r}-')).map(b => [b.id, b.className, b.title])")
+        ck(len(eyes) == 1 and 'wide' in eyes[0][1] and 'none' not in eyes[0][1] and eyes[0][2] == 'See Piano',
+           f'{label}: one eye for the Piano, across the instrument columns ({eyes})')
+        wide = await pg.evaluate('() => document.documentElement.scrollWidth - window.innerWidth')
+        ck(wide <= 1, f'{label}: no sideways scrolling ({wide}px extra)')
+        ck('piano-generaluser-sf2.b64.txt' in sounds and 'strings-generaluser-sf2.b64.txt' in sounds, f'{label}: the piano sound loads with the strings ({sounds})')
+        if label != 'laptop':
+            ck(not errors, f'{label}: no script errors' + (f': {errors[:3]}' if errors else ''))
+            await ctx.close()
+            continue
+        # The piano alone: shown and played, two staves named "Pno", no string colours.
+        await pg.click(f'#see-{r}-0'); await pg.click('#see-4-0'); await pg.wait_for_timeout(2500)
+        ck(await pg.evaluate(SHOWN_JS) == [n - 1] and await pg.evaluate(PLAYING_JS) == [n - 1],
+           f'the eye shows and plays the Piano alone ({await pg.evaluate(SHOWN_JS)})')
+        staff = await pg.evaluate('() => reader.api.tracks.map(t => [t.name, t.staves.length])')
+        ck(staff == [['Pno', 2]], f'the piano is two staves named Pno ({staff})')
+        coloured = await pg.evaluate(f"() => reader.api.score.tracks[{n - 1}].staves.flatMap(s => s.bars.flatMap(b => b.voices.flatMap(v => v.beats.flatMap(be => be.notes)))).filter(x => x.style).length")
+        ck(coloured == 0, f'the piano has no string colours ({coloured} coloured notes)')
+        inside = await pg.evaluate("""() => { const edge = document.getElementById('sheet').getBoundingClientRect().left;
+          return [...document.querySelectorAll('#sheet .at-surface svg g[transform*="rotate"] > text')].filter(t => t.textContent === 'Pno').map(t => Math.round(t.getBoundingClientRect().left - edge)); }""")
+        ck(inside and min(inside) >= 0, f'the name Pno starts inside the music ({inside} px from its left edge)')
+        for _ in range(3):
+            await pg.click('#g-colors'); await pg.wait_for_timeout(300)
+            told = await pg.text_content('#toast') or ''
+            if not told.endswith('off'): break
+        ck('Piano parts have no string colors' in told, f'String colors says the Piano has none ("{told}")')
+        about = await pg.evaluate("() => document.getElementById('infoPop').textContent")
+        ck('a piano part' in about, 'the About box names the piano part')
+        stored = await pg.evaluate(f"() => JSON.parse(localStorage.getItem('{slug}-reader') || '{{}}')")
+        ck(stored.get('parts') == 'voices40' and str(stored.get('partsFull', '')).endswith('+piano') and stored.get('seen') == [n - 1],
+           f"choices are saved with the full layout ({stored.get('parts')}, {stored.get('partsFull')}, {stored.get('seen')})")
+        ck(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
+        await ctx.close()
+
+
 async def main():
     began = time.monotonic()
     base = serve()
@@ -1213,6 +1275,7 @@ async def main():
         await one_line_checks(browser, base)
         await print_checks(browser, base)
         await extras_checks(browser, base)
+        await piano_checks(browser, base)
         await preview_checks(browser, base)
         await app_checks(browser)
         await browser.close()

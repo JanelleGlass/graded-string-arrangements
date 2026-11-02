@@ -392,6 +392,7 @@ html.small .group-rule { padding-bottom: 2px; font-size: 0.7rem; }
 .mix-div { grid-column: 1 / -1; height: 1px; background: var(--line); }
 .mix-list.voices .mix-h { box-shadow: 6px 0 0 var(--panel); } /* the headings cover the gaps between them, which the hairlines and the rule scroll under */
 .tog.none { opacity: 0.42; border-style: dashed; cursor: default; }
+.tog.wide { grid-column: span 4; justify-self: center; } /* the Piano row's one part, across the instrument columns */
 .tog.none:hover { border-color: var(--line); }
 .tempo-big { font-family: var(--font-display); font-size: 2.1rem; font-weight: 600; line-height: 1; text-align: center; font-variant-numeric: tabular-nums; }
 .qn { width: 0.42em; height: 1em; fill: currentColor; vertical-align: -0.12em; }
@@ -660,6 +661,8 @@ body.following .host-only { display: none !important; }
   const FONT_URL = '../../assets/font/Bravura.woff2?v=181e0e7c48';
   // String sounds: GeneralUser GS cut down to the violin, viola, cello, bass and pizzicato presets, as base64 text.
   const SOUNDFONT_URL = '../../assets/soundfont/strings-generaluser-sf2.b64.txt?v=bcdca70e5f';
+  // A song with a Piano part also loads GeneralUser GS's Grand Piano, added to the strings ('' = no piano).
+  const PIANO_SOUNDFONT_URL = '';
   const PDF_URL = ''; // Paste the Payhip product link here when it exists.
   const BASE_TEMPO = 60; // written tempo, from bar 1 of the score
   // A score that changes tempo partway through: the tempo control reads as a percentage of the written tempos,
@@ -707,6 +710,11 @@ body.following .host-only { display: none !important; }
     note: 'Played with the group by a teacher or an advanced player: double stops, three- and four-note chords and drones. Up to fifth position.' };
   const LAYOUTS = { tiers: TIERS, voices: VOICES34, voices40: VOICES, 'voices40+counter': [...VOICES, COUNTER],
     'voices40+concert': [...VOICES, CONCERT], 'voices40+counter+concert': [...VOICES, COUNTER, CONCERT] };
+  // A Piano part, last (Silent Night, 2026-11-02): the hymn as the hymnal prints it, on two staves. One part, not one
+  // per instrument, so its row has a single eye across the instrument columns; named "Piano" in the score.
+  const PIANO = { name: 'Piano', short: 'Piano', insts: [0], level: true, extra: true, plain: true, piano: true,
+    note: 'The hymn as the hymnal prints it, on two staves, for a pianist playing with the group.' };
+  for (const id of Object.keys(LAYOUTS)) if (id.startsWith('voices40')) LAYOUTS[id + '+piano'] = [...LAYOUTS[id], PIANO];
   // A piece with no levels has one line, named the same on each of its instruments (Twinkle Harmony: "Viola —
   // Harmony", "Cello — Harmony"): one row, with the other instruments greyed out. Its id names the instruments and the
   // line ("one:12:Harmony"), so saved choices find it again before the score has loaded.
@@ -727,7 +735,7 @@ body.following .host-only { display: none !important; }
   // The layout whose part names ("Viola — Easy Inner") the score has, in order; else one line, if every part has the
   // same line's name, in violin-to-bass order; the six levels if neither.
   const layoutOf = (names) => Object.keys(LAYOUTS).find(id => {
-    const want = LAYOUTS[id].flatMap(row => (row.insts || [0, 1, 2, 3]).map(i => INSTRUMENTS[i] + ' — ' + row.name));
+    const want = LAYOUTS[id].flatMap(row => row.piano ? ['Piano'] : (row.insts || [0, 1, 2, 3]).map(i => INSTRUMENTS[i] + ' — ' + row.name));
     return want.length === names.length && want.every((w, k) => names[k].replace(/\s*\(pizz\.\)\s*$/, '').replace(/\s*[—–-]\s*/, ' — ').trim() === w);
   }) || oneLineOf(names) || 'tiers';
   function oneLineOf(names) {
@@ -1050,7 +1058,7 @@ body.following .host-only { display: none !important; }
   }
   function mixTog(list, kind, id, label, onClick) {
     const b = document.createElement('button');
-    b.type = 'button'; b.className = 'tog ' + kind + (kind === 'hear' ? ' hcol host-only' : ''); b.id = id;
+    b.type = 'button'; b.className = 'tog ' + kind + (kind.startsWith('hear') ? ' hcol host-only' : ''); b.id = id;
     b.setAttribute('aria-label', label); b.title = label;
     b.addEventListener('click', onClick);
     list.append(b);
@@ -1083,6 +1091,13 @@ body.following .host-only { display: none !important; }
       name.innerHTML = '<span class="lvl-long"></span><span class="lvl-short"></span><span class="lvl-same"></span>';
       name.children[0].textContent = row.name; name.children[1].textContent = row.short;
       name.children[2].id = 'same-' + r;
+      if (row.piano) { // one part: one eye (and one speaker) across the four instrument columns
+        const ti = row.cells[0];
+        mixTog(list, 'see wide', 'see-' + r + '-0', 'See Piano', () => { noteTier = r; toggleSee(ti); });
+        mixCell(list, 'mix-gap hcol', '', true);
+        mixTog(list, 'hear wide', 'hear-' + r + '-0', 'Hear Piano', () => { noteTier = r; hearPart(ti); });
+        return;
+      }
       row.cells.forEach((ti, i) => ti == null ? mixNone(list, 'see', r, i)
         : mixTog(list, 'see', 'see-' + r + '-' + i, 'See ' + INSTRUMENTS[i] + ', ' + row.name, () => { noteTier = r; toggleSee(ti); }));
       mixCell(list, 'mix-gap hcol', '', true);
@@ -1174,7 +1189,7 @@ body.following .host-only { display: none !important; }
     $('tierNote').append(b, ' ' + ROWS[nt].note);
     // The tab's name (read out, and shown on pointing at it) says the part on the page, or counts them.
     const idx = shownIndexes();
-    const on = idx.length === 1 ? INSTRUMENTS[instOf(idx[0])] + ' · ' + ROWS[rowOf(idx[0])].name : idx.length + ' parts';
+    const on = idx.length === 1 ? (ROWS[rowOf(idx[0])].piano ? 'Piano' : INSTRUMENTS[instOf(idx[0])] + ' · ' + ROWS[rowOf(idx[0])].name) : idx.length + ' parts';
     $('g-parts').setAttribute('aria-label', 'Parts to see and hear: ' + on + ' on the page');
     $('g-parts').title = 'Parts: ' + on;
   }
@@ -1395,7 +1410,7 @@ body.following .host-only { display: none !important; }
   // Why the parts on the page have no finger numbers (or string colours): said when a tap can't show them.
   function noMarksWhy(what) {
     const rows = [...new Set(shownIndexes().map(rowOf))].map(r => ROWS[r]);
-    const names = [...new Set(rows.map(r => r.plain ? 'Concert' : r.name === 'Open Strings' && what === 'finger numbers' ? 'Open Strings' : null).filter(Boolean))];
+    const names = [...new Set(rows.map(r => r.piano ? 'Piano' : r.plain ? 'Concert' : r.name === 'Open Strings' && what === 'finger numbers' ? 'Open Strings' : null).filter(Boolean))];
     return names.length ? ' (' + names.join(' and ') + ' parts have no ' + what + ')' : '';
   }
   function applyMarks() {
@@ -1545,11 +1560,12 @@ body.following .host-only { display: none !important; }
   }
 
   function labelStaves(idx) {
-    // Label each staff with whatever tells the shown staves apart: the instrument, the level, or both.
-    const insts = new Set(idx.map(instOf)), tiers = new Set(idx.map(rowOf));
+    // Label each staff with whatever tells the shown staves apart: the instrument, the level, or both. The piano is "Pno".
+    const strings = idx.filter(i => !ROWS[rowOf(i)]?.piano);
+    const insts = new Set(strings.map(instOf)), tiers = new Set(strings.map(rowOf));
     score.tracks.forEach((t, i) => {
       const inst = SHORT[INSTRUMENTS[instOf(i)]], tier = ROWS[rowOf(i)]?.short ?? '';
-      const name = tiers.size > 1 && insts.size > 1 ? inst + ' ' + tier : tiers.size > 1 ? tier : inst;
+      const name = ROWS[rowOf(i)]?.piano ? 'Pno' : tiers.size > 1 && insts.size > 1 ? inst + ' ' + tier : tiers.size > 1 ? tier : inst;
       t.shortName = name; t.name = name;
     });
   }
@@ -1557,7 +1573,7 @@ body.following .host-only { display: none !important; }
     $('loading').hidden = false;
     const idx = shownIndexes();
     labelStaves(idx);
-    if (nameRoom.part || nameRoom.line) { nameRoom = { part: 0, line: 0 }; setSpacing(api.settings.display); api.updateSettings(); } // new names: measure afresh
+    if (nameRoom.part || nameRoom.line || nameRoom.left) { nameRoom = { part: 0, line: 0 }; setSpacing(api.settings.display); api.updateSettings(); } // new names: measure afresh
     api.renderTracks(idx.map(i => score.tracks[i]));
   }
 
@@ -3153,16 +3169,21 @@ body.following .host-only { display: none !important; }
   }
   // Each part's name runs sideways beside its staff. With the lines close together a long name ("C Adv. bass line")
   // can be taller than its staff and run into the next part's name; then the music is drawn again with just enough
-  // room between those staves (between parts, or between lines of music). Returns true when it started a new drawing.
+  // room between those staves (between parts, or between lines of music). A name left of a brace (the Piano's) can start
+  // past the left edge of the music; then the music is drawn again with that much more room on the left (nameRoom.left).
+  // Returns true when it started a new drawing.
   let nameRoom = { part: 0, line: 0 }, nameTries = 0, namePending = false;
   function fitNames() {
     const surf = $('sheet').querySelector('.at-surface');
     if (!surf || !api || !api.boundsLookup || nameTries >= 2) return false;
     const top = surf.getBoundingClientRect().top, systems = api.boundsLookup.staffSystems;
-    const names = [];
+    const names = [], edge = $('sheet').getBoundingClientRect().left + 1;
+    const braced = shownIndexes().some(ti => ROWS[rowOf(ti)]?.piano); // only a braced name runs past the edge
+    let left = 0;
     for (const t of surf.querySelectorAll('svg g[transform*="rotate"] > text')) {
       const r = t.getBoundingClientRect();
       if (!r.height) continue;
+      if (braced) left = Math.max(left, edge - r.left);
       const mid = (r.top + r.bottom) / 2 - top;
       names.push({ top: r.top, bottom: r.bottom, line: systems.findIndex(s => mid >= s.realBounds.y && mid <= s.realBounds.y + s.realBounds.h) });
     }
@@ -3174,8 +3195,9 @@ body.following .host-only { display: none !important; }
       if (short <= 0) continue;
       if (names[i].line === names[i - 1].line) part = Math.max(part, short); else line = Math.max(line, short);
     }
-    if (!part && !line) return false;
-    nameRoom = { part: nameRoom.part + Math.ceil(part / scale), line: nameRoom.line + Math.ceil(line / scale) };
+    if (!part && !line && left <= 0) return false;
+    nameRoom = { part: nameRoom.part + Math.ceil(part / scale), line: nameRoom.line + Math.ceil(line / scale),
+      left: (nameRoom.left || 0) + Math.max(0, left) / scale }; // in the music's own units, so it follows the size
     nameTries++; namePending = true;
     applySize(); api.render();
     return true;
@@ -3196,7 +3218,9 @@ body.following .host-only { display: none !important; }
     const d = api.settings.display, narrow = window.innerWidth < 560, mid = window.innerWidth < 900;
     d.scale = musicScale();
     d.layoutMode = state.layout === 'line' ? alphaTab.LayoutMode.Horizontal : alphaTab.LayoutMode.Page;
-    d.padding = document.documentElement.classList.contains('small') && !onPaper() ? [10, 2] : [10, 10];
+    const v = document.documentElement.classList.contains('small') && !onPaper() ? 2 : 10;
+    const left = Math.ceil((nameRoom.left || 0) * d.scale); // the padding is in screen pixels
+    d.padding = left ? [10 + left, v, 10, v] : [10, v]; // left, top, right, bottom
     d.stretchForce = (BIG() && fingerSpot() !== 'inside' ? 1.35 : 1) * (onPaper() ? 0.5 : 1);
     setSpacing(d);
     api.updateSettings();
@@ -3227,6 +3251,18 @@ body.following .host-only { display: none !important; }
     } catch {
       $('playText').textContent = 'No sound';
       fail('The instrument sounds did not load, so playback is off. You can still read the music.');
+      return;
+    }
+    if (!PIANO_SOUNDFONT_URL) return;
+    try { // the piano, added to the strings
+      const r = await fetch(PIANO_SOUNDFONT_URL);
+      if (!r.ok) throw new Error('missing');
+      const bin = atob((await r.text()).trim());
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      api.loadSoundFont(bytes, true);
+    } catch {
+      toast('The piano sound did not load, so the Piano part is silent', 4000);
     }
   }
 
@@ -3790,7 +3826,7 @@ body.following .host-only { display: none !important; }
   function paperHead() {
     const head = document.createElement('header'), el = (tag, cls, text) => { const e = document.createElement(tag); e.className = cls; e.textContent = text; return e; };
     head.className = 'pr-head';
-    head.append(el('p', 'pr-parts', shownIndexes().map(ti => INSTRUMENTS[instOf(ti)] + ' — ' + ROWS[rowOf(ti)].name).join(' · ')));
+    head.append(el('p', 'pr-parts', shownIndexes().map(ti => ROWS[rowOf(ti)].piano ? 'Piano' : INSTRUMENTS[instOf(ti)] + ' — ' + ROWS[rowOf(ti)].name).join(' · ')));
     if (!$('legend').hidden) { const key = $('legend').cloneNode(true); key.removeAttribute('id'); head.append(key); }
     head.append(el('h1', 'pr-title', document.querySelector('.info-title').textContent), el('p', 'pr-src', document.querySelector('.info-src').textContent));
     return head;
