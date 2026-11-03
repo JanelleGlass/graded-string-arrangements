@@ -340,9 +340,12 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   notes all alike, so a bar with a sixteenth and "↓2" spreads as a whole: What Child Is This's violin melody takes 10
   lines instead of 7, still two sheets). The print chooses where the lines end (alphaTab's model layout: bars per line
   and each bar's share), as few lines as fit, each about as full as the next, the last line full width too, and a bar
-  ending a line is wide enough for its words ("Allargando" was cut off). A last sheet less than half full is saved by
-  printing the music smaller, down to 80% of its size, again while the new last sheet is under half full (Joy to the
-  World: one sheet, was two; Morning Has Broken: three, was five). Planned for Letter (A4 is taller) with 4% to spare;
+  ending a line is wide enough for its words ("Allargando" was cut off). A last sheet less than 60% full is saved by
+  printing the music smaller, down to 80% of its size, again while the new last sheet is under 60% full (Joy to the
+  World: one sheet, was two; Morning Has Broken: three, was five). It was half full until 2026-11-03, when Joy's second
+  sheet came out 53% full on Windows (the one sheet had been measured on Linux, whose lettering measures a little
+  differently) and Janelle chose 60%; that also put Drunken Sailor's violin melody on one sheet (at 80%, was two) and
+  the Epic's on eight (was nine). Planned for Letter (A4 is taller) with 4% to spare;
   sheets fill as a browser fills them (a line that doesn't fit starts a new sheet). It takes about 0.3 to 1.5 seconds.
   Where the print window doesn't open by itself, the card says "The music is ready to print." with a Print button.
   The browser's own Print menu on pages prints the music as drawn on the screen; in one long line it prints the page
