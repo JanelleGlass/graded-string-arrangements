@@ -1357,6 +1357,46 @@ body.following .host-only { display: none !important; }
       )
     );
   }
+  // A pickup shorter than a whole beat (the Wellerman's eighth in 4/4): the player counts in whole beats and starts
+  // the music straight after, so the pickup came in on the beat ("1 2 3 4 1 2 3", pickup on 4) and every click
+  // while playing fell on an "&". Silence in front of the pickup, written as an unseen gap (a MusicXML forward) in
+  // every part's first bar, fills it out to a whole beat: the count runs "1 2 3 4 1 2 3", the gap is 4 and the
+  // pickup lands on its "&". Nothing is drawn for the gap; the counts, start ring and taps skip it.
+  function padPickup(doc) {
+    const parts = [...doc.querySelectorAll('part')];
+    const firsts = parts.map(p => p.querySelector(':scope > measure'));
+    if (!firsts.length || firsts.some(m => !m)) return false;
+    let divisions = [], len = 0, beatQ = 0;
+    firsts.forEach((m, k) => {
+      const at = m.querySelector(':scope > attributes');
+      divisions[k] = Number(at?.querySelector('divisions')?.textContent) || 1;
+      const den = Number(at?.querySelector('time > beat-type')?.textContent);
+      if (den && !beatQ) beatQ = 4 / den;
+      let pos = 0, most = 0;
+      for (const el of m.children) {
+        const d = Number(el.querySelector(':scope > duration')?.textContent) || 0;
+        if (el.tagName === 'note' && !el.querySelector('chord') && !el.querySelector('grace')) pos += d;
+        else if (el.tagName === 'backup') pos -= d;
+        else if (el.tagName === 'forward') pos += d;
+        most = Math.max(most, pos);
+      }
+      len = Math.max(len, most / divisions[k]); // in quarter notes
+    });
+    const num = Number(firsts[0].querySelector(':scope > attributes time > beats')?.textContent);
+    if (!beatQ || !num || len <= 0 || len >= num * beatQ - 1e-6) return false; // no pickup
+    const gapQ = Math.ceil(len / beatQ - 1e-6) * beatQ - len;
+    if (gapQ < 1e-6) return false; // whole beats already
+    const durs = divisions.map(d => gapQ * d);
+    if (durs.some(d => Math.abs(d - Math.round(d)) > 1e-6)) return false;
+    firsts.forEach((m, k) => {
+      const fw = doc.createElementNS(null, 'forward'), du = doc.createElementNS(null, 'duration');
+      du.textContent = String(Math.round(durs[k]));
+      fw.appendChild(du);
+      const before = [...m.children].find(el => !['attributes', 'print', 'barline'].includes(el.tagName));
+      m.insertBefore(fw, before || null);
+    });
+    return true;
+  }
   // The score's words (a tempo word, a section name, "dolce", "rit."), per part, by bar and where in the bar they
   // fall. The music reader keeps only the last words before a note, so a tempo word followed by a section name
   // would lose the tempo word; reading them here keeps both. A tempo word is one written with a tempo change.
@@ -1538,6 +1578,12 @@ body.following .host-only { display: none !important; }
     // Bar start ticks were worked out before the pickup was marked; redo them so they match playback.
     let t = 0;
     for (const mb of score.masterBars) { mb.start = t; t += mb.calculateDuration(); }
+    // The unseen gap before a short pickup (padPickup) keeps its time but takes no room: the notes after it are laid
+    // out from the start of the bar, as written.
+    for (const tr of score.tracks) for (const st of tr.staves) for (const v of st.bars[0]?.voices || []) {
+      const shift = v.beats.length > 1 && v.beats[0].isEmpty ? v.beats[1].displayStart : 0;
+      if (shift) v.beats.forEach((b, k) => { if (k) b.displayStart -= shift; });
+    }
     // Give every part its own playback channel so each keeps its own sound and can be muted on its own.
     let ch = 0;
     for (const t of score.tracks) {
@@ -1603,7 +1649,8 @@ body.following .host-only { display: none !important; }
   // voice the counts follow (the tune), else the first voice's.
   function beatAt(ti, bi, rel) {
     const voices = score.tracks[ti].staves[0].bars[bi].voices, beats = voices[0].beats;
-    const first = beats.find(b => rel >= b.playbackStart - 1 && rel < b.playbackStart + b.playbackDuration) || beats[0];
+    let first = beats.find(b => rel >= b.playbackStart - 1 && rel < b.playbackStart + b.playbackDuration) || beats[0];
+    if (first && first.isEmpty) first = beats.find(b => !b.isEmpty) || first; // the unseen gap before a short pickup
     if (voices.length < 2) return first;
     if (markBeat && markBeat.voice.bar.staff.track.index === ti && markBeat.voice.bar.index === bi && Math.abs(rel - markBeat.playbackStart) <= 1) return markBeat;
     const starts = voices.flatMap(v => v.beats).filter(b => !b.isRest && Math.abs(rel - b.playbackStart) <= 1);
@@ -1941,7 +1988,7 @@ body.following .host-only { display: none !important; }
   function startTickFor(countIn) {
     let tick = api.tickPosition || 0;
     const bi = barAtTick(tick);
-    if (countIn && bi > 0 && tick - score.masterBars[bi].start > 10) tick = score.masterBars[bi].start;
+    if (countIn && tick - score.masterBars[bi].start > 10) tick = score.masterBars[bi].start;
     return tick;
   }
   function clearTimers() { conductor.timers.forEach(clearTimeout); conductor.timers = []; }
@@ -2418,7 +2465,7 @@ body.following .host-only { display: none !important; }
     let tick = api.tickPosition || 0;
     let bi = barAtTick(tick);
     // Start counting from the top of the bar so the count leads straight into beat 1.
-    if (bi > 0 && tick - score.masterBars[bi].start > 10) { tick = score.masterBars[bi].start; api.tickPosition = tick; }
+    if (tick - score.masterBars[bi].start > 10) { tick = score.masterBars[bi].start; api.tickPosition = tick; } // a pickup too: from its unseen gap
     markTick = tick;
     const mb = score.masterBars[bi];
     const perBar = mb.timeSignatureNumerator;
@@ -2887,7 +2934,7 @@ body.following .host-only { display: none !important; }
           const k = beats.findIndex(b => at >= b.playbackStart && at < b.playbackStart + b.playbackDuration);
           if (k < 0) continue;
           const beat = beats[k], bb = lookup.findBeat(beat);
-          if (!bb) continue;
+          if (!bb || beat.isEmpty) continue;
           const nb = beats[k + 1] && lookup.findBeat(beats[k + 1]);
           const bar = bb.barBounds.visualBounds;
           const x0 = bb.onNotesX, x1 = nb ? nb.onNotesX : bar.x + bar.w - sz * 0.4;
@@ -4341,6 +4388,7 @@ body.following .host-only { display: none !important; }
     } catch { return fail('The score did not load. Reload the page to try again.'); }
 
     const xmlDoc = new DOMParser().parseFromString(new TextDecoder().decode(xmlBuf), 'application/xml');
+    if (padPickup(xmlDoc)) xmlBuf = new TextEncoder().encode(new XMLSerializer().serializeToString(xmlDoc)).buffer;
     marks = readMarks(xmlDoc);
     words = readWords(xmlDoc);
     // The six levels, levels and voices, or one line, from the part names; the Parts table follows.
