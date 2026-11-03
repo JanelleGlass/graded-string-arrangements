@@ -299,6 +299,7 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   "Audio latency" is the next step. alphaTab's .min.js shortens its own internal names, so the reader measures
   through the browser's audio node and alphaTab's public events, never alphaTab's underscore names.
 - Metronome is one button that cycles Off → On → On with count-in → Count-in only.
+  A count-in before a pickup counts the missing beats of its bar ("1 2 3 1 2" before a one-beat pickup in 3/4). The player only counts whole beats and starts the music straight after, so a pickup shorter than a beat (the Wellerman's eighth in 4/4) came in on the beat, with an empty beat before it, and every click while playing fell on an "&" (Janelle heard the gap, 2026-11-03). The reader now puts an unseen half beat of silence in front of such a pickup (a MusicXML forward in each part's first bar, `padPickup`), laid out with no room, so it counts "1 2 3 4 1 2 3", the gap is 4 and the pickup lands on its "&". The counts and the start ring skip the gap. A count-in started anywhere in the first bar counts from the top of it, like any other bar.
 - Tap a note to choose where Play starts: a thin, pale ring around the note head until the music
   starts. No flag.
 - Drag across bars (on touch: press, hold, then drag) to loop them. Tapping outside the loop clears
