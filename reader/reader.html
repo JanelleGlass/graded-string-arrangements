@@ -3815,10 +3815,11 @@ body.following .host-only { display: none !important; }
   // A Letter sheet inside the 12 mm margins, in CSS pixels. A4 is a little narrower and taller, so what fits on Letter
   // fits on A4.
   const SHEET = { w: 725.3, h: 965.3 };
-  // A last sheet less than half full is saved by printing the music smaller, down to 80% of its size (Janelle,
-  // 2026-11-02: a second sheet only for a fair amount of music). Planned to fit 96% of a sheet, so a printer's own
-  // margins don't push a line over after all.
-  const LEFTOVER = 0.5, SMALLEST = 0.8, SNUG = 0.96;
+  // A last sheet less than 60% full is saved by printing the music smaller, down to 80% of its size (Janelle,
+  // 2026-11-02: a second sheet only for a fair amount of music; 60%, not half, since 2026-11-03: on Windows Joy to the
+  // World's second sheet came out 53% full and stayed). Planned to fit 96% of a sheet, so a printer's own margins don't
+  // push a line over after all.
+  const LEFTOVER = 0.6, SMALLEST = 0.8, SNUG = 0.96;
   const MODEL_LAYOUT = typeof alphaTab !== 'undefined' && alphaTab.SystemsLayoutMode ? alphaTab.SystemsLayoutMode.UseModelLayout : 1;
   let printTimer = 0, paperKey = null, printOpened = false;
   // What the copy for paper shows; a copy made for other choices than the page has now is not printed.
