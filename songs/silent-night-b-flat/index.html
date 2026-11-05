@@ -242,6 +242,14 @@ hr.div { border: 0; border-top: 1px solid var(--line); margin: 0; }
 /* A held note (half note, dotted quarter…): a line joins the counts it lasts through, and lights up as the note is held */
 .count-link { position: absolute; z-index: 0; border-radius: 999px; background: #CDD4D1; transition: background 0.12s; }
 .count-link.now { background: #1D5B72; }
+/* The pointer: a small finger above each part's staff that hops to the next note on each count, landing half a
+   count early; over a rest, an open palm (wait) */
+.point-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; }
+.pointer { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; will-change: transform; }
+.pointer svg { position: absolute; display: block; overflow: visible; }
+.pointer .palm, .pointer.rest .point { display: none; }
+.pointer.rest .palm { display: block; }
+@media print { .point-layer { display: none; } }
 /* Counts switched off: the row goes blank (the music is drawn again without its room, so the lines close up) */
 #sheet.counts-off .count-layer { visibility: hidden; }
 /* Dynamics (mf, f…) are nudged down under the count row; let them draw past the edge of their svg if need be */
@@ -632,6 +640,7 @@ body.following .host-only { display: none !important; }
     <button class="fab-btn cyc" id="g-colors" type="button"></button>
     <button class="fab-btn cyc" id="g-look" type="button"></button>
     <button class="fab-btn cyc" id="g-count" type="button"></button>
+    <button class="fab-btn cyc" id="g-point" type="button"></button>
     </div>
     <div class="fab-set" role="group" aria-label="Playback settings">
     <button class="fab-btn host-only" id="g-tempo" type="button" aria-expanded="false" aria-controls="pop-tempo" title="Tempo"><svg class="qn" viewBox="0 0 10 24" aria-hidden="true"><ellipse cx="4.6" cy="19.2" rx="4.4" ry="3.1" transform="rotate(-22 4.6 19.2)"/><rect x="7.7" y="1" width="1.5" height="18.2"/></svg><span id="tempoChip">100</span></button>
@@ -836,6 +845,8 @@ body.following .host-only { display: none !important; }
     fingers: saved.fingers === 'right' || saved.fingers === 'left' ? 'left' : 'inside',
     // The counts under the notes: on unless switched off with the Counting switch beside them.
     countAlong: saved.counts !== 'off',
+    // The pointer (a finger hopping to the next note): on unless switched off (Janelle, 2026-11-05).
+    pointer: saved.pointer !== 'off',
     layout: saved.layout === 'page' ? 'page' : 'line',
     // Letter names inside the notes: phones start with them on, bigger screens off (each kept on its own).
     letterMode: saved.letterMode === 'off' ? 'off' : 'all',
@@ -879,7 +890,7 @@ body.following .host-only { display: none !important; }
   // While the music is drawn for paper (Print), it is on pages for a moment; the saved choice stays the screen's.
   let printing = null;
   const onPaper = () => !!printing && printing.stage === 'paper'; // drawing the music for paper
-  const save = () => store.set({ zoom: state.zoom, parts: savedId(), partsFull: layout, seen: state.seen, heard: state.heard, hearOpen: state.hearOpen, colorMode: state.colorMode, fingerMode: state.fingerMode, tempo: state.tempo, follow: state.follow, countBy: state.unit, fingers: state.fingers, counts: state.countAlong ? 'on' : 'off', layout: printing ? printing.layout : state.layout, letterMode: state.letterMode, lettersBig: state.letterModeBig, metro: state.metro });
+  const save = () => store.set({ zoom: state.zoom, parts: savedId(), partsFull: layout, seen: state.seen, heard: state.heard, hearOpen: state.hearOpen, colorMode: state.colorMode, fingerMode: state.fingerMode, tempo: state.tempo, follow: state.follow, countBy: state.unit, fingers: state.fingers, counts: state.countAlong ? 'on' : 'off', pointer: state.pointer ? 'on' : 'off', layout: printing ? printing.layout : state.layout, letterMode: state.letterMode, lettersBig: state.letterModeBig, metro: state.metro });
 
   // ---- Room reverb ----
   // alphaTab plays through Web Audio; route whatever it sends to the speakers through a small reverb bus.
@@ -984,6 +995,14 @@ body.following .host-only { display: none !important; }
     : '<rect x="7" y="1" width="14" height="16" rx="1.8" fill="none" stroke="#1D5B72" stroke-width="1.4"/><path d="M9.5 4.6h9M9.5 6.8h9M9.5 11h9M9.5 13.2h9" stroke="#1D5B72" stroke-width="1.1" fill="none"/>') + '</svg>';
   // A button's labels, all in one spot (the button is as wide as the longest), with the current one showing.
   const stackBadge = (labels, now) => '<span class="cyc-badge stack">' + labels.map(t => '<span' + (t === now ? ' class="now"' : '') + '>' + t + '</span>').join('') + '</span>';
+  // The pointer's hand shapes (see "The pointer" below): a finger pointing down, and an open palm for a rest.
+  const HAND_POINT = '<rect x="4.4" y="0" width="11.6" height="3.4" rx="1.2"/><rect x="4" y="2.6" width="12.4" height="12.4" rx="4"/><circle cx="15.6" cy="6.4" r="2.2"/><circle cx="15.9" cy="9.9" r="2.2"/><circle cx="15.3" cy="13.2" r="2"/><rect x="1" y="5.4" width="4.8" height="8.6" rx="2.4"/><rect x="5.4" y="10.5" width="5.2" height="21" rx="2.6"/>';
+  const HAND_POINT_LINES = '<path d="M12.4 8.2h3.6M12.4 11.6h3.4"/>';
+  const HAND_PALM = '<rect x="4.6" y="11.5" width="15" height="15.5" rx="5.5"/><rect x="4.8" y="4.6" width="3.5" height="11" rx="1.75"/><rect x="8.6" y="1.6" width="3.5" height="13" rx="1.75"/><rect x="12.4" y="2.2" width="3.5" height="13" rx="1.75"/><rect x="16.2" y="5.2" width="3.4" height="10.5" rx="1.7"/><rect x="0.6" y="12.6" width="3.6" height="9.4" rx="1.8" transform="rotate(-28 2.4 17.3)"/>';
+  const handSvg = (cls, shapes, lines, vw, vh, w, h, tipX) => `<svg class="${cls}" viewBox="0 0 ${vw} ${vh}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" style="left:${(-tipX * w / vw).toFixed(1)}px;top:${(-h).toFixed(1)}px" aria-hidden="true">`
+    + `<g fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2.6" stroke-linejoin="round">${shapes}</g><g fill="#1D5B72">${shapes}</g>`
+    + (lines ? `<g fill="none" stroke="#FFFFFF" stroke-width="0.9" stroke-linecap="round" opacity="0.75">${lines}</g>` : '') + '</svg>';
+  const pointIco = (on) => `<svg class="cyc-ico" viewBox="-1.5 -1.5 23 35" style="width:13px;height:20px" aria-hidden="true"><g fill="${on ? '#1D5B72' : GREY}">${HAND_POINT}</g></svg>`;
   function renderCycles() {
     $('g-metro').innerHTML = metroIco(state.metro !== 'off') + stackBadge(Object.values(METRO_BADGE), METRO_BADGE[state.metro]);
     $('g-metro').setAttribute('aria-label', METRO_WORD[state.metro] + '. Tap to change.');
@@ -998,7 +1017,10 @@ body.following .host-only { display: none !important; }
     const cOn = state.countAlong;
     $('g-count').innerHTML = stackBadge(['Counting: On', 'Counting: Off'], cOn ? 'Counting: On' : 'Counting: Off');
     $('g-count').setAttribute('aria-label', 'Counts under the notes: ' + (cOn ? 'on' : 'off') + '. Tap to change.');
-    for (const id of ['g-metro', 'g-colors', 'g-look', 'g-layout', 'g-count']) $(id).title = $(id).getAttribute('aria-label').replace(/\. Tap to change\.$/, '');
+    const pOn = state.pointer;
+    $('g-point').innerHTML = pointIco(pOn) + stackBadge(['Pointer: On', 'Pointer: Off'], pOn ? 'Pointer: On' : 'Pointer: Off');
+    $('g-point').setAttribute('aria-label', 'A finger pointing to the next note: ' + (pOn ? 'on' : 'off') + '. Tap to change.');
+    for (const id of ['g-metro', 'g-colors', 'g-look', 'g-layout', 'g-count', 'g-point']) $(id).title = $(id).getAttribute('aria-label').replace(/\. Tap to change\.$/, '');
   }
   function toast(text, ms = 1700) {
     const el = $('toast');
@@ -1678,6 +1700,7 @@ body.following .host-only { display: none !important; }
   function drawStartMark() {
     markLayer.replaceChildren();
     if (!api || !api.boundsLookup || !score || (playing && !counting)) return;
+    idlePointer();
     const tick = Math.max(0, markTick || 0), bi = barAtTick(tick), rel = tick - score.masterBars[bi].start;
     for (const ti of shownIndexes()) {
       const beat = beatAt(ti, bi, rel);
@@ -2906,7 +2929,7 @@ body.following .host-only { display: none !important; }
   function buildCounts() {
     clearCounts();
     const wrap = $('sheet').querySelector('.at-cursors');
-    if (wrap) for (const l of [loopLayer, countLayer, markLayer]) wrap.appendChild(l); // in this order: loop shading, counts, start frame
+    if (wrap) for (const l of [loopLayer, countLayer, pointLayer, markLayer]) wrap.appendChild(l); // in this order: loop shading, counts, pointer, start frame
     countRows = [];
     if (!api || !api.boundsLookup || !score) { showCounting(); return; }
     const lookup = api.boundsLookup;
@@ -2996,6 +3019,7 @@ body.following .host-only { display: none !important; }
     countLayer.appendChild(frag);
     if (state.countAlong) moveDynamics(sz); // with the counts off there's no row to clear, so they stay under the notes
     showCounting();
+    buildPointer();
   }
   function staffTopBelow(barBounds) {
     const vb = barBounds.visualBounds, sys = barBounds.masterBarBounds.staffSystemBounds;
@@ -3104,6 +3128,7 @@ body.following .host-only { display: none !important; }
     const base = surf.getBoundingClientRect();
     const out = [];
     surf.querySelectorAll('svg rect, svg path, svg polygon, svg line').forEach((el) => {
+      if (el.closest('.point-layer')) return; // the pointer's own hand is not the music
       const r = el.getBoundingClientRect();
       if (!r.width && !r.height) return;
       out.push({ x: r.left - base.left, r: r.right - base.left, y: r.top - base.top, b: r.bottom - base.top });
@@ -3202,8 +3227,161 @@ body.following .host-only { display: none !important; }
   }
 
 
+  // ---- The pointer ----
+  // For young students who can't read rhythms yet (Janelle, 2026-11-05): a small finger above each part's staff shows
+  // where to look next. It takes one hop per count toward the next note (a half note: two hops, a whole note: four)
+  // and lands on it half a count before it plays, so the eye gets there first. It hops on the "&", so on each count
+  // it is standing still. Over a rest it is an open palm ("wait"), still hopping along. Tied notes count as one.
+  const pointLayer = document.createElement('div');
+  pointLayer.className = 'point-layer';
+  var pointRuns = []; // (var: drawStartMark can ask before this line has run) per part on the page: its finger and the notes (and rests) it stops on
+  // Every count in the piece (pickups counted from the end of their bar, as the counts do), for the hops in between.
+  function countTicks() {
+    const out = [];
+    for (const mb of score.masterBars) {
+      const beat = 3840 / mb.timeSignatureDenominator, full = mb.timeSignatureNumerator * beat;
+      const lead = mb.isAnacrusis ? full - mb.calculateDuration() : 0;
+      for (let q = Math.ceil(lead / beat) * beat; q < full; q += beat) out.push(mb.start + q - lead);
+    }
+    return out;
+  }
+  const handH = (space) => Math.max(16, space * 2.1);
+  // The lowest thing of the part above in this line of music (its counts, or its staff), or of the line above.
+  function roomAbove(barBounds) {
+    const vb = barBounds.visualBounds, sys = barBounds.masterBarBounds.staffSystemBounds;
+    let c = -Infinity;
+    if (state.countAlong) for (const r of countRows) if (r.line < vb.y - 1 && r.line > vb.y - vb.h * 4 && vb.x + vb.w > r.sx && vb.x < r.sr) c = Math.max(c, r.y1);
+    if (sys) for (const mbb of sys.bars) for (const b of mbb.bars) { const y = b.visualBounds.y + b.visualBounds.h; if (y < vb.y - 1) c = Math.max(c, y + vb.h / 4); }
+    return c;
+  }
+  function buildPointer() {
+    pointLayer.replaceChildren(); pointRuns = [];
+    if (!state.pointer || !api || !api.boundsLookup || !score || onPaper()) return;
+    const lookup = api.boundsLookup, counts = countTicks();
+    if (!ink) ink = collectInk();
+    // Bow marks and articulations are font glyphs (SMuFL), not lines, so they aren't in the ink.
+    const marks = [], surf = $('sheet').querySelector('.at-surface'), base = surf && surf.getBoundingClientRect();
+    if (surf) surf.querySelectorAll('svg text').forEach((t) => {
+      const c = (t.textContent || '').codePointAt(0);
+      if (!((c >= 0xE4A0 && c <= 0xE4BF) || (c >= 0xE610 && c <= 0xE62F))) return;
+      // Their text box is far taller than the ink: measure the glyph from its baseline (as for the dynamics).
+      try {
+        const m = t.getScreenCTM(), p = t.getStartPositionOfChar(0), px = parseFloat(getComputedStyle(t).fontSize) * (m ? m.d : 1);
+        const r = t.getBoundingClientRect(), y = m.b * p.x + m.d * p.y + m.f - base.top, ext = dynExtent(t, px);
+        if (r.width) marks.push({ x: r.left - base.left, r: r.right - base.left, y: y - ext.up, b: y + ext.down });
+      } catch {}
+    });
+    for (const ti of shownIndexes()) {
+      const stops = [];
+      score.masterBars.forEach((mb, bi) => {
+        for (const beat of countBeats(ti, bi)) {
+          if (beat.isEmpty) continue; // the unseen gap before a short pickup
+          const bb = lookup.findBeat(beat);
+          if (!bb) continue;
+          const tick = mb.start + beat.playbackStart, end = tick + beat.playbackDuration;
+          const rest = beat.isRest || !beat.notes.length;
+          const tied = !rest && beat.notes.every(n => n.isTieDestination);
+          const last = stops[stops.length - 1];
+          // A tie carries on the note before; rests one after another are one wait.
+          if (last && Math.abs(last.end - tick) < 2 && ((tied && !last.rest) || (rest && last.rest))) { last.end = end; continue; }
+          const hb = headBox(beat, bb), vb = bb.barBounds.visualBounds, space = vb.h / 4;
+          const sys = bb.barBounds.masterBarBounds.staffSystemBounds, sv = sys ? sys.visualBounds : vb;
+          // Just above the staff, or above a high note; a little higher over a high-finger arrow drawn above the head.
+          const arrow = !rest && beat.notes.some(n => (n.finger || '').includes('↑'));
+          let top = Math.min(vb.y, rest ? vb.y : hb.cy - hb.h / 2);
+          // Clear the note's stem and beam too (a short line, not a slur or the staff lines), no higher than 5 spaces.
+          if (!rest) for (const e of ink) if (e.x < hb.x + hb.w + space && e.r > hb.x - space * 0.2 && e.r - e.x < space * 6 && e.b > vb.y - space * 5 && e.y < vb.y + vb.h && e.y < top) top = Math.max(e.y, vb.y - space * 5);
+          // A bow mark (down-bow, up-bow) or other mark drawn above the note: the finger stays above it too.
+          for (const m of marks) if (m.x < hb.x + hb.w + space * 0.5 && m.r > hb.x - space * 0.5 && m.b <= vb.y + space && m.y > vb.y - space * 8 && m.y < top + space * 0.5) top = Math.min(top, m.y + space * 0.5);
+          top -= space * (arrow ? 1.5 : 0.5);
+          // Never up into the counts (or notes) of the part above: the finger stays in the room between.
+          top = Math.max(top, roomAbove(bb.barBounds) + handH(space) + 2);
+          stops.push({ tick, end, x: rest ? bb.visualBounds.x + bb.visualBounds.w / 2 : hb.x + hb.w / 2, y: top, rest, sys, right: sv.x + sv.w, space });
+        }
+      });
+      if (!stops.length) continue;
+      for (let k = 0; k < stops.length; k++) {
+        const a = stops[k].tick, b = stops[k + 1] ? stops[k + 1].tick : stops[k].end;
+        stops[k].hops = counts.filter(c => c > a + 1 && c < b - 1);
+      }
+      const h = handH(stops[0].space), w = h * 20 / 32;
+      const el = document.createElement('div');
+      el.className = 'pointer';
+      el.innerHTML = handSvg('point', HAND_POINT, HAND_POINT_LINES, 20, 32, w, h, 8) + handSvg('palm', HAND_PALM, '', 24, 28, h * 0.72 * 24 / 28, h * 0.72, 12);
+      pointLayer.appendChild(el);
+      pointRuns.push({ ti, el, stops, k: 0 });
+    }
+    idlePointer();
+  }
+  function putPointer(run, x, y, rest) {
+    run.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+    if (run.rest !== rest) { run.rest = rest; run.el.classList.toggle('rest', rest); }
+  }
+  // The last stop at or before this tick (kept from the frame before, so it is cheap while playing).
+  function stopAt(run, tick) {
+    const s = run.stops;
+    let k = Math.min(run.k, s.length - 1);
+    if (s[k].tick > tick) k = 0;
+    while (k + 1 < s.length && s[k + 1].tick <= tick) k++;
+    return (run.k = k);
+  }
+  // Stopped: on the note (or rest) Play starts from.
+  function idlePointer() {
+    for (const run of pointRuns) { const s = run.stops[stopAt(run, Math.max(0, markTick || 0) + 1)]; putPointer(run, s.x, s.y, s.rest); }
+  }
+  // Playing: half a count ahead of what is heard. Between notes it lands on each count's "&", a share of the way
+  // across in proportion to the time; each hop is a quick little arc into its landing.
+  function updatePointer(now) {
+    if (!pointRuns.length) return;
+    if (counting || now < pos.at) { idlePointer(); return; }
+    const est = playedTick(now);
+    if (est < 0) return;
+    const mb = score.masterBars[barAtTick(est)];
+    let u = est + 1920 / mb.timeSignatureDenominator; // half a count ahead
+    const r = loop && api.playbackRange;
+    const bpm = pos.bpm || BASE_TEMPO, hopT = 170 * 0.016 * bpm;
+    for (const run of pointRuns) {
+      const s = run.stops;
+      let at = u, k;
+      // Half a count before the end of a loop it goes back to the loop's first note, ready for the next time round.
+      if (r && at >= r.endTick) { k = stopAt(run, r.startTick + 1); putPointer(run, s[k].x, s[k].y, s[k].rest); continue; }
+      k = stopAt(run, at);
+      const cur = s[k];
+      if (at < cur.tick) { putPointer(run, cur.x, cur.y, cur.rest); continue; }
+      let nxt = s[k + 1], end = nxt ? nxt.tick : cur.end;
+      if (r && nxt && nxt.tick >= r.endTick) { nxt = s[stopAt(run, r.startTick + 1)]; run.k = k; end = r.endTick; }
+      if (!nxt) { putPointer(run, cur.x, cur.y, cur.rest); continue; }
+      const other = nxt.sys !== cur.sys; // the next note is on the next line of music down the page
+      const toX = other ? cur.right - cur.space : nxt.x;
+      const lands = [cur.tick, ...cur.hops.filter(c => c < end - 1), end];
+      let i = 0;
+      while (i + 2 < lands.length && lands[i + 1] <= at) i++;
+      const spot = (j) => {
+        if (j === lands.length - 1) return { x: nxt.x, y: nxt.y };
+        const f = (lands[j] - cur.tick) / (end - cur.tick);
+        return { x: cur.x + (toX - cur.x) * f, y: cur.y + (other ? 0 : (nxt.y - cur.y) * f) };
+      };
+      const from = spot(i), to = spot(i + 1);
+      const T = Math.min(hopT, (lands[i + 1] - lands[i]) * 0.6), p = Math.max(0, Math.min(1, (at - (lands[i + 1] - T)) / T));
+      if (p <= 0) { putPointer(run, from.x, from.y, cur.rest); continue; }
+      const last = i + 1 === lands.length - 1;
+      if (last && other) { putPointer(run, p < 0.5 ? from.x : to.x, p < 0.5 ? from.y : to.y, p < 0.5 ? cur.rest : nxt.rest); continue; }
+      const e = p * p * (3 - 2 * p), lift = Math.sin(Math.PI * p) * cur.space * 0.9;
+      putPointer(run, from.x + (to.x - from.x) * e, from.y + (to.y - from.y) * e - lift, last && p >= 0.5 ? nxt.rest : cur.rest);
+    }
+  }
+  $('g-point').addEventListener('click', () => {
+    setPop(null);
+    state.pointer = !state.pointer;
+    save(); renderCycles();
+    if (state.pointer && api && score) { const wrap = $('sheet').querySelector('.at-cursors'); if (wrap && !pointLayer.parentNode) wrap.insertBefore(pointLayer, markLayer); }
+    buildPointer();
+    toast(state.pointer ? 'Pointer: on (a finger shows the next note)' : 'Pointer: off');
+  });
+
   function gridTick(now) {
     if (!playing) return;
+    updatePointer(now);
     if ((pulseOn() || state.countAlong) && score) {
       const est = playedTick(now);
       if (est >= 0) {
