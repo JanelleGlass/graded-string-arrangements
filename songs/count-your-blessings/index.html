@@ -250,6 +250,9 @@ hr.div { border: 0; border-top: 1px solid var(--line); margin: 0; }
 .pointer .palm, .pointer.rest .point { display: none; }
 .pointer.rest .palm { display: block; }
 @media print { .point-layer { display: none; } }
+/* Its switch, at the top beside Print: the finger, teal when on, grey and crossed out when off */
+.fab-btn svg.pt-ico { width: 20px; height: 22px; fill: none; }
+#g-point[aria-pressed="true"] { border-color: #1D5B72; }
 /* Counts switched off: the row goes blank (the music is drawn again without its room, so the lines close up) */
 #sheet.counts-off .count-layer { visibility: hidden; }
 /* Dynamics (mf, f…) are nudged down under the count row; let them draw past the edge of their svg if need be */
@@ -590,7 +593,7 @@ body.following .host-only { display: none !important; }
   <p class="err" id="err" role="alert"></p>
 
   <div class="sheet-wrap">
-    <div class="tools-dock"><div class="top-tools" id="topTools"><button class="fab-btn round host-only" id="printBtn" type="button" aria-label="Print the music" title="Print the music"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg></button><button class="fab-btn round host-only" id="pdfBtn" type="button" aria-label="Download the music as a PDF" title="Download a PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/></svg></button><div class="zoom-pill" role="group" aria-label="Size of the music"><button type="button" id="zoomOut" aria-label="Smaller music" title="Smaller">−</button><button type="button" id="zoomIn" aria-label="Bigger music" title="Bigger">+</button></div><button class="fab-btn big-only cyc" id="g-layout" type="button"></button></div></div>
+    <div class="tools-dock"><div class="top-tools" id="topTools"><button class="fab-btn round" id="g-point" type="button" aria-pressed="true"></button><button class="fab-btn round host-only" id="printBtn" type="button" aria-label="Print the music" title="Print the music"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg></button><button class="fab-btn round host-only" id="pdfBtn" type="button" aria-label="Download the music as a PDF" title="Download a PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/></svg></button><div class="zoom-pill" role="group" aria-label="Size of the music"><button type="button" id="zoomOut" aria-label="Smaller music" title="Smaller">−</button><button type="button" id="zoomIn" aria-label="Bigger music" title="Bigger">+</button></div><button class="fab-btn big-only cyc" id="g-layout" type="button"></button></div></div>
     <div class="key-dock"><div class="key" id="legend" role="note" aria-label="String colors"></div></div>
     <div class="sheet" id="sheet"></div>
     <div class="loading" id="loading">Setting out the music…</div>
@@ -640,7 +643,6 @@ body.following .host-only { display: none !important; }
     <button class="fab-btn cyc" id="g-colors" type="button"></button>
     <button class="fab-btn cyc" id="g-look" type="button"></button>
     <button class="fab-btn cyc" id="g-count" type="button"></button>
-    <button class="fab-btn cyc" id="g-point" type="button"></button>
     </div>
     <div class="fab-set" role="group" aria-label="Playback settings">
     <button class="fab-btn host-only" id="g-tempo" type="button" aria-expanded="false" aria-controls="pop-tempo" title="Tempo"><svg class="qn" viewBox="0 0 10 24" aria-hidden="true"><ellipse cx="4.6" cy="19.2" rx="4.4" ry="3.1" transform="rotate(-22 4.6 19.2)"/><rect x="7.7" y="1" width="1.5" height="18.2"/></svg><span id="tempoChip">100</span></button>
@@ -1002,7 +1004,9 @@ body.following .host-only { display: none !important; }
   const handSvg = (cls, shapes, lines, vw, vh, w, h, tipX) => `<svg class="${cls}" viewBox="0 0 ${vw} ${vh}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" style="left:${(-tipX * w / vw).toFixed(1)}px;top:${(-h).toFixed(1)}px" aria-hidden="true">`
     + `<g fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2.6" stroke-linejoin="round">${shapes}</g><g fill="#1D5B72">${shapes}</g>`
     + (lines ? `<g fill="none" stroke="#FFFFFF" stroke-width="0.9" stroke-linecap="round" opacity="0.75">${lines}</g>` : '') + '</svg>';
-  const pointIco = (on) => `<svg class="cyc-ico" viewBox="-1.5 -1.5 23 35" style="width:13px;height:20px" aria-hidden="true"><g fill="${on ? '#1D5B72' : GREY}">${HAND_POINT}</g></svg>`;
+  // Off: grey, with a line through it.
+  const pointIco = (on) => `<svg class="pt-ico" viewBox="-6 -1.5 32 35" aria-hidden="true"><g fill="${on ? '#1D5B72' : '#8A948F'}">${HAND_POINT}</g>`
+    + (on ? '' : '<path d="M-3 31 23 1" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round"/><path d="M-3 31 23 1" stroke="#8A948F" stroke-width="2.4" stroke-linecap="round"/>') + '</svg>';
   function renderCycles() {
     $('g-metro').innerHTML = metroIco(state.metro !== 'off') + stackBadge(Object.values(METRO_BADGE), METRO_BADGE[state.metro]);
     $('g-metro').setAttribute('aria-label', METRO_WORD[state.metro] + '. Tap to change.');
@@ -1018,8 +1022,10 @@ body.following .host-only { display: none !important; }
     $('g-count').innerHTML = stackBadge(['Counting: On', 'Counting: Off'], cOn ? 'Counting: On' : 'Counting: Off');
     $('g-count').setAttribute('aria-label', 'Counts under the notes: ' + (cOn ? 'on' : 'off') + '. Tap to change.');
     const pOn = state.pointer;
-    $('g-point').innerHTML = pointIco(pOn) + stackBadge(['Pointer: On', 'Pointer: Off'], pOn ? 'Pointer: On' : 'Pointer: Off');
-    $('g-point').setAttribute('aria-label', 'A finger pointing to the next note: ' + (pOn ? 'on' : 'off') + '. Tap to change.');
+    // The pointer's switch: a round button at the top beside Print (the strip has no room on an iPhone SE on its side).
+    $('g-point').innerHTML = pointIco(pOn);
+    $('g-point').setAttribute('aria-pressed', String(pOn));
+    $('g-point').setAttribute('aria-label', 'Pointer (a finger showing the next note): ' + (pOn ? 'on' : 'off') + '. Tap to change.');
     for (const id of ['g-metro', 'g-colors', 'g-look', 'g-layout', 'g-count', 'g-point']) $(id).title = $(id).getAttribute('aria-label').replace(/\. Tap to change\.$/, '');
   }
   function toast(text, ms = 1700) {
@@ -3376,7 +3382,7 @@ body.following .host-only { display: none !important; }
     save(); renderCycles();
     if (state.pointer && api && score) { const wrap = $('sheet').querySelector('.at-cursors'); if (wrap && !pointLayer.parentNode) wrap.insertBefore(pointLayer, markLayer); }
     buildPointer();
-    toast(state.pointer ? 'Pointer: on (a finger shows the next note)' : 'Pointer: off');
+    toast(state.pointer ? 'Pointer on: a finger shows the next note' : 'Pointer off');
   });
 
   function gridTick(now) {

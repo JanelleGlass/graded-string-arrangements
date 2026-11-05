@@ -309,8 +309,9 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   note. Over a rest it is an open palm (wait), still hopping along; rests in a row are one wait. Eighth notes: always
   one note ahead. Stopped, it sits on the note Play starts from; half a count before a loop's end it goes back to the
   loop's first note; to the next line on pages, it hops to the end of the line, then jumps. Like everything that moves
-  with the music, it keeps time with the speaker. On by default, switched off with "Pointer: On / Off" in the strip
-  (after Counting), saved. Never printed. A bouncing ball (one bounce per count) is Janelle's second choice if the
+  with the music, it keeps time with the speaker. On by default, saved. Its switch is a round finger button at the top
+  right of the music, just left of Print (teal when on, grey and crossed out when off; a tap shows a toast), on every
+  screen: as a "Pointer: On / Off" button in the strip it pushed the strip to two rows on an iPhone SE on its side. Never printed. A bouncing ball (one bounce per count) is Janelle's second choice if the
   finger doesn't work out.
 - Tap a note to choose where Play starts: a thin, pale ring around the note head until the music
   starts. No flag.
