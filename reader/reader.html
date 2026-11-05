@@ -593,7 +593,7 @@ body.following .host-only { display: none !important; }
     <output class="tempo-big" id="tempoOut" for="tempo"><svg class="qn" viewBox="0 0 10 24" aria-hidden="true"><ellipse cx="4.6" cy="19.2" rx="4.4" ry="3.1" transform="rotate(-22 4.6 19.2)"/><rect x="7.7" y="1" width="1.5" height="18.2"/></svg> = 100</output>
     <div class="tempo-row">
       <button class="step" id="slower" type="button" aria-label="Slower">−</button>
-      <input type="range" id="tempo" min="40" max="130" step="5" value="100" aria-label="Tempo, quarter notes per minute">
+      <input type="range" id="tempo" min="20" max="130" step="5" value="100" aria-label="Tempo, quarter notes per minute">
       <button class="step" id="faster" type="button" aria-label="Faster">+</button>
     </div>
     <div class="pop-line"><button class="link" id="tempoReset" type="button">Back to the written tempo (100)</button></div>
@@ -1201,8 +1201,9 @@ body.following .host-only { display: none !important; }
     $('g-tempo').setAttribute('aria-label', 'Tempo, ' + state.tempo + (TEMPO_PERCENT ? ' percent' : ''));
   }
   // The slider moves in steps of 5, but the written tempo is always reachable even when it isn't a multiple of 5,
-  // and the range stretches to include it.
-  const TEMPO_MIN = Math.min(40, SPEED_BASE), TEMPO_MAX = Math.max(130, SPEED_BASE);
+  // and the range stretches to include it. It goes down to 20 (or 20%) so a hard passage can be practised very slowly
+  // (Janelle asked for a much slower metronome, 2026-11-05; it stopped at 40 before).
+  const TEMPO_MIN = Math.min(20, SPEED_BASE), TEMPO_MAX = Math.max(130, SPEED_BASE);
   $('tempo').min = TEMPO_MIN; $('tempo').max = TEMPO_MAX;
   if (SPEED_BASE % 5) $('tempo').step = 1; // so the slider can sit exactly on the written tempo
   function setTempo(v) {
