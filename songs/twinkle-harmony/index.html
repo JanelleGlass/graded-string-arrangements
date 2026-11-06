@@ -242,16 +242,16 @@ hr.div { border: 0; border-top: 1px solid var(--line); margin: 0; }
 /* A held note (half note, dotted quarter…): a line joins the counts it lasts through, and lights up as the note is held */
 .count-link { position: absolute; z-index: 0; border-radius: 999px; background: #CDD4D1; transition: background 0.12s; }
 .count-link.now { background: #1D5B72; }
-/* The pointer: a small finger above each part's staff that hops to the next note on each count, landing half a
-   count early; over a rest, an open palm (wait) */
+/* The bouncing ball: a small teal ball above each part's staff, one bounce per count, from note to note; over a rest,
+   a hollow ring (quiet) */
 .point-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; }
 .pointer { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; will-change: transform; }
 .pointer svg { position: absolute; display: block; overflow: visible; }
-.pointer .palm, .pointer.rest .point { display: none; }
-.pointer.rest .palm { display: block; }
+.pointer .ring, .pointer.rest .ball { display: none; }
+.pointer.rest .ring { display: block; }
 @media print { .point-layer { display: none; } }
-/* Its switch, at the top beside Print: the finger, teal when on, grey and crossed out when off */
-.fab-btn svg.pt-ico { width: 20px; height: 22px; fill: none; }
+/* Its switch, at the top beside Print: the ball, teal when on, grey and crossed out when off */
+.fab-btn svg.pt-ico { width: 22px; height: 22px; fill: none; }
 #g-point[aria-pressed="true"] { border-color: #1D5B72; }
 /* Counts switched off: the row goes blank (the music is drawn again without its room, so the lines close up) */
 #sheet.counts-off .count-layer { visibility: hidden; }
@@ -997,16 +997,10 @@ body.following .host-only { display: none !important; }
     : '<rect x="7" y="1" width="14" height="16" rx="1.8" fill="none" stroke="#1D5B72" stroke-width="1.4"/><path d="M9.5 4.6h9M9.5 6.8h9M9.5 11h9M9.5 13.2h9" stroke="#1D5B72" stroke-width="1.1" fill="none"/>') + '</svg>';
   // A button's labels, all in one spot (the button is as wide as the longest), with the current one showing.
   const stackBadge = (labels, now) => '<span class="cyc-badge stack">' + labels.map(t => '<span' + (t === now ? ' class="now"' : '') + '>' + t + '</span>').join('') + '</span>';
-  // The pointer's hand shapes (see "The pointer" below): a finger pointing down, and an open palm for a rest.
-  const HAND_POINT = '<rect x="4.4" y="0" width="11.6" height="3.4" rx="1.2"/><rect x="4" y="2.6" width="12.4" height="12.4" rx="4"/><circle cx="15.6" cy="6.4" r="2.2"/><circle cx="15.9" cy="9.9" r="2.2"/><circle cx="15.3" cy="13.2" r="2"/><rect x="1" y="5.4" width="4.8" height="8.6" rx="2.4"/><rect x="5.4" y="10.5" width="5.2" height="21" rx="2.6"/>';
-  const HAND_POINT_LINES = '<path d="M12.4 8.2h3.6M12.4 11.6h3.4"/>';
-  const HAND_PALM = '<rect x="4.6" y="11.5" width="15" height="15.5" rx="5.5"/><rect x="4.8" y="4.6" width="3.5" height="11" rx="1.75"/><rect x="8.6" y="1.6" width="3.5" height="13" rx="1.75"/><rect x="12.4" y="2.2" width="3.5" height="13" rx="1.75"/><rect x="16.2" y="5.2" width="3.4" height="10.5" rx="1.7"/><rect x="0.6" y="12.6" width="3.6" height="9.4" rx="1.8" transform="rotate(-28 2.4 17.3)"/>';
-  const handSvg = (cls, shapes, lines, vw, vh, w, h, tipX) => `<svg class="${cls}" viewBox="0 0 ${vw} ${vh}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" style="left:${(-tipX * w / vw).toFixed(1)}px;top:${(-h).toFixed(1)}px" aria-hidden="true">`
-    + `<g fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2.6" stroke-linejoin="round">${shapes}</g><g fill="#1D5B72">${shapes}</g>`
-    + (lines ? `<g fill="none" stroke="#FFFFFF" stroke-width="0.9" stroke-linecap="round" opacity="0.75">${lines}</g>` : '') + '</svg>';
-  // Off: grey, with a line through it.
-  const pointIco = (on) => `<svg class="pt-ico" viewBox="-6 -1.5 32 35" aria-hidden="true"><g fill="${on ? '#1D5B72' : '#8A948F'}">${HAND_POINT}</g>`
-    + (on ? '' : '<path d="M-3 31 23 1" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round"/><path d="M-3 31 23 1" stroke="#8A948F" stroke-width="2.4" stroke-linecap="round"/>') + '</svg>';
+  // The ball and its switch's icon: a teal ball, with a dotted arc for the bounce (grey and crossed out when off).
+  const pointIco = (on) => { const c = on ? '#1D5B72' : '#8A948F';
+    return `<svg class="pt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20C5 6 11 6 13 13" fill="none" stroke="${c}" stroke-width="1.6" stroke-dasharray="1.6 2.2" stroke-linecap="round"/><circle cx="17" cy="16.5" r="4.6" fill="${c}"/>`
+      + (on ? '' : '<path d="M3 21 21 3" stroke="#FFFFFF" stroke-width="4.4" stroke-linecap="round"/><path d="M3 21 21 3" stroke="#8A948F" stroke-width="2.2" stroke-linecap="round"/>') + '</svg>'; };
   function renderCycles() {
     $('g-metro').innerHTML = metroIco(state.metro !== 'off') + stackBadge(Object.values(METRO_BADGE), METRO_BADGE[state.metro]);
     $('g-metro').setAttribute('aria-label', METRO_WORD[state.metro] + '. Tap to change.');
@@ -1022,10 +1016,10 @@ body.following .host-only { display: none !important; }
     $('g-count').innerHTML = stackBadge(['Counting: On', 'Counting: Off'], cOn ? 'Counting: On' : 'Counting: Off');
     $('g-count').setAttribute('aria-label', 'Counts under the notes: ' + (cOn ? 'on' : 'off') + '. Tap to change.');
     const pOn = state.pointer;
-    // The pointer's switch: a round button at the top beside Print (the strip has no room on an iPhone SE on its side).
+    // The bouncing ball's switch: a round button at the top beside Print (the strip has no room on an iPhone SE on its side).
     $('g-point').innerHTML = pointIco(pOn);
     $('g-point').setAttribute('aria-pressed', String(pOn));
-    $('g-point').setAttribute('aria-label', 'Pointer (a finger showing the next note): ' + (pOn ? 'on' : 'off') + '. Tap to change.');
+    $('g-point').setAttribute('aria-label', 'Bouncing ball (it bounces on each count, from note to note): ' + (pOn ? 'on' : 'off') + '. Tap to change.');
     for (const id of ['g-metro', 'g-colors', 'g-look', 'g-layout', 'g-count', 'g-point']) $(id).title = $(id).getAttribute('aria-label').replace(/\. Tap to change\.$/, '');
   }
   function toast(text, ms = 1700) {
@@ -3134,7 +3128,7 @@ body.following .host-only { display: none !important; }
     const base = surf.getBoundingClientRect();
     const out = [];
     surf.querySelectorAll('svg rect, svg path, svg polygon, svg line').forEach((el) => {
-      if (el.closest('.point-layer')) return; // the pointer's own hand is not the music
+      if (el.closest('.point-layer')) return; // the bouncing ball is not the music
       const r = el.getBoundingClientRect();
       if (!r.width && !r.height) return;
       out.push({ x: r.left - base.left, r: r.right - base.left, y: r.top - base.top, b: r.bottom - base.top });
@@ -3233,15 +3227,17 @@ body.following .host-only { display: none !important; }
   }
 
 
-  // ---- The pointer ----
-  // For young students who can't read rhythms yet (Janelle, 2026-11-05): a small finger above each part's staff shows
-  // where to look next. It takes one hop per count toward the next note (a half note: two hops, a whole note: four)
-  // and lands on it half a count before it plays, so the eye gets there first. It hops on the "&", so on each count
-  // it is standing still. Over a rest it is an open palm ("wait"), still hopping along. Tied notes count as one.
+  // ---- The bouncing ball ----
+  // For young students who can't read rhythms yet (Janelle, 2026-11-05/06): a small ball above each part's staff
+  // bounces once on every count, landing as the count is heard: on a held note it bounces in place (a half note two
+  // bounces, a whole note four), then it arcs over to the next note, so the eye sees where it's going while it flies.
+  // Over a rest it is a hollow ring. Tied notes count as one. (A finger came first: hopping, then gliding; Janelle
+  // found the hops too much and chose the ball.)
   const pointLayer = document.createElement('div');
   pointLayer.className = 'point-layer';
   var pointRuns = []; // (var: drawStartMark can ask before this line has run) per part on the page: its finger and the notes (and rests) it stops on
-  // Every count in the piece (pickups counted from the end of their bar, as the counts do), for the hops in between.
+  const ballD = (space) => Math.max(9, space * 1.05);
+  // Every count in the piece (pickups counted from the end of their bar, as the counts do): where the ball lands.
   function countTicks() {
     const out = [];
     for (const mb of score.masterBars) {
@@ -3251,7 +3247,6 @@ body.following .host-only { display: none !important; }
     }
     return out;
   }
-  const handH = (space) => Math.max(16, space * 2.1);
   // The lowest thing of the part above in this line of music (its counts, or its staff), or of the line above.
   function roomAbove(barBounds) {
     const vb = barBounds.visualBounds, sys = barBounds.masterBarBounds.staffSystemBounds;
@@ -3297,23 +3292,27 @@ body.following .host-only { display: none !important; }
           let top = Math.min(vb.y, rest ? vb.y : hb.cy - hb.h / 2);
           // Clear the note's stem and beam too (a short line, not a slur or the staff lines), no higher than 5 spaces.
           if (!rest) for (const e of ink) if (e.x < hb.x + hb.w + space && e.r > hb.x - space * 0.2 && e.r - e.x < space * 6 && e.b > vb.y - space * 5 && e.y < vb.y + vb.h && e.y < top) top = Math.max(e.y, vb.y - space * 5);
-          // A bow mark (down-bow, up-bow) or other mark drawn above the note: the finger stays above it too.
+          // A bow mark (down-bow, up-bow) or other mark drawn above the note: the ball stays above it too.
           for (const m of marks) if (m.x < hb.x + hb.w + space * 0.5 && m.r > hb.x - space * 0.5 && m.b <= vb.y + space && m.y > vb.y - space * 8 && m.y < top + space * 0.5) top = Math.min(top, m.y + space * 0.5);
-          top -= space * (arrow ? 1.5 : 0.5);
-          // Never up into the counts (or notes) of the part above: the finger stays in the room between.
-          top = Math.max(top, roomAbove(bb.barBounds) + handH(space) + 2);
-          stops.push({ tick, end, x: rest ? bb.visualBounds.x + bb.visualBounds.w / 2 : hb.x + hb.w / 2, y: top, rest, sys, right: sv.x + sv.w, space });
+          top -= space * (arrow ? 1.4 : 0.4);
+          // Never up into the counts (or notes) of the part above: the ball sits in the room between, and bounces no higher.
+          const ceil = roomAbove(bb.barBounds) + 2;
+          top = Math.max(top, ceil + ballD(space));
+          stops.push({ tick, end, x: rest ? bb.visualBounds.x + bb.visualBounds.w / 2 : hb.x + hb.w / 2, y: top, rest, sys, right: sv.x + sv.w, space, ceil });
         }
       });
       if (!stops.length) continue;
+      // Where the ball lands while each note lasts: its start and every count inside it.
       for (let k = 0; k < stops.length; k++) {
         const a = stops[k].tick, b = stops[k + 1] ? stops[k + 1].tick : stops[k].end;
-        stops[k].hops = counts.filter(c => c > a + 1 && c < b - 1);
+        stops[k].lands = [a, ...counts.filter(c => c > a + 1 && c < b - 1)];
       }
-      const h = handH(stops[0].space), w = h * 20 / 32;
+      const d = ballD(stops[0].space), rr = d / 2;
       const el = document.createElement('div');
       el.className = 'pointer';
-      el.innerHTML = handSvg('point', HAND_POINT, HAND_POINT_LINES, 20, 32, w, h, 8) + handSvg('palm', HAND_PALM, '', 24, 28, h * 0.72 * 24 / 28, h * 0.72, 12);
+      const ball = (cls, inner) => `<svg class="${cls}" width="${(d + 4).toFixed(1)}" height="${(d + 4).toFixed(1)}" viewBox="${(-rr - 2).toFixed(2)} ${(-rr - 2).toFixed(2)} ${(d + 4).toFixed(2)} ${(d + 4).toFixed(2)}" style="left:${(-rr - 2).toFixed(1)}px;top:${(-d - 2).toFixed(1)}px" aria-hidden="true">${inner}</svg>`;
+      el.innerHTML = ball('ball', `<circle r="${(rr + 1.2).toFixed(2)}" fill="#FFFFFF"/><circle r="${rr.toFixed(2)}" fill="#1D5B72"/>`)
+        + ball('ring', `<circle r="${(rr + 1.2).toFixed(2)}" fill="#FFFFFF"/><circle r="${(rr - rr * 0.14).toFixed(2)}" fill="none" stroke="#1D5B72" stroke-width="${(rr * 0.28).toFixed(2)}" opacity="0.75"/>`);
       pointLayer.appendChild(el);
       pointRuns.push({ ti, el, stops, k: 0 });
     }
@@ -3335,45 +3334,36 @@ body.following .host-only { display: none !important; }
   function idlePointer() {
     for (const run of pointRuns) { const s = run.stops[stopAt(run, Math.max(0, markTick || 0) + 1)]; putPointer(run, s.x, s.y, s.rest); }
   }
-  // Playing: half a count ahead of what is heard. Between notes it lands on each count's "&", a share of the way
-  // across in proportion to the time; each hop is a quick little arc into its landing.
+  // Playing: the ball lands on every count as it is heard, and on every note as it starts; between landings it flies
+  // in an arc, higher for a longer flight. On a held note it bounces in place, then flies to the next note.
   function updatePointer(now) {
     if (!pointRuns.length) return;
     if (counting || now < pos.at) { idlePointer(); return; }
-    const est = playedTick(now);
-    if (est < 0) return;
-    const mb = score.masterBars[barAtTick(est)];
-    let u = est + 1920 / mb.timeSignatureDenominator; // half a count ahead
+    const t = playedTick(now);
+    if (t < 0) return;
     const r = loop && api.playbackRange;
-    const bpm = pos.bpm || BASE_TEMPO, hopT = 170 * 0.016 * bpm;
     for (const run of pointRuns) {
-      const s = run.stops;
-      let at = u, k;
-      // Half a count before the end of a loop it goes back to the loop's first note, ready for the next time round.
-      if (r && at >= r.endTick) { k = stopAt(run, r.startTick + 1); putPointer(run, s[k].x, s[k].y, s[k].rest); continue; }
-      k = stopAt(run, at);
-      const cur = s[k];
-      if (at < cur.tick) { putPointer(run, cur.x, cur.y, cur.rest); continue; }
+      const s = run.stops, k = stopAt(run, t), cur = s[k];
       let nxt = s[k + 1], end = nxt ? nxt.tick : cur.end;
+      // The last flight of a loop goes back to the loop's first note, landing as the loop ends.
       if (r && nxt && nxt.tick >= r.endTick) { nxt = s[stopAt(run, r.startTick + 1)]; run.k = k; end = r.endTick; }
-      if (!nxt) { putPointer(run, cur.x, cur.y, cur.rest); continue; }
-      const other = nxt.sys !== cur.sys; // the next note is on the next line of music down the page
-      const toX = other ? cur.right - cur.space : nxt.x;
-      const lands = [cur.tick, ...cur.hops.filter(c => c < end - 1), end];
+      if (t < cur.tick || !nxt) { putPointer(run, cur.x, cur.y, cur.rest); continue; }
+      const lands = cur.lands.filter(c => c < end - 1);
       let i = 0;
-      while (i + 2 < lands.length && lands[i + 1] <= at) i++;
-      const spot = (j) => {
-        if (j === lands.length - 1) return { x: nxt.x, y: nxt.y };
-        const f = (lands[j] - cur.tick) / (end - cur.tick);
-        return { x: cur.x + (toX - cur.x) * f, y: cur.y + (other ? 0 : (nxt.y - cur.y) * f) };
-      };
-      const from = spot(i), to = spot(i + 1);
-      const T = Math.min(hopT, (lands[i + 1] - lands[i]) * 0.6), p = Math.max(0, Math.min(1, (at - (lands[i + 1] - T)) / T));
-      if (p <= 0) { putPointer(run, from.x, from.y, cur.rest); continue; }
-      const last = i + 1 === lands.length - 1;
-      if (last && other) { putPointer(run, p < 0.5 ? from.x : to.x, p < 0.5 ? from.y : to.y, p < 0.5 ? cur.rest : nxt.rest); continue; }
-      const e = p * p * (3 - 2 * p), lift = Math.sin(Math.PI * p) * cur.space * 0.9;
-      putPointer(run, from.x + (to.x - from.x) * e, from.y + (to.y - from.y) * e - lift, last && p >= 0.5 ? nxt.rest : cur.rest);
+      while (i + 1 < lands.length && lands[i + 1] <= t) i++;
+      const a = lands[i], b = i + 1 < lands.length ? lands[i + 1] : end, last = i + 1 >= lands.length;
+      const p = Math.max(0, Math.min(1, (t - a) / Math.max(1, b - a)));
+      const beats = (b - a) / 960; // length of this flight in quarter notes
+      let from = cur, to = last ? nxt : cur;
+      if (last && nxt.sys !== cur.sys) { // to the next line down the page: off the end of this line, then down onto the next
+        if (p < 0.5) to = { x: cur.right, y: cur.y, ceil: cur.ceil, space: cur.space };
+        else from = { x: nxt.x - nxt.space * 3, y: nxt.y, ceil: nxt.ceil, space: nxt.space };
+      }
+      const q = last && nxt.sys !== cur.sys ? (p < 0.5 ? p * 2 : (p - 0.5) * 2) : p;
+      const room = Math.min(from.y, to.y) - ballD(cur.space) - Math.max(from.ceil ?? -Infinity, to.ceil ?? -Infinity);
+      const H = Math.max(cur.space * 0.4, Math.min(cur.space * (0.9 + 0.7 * Math.min(2, beats)), room));
+      const x = from.x + (to.x - from.x) * q, y = from.y + (to.y - from.y) * q - H * 4 * q * (1 - q);
+      putPointer(run, x, y, last && p >= 0.5 ? nxt.rest : cur.rest);
     }
   }
   $('g-point').addEventListener('click', () => {
@@ -3382,7 +3372,7 @@ body.following .host-only { display: none !important; }
     save(); renderCycles();
     if (state.pointer && api && score) { const wrap = $('sheet').querySelector('.at-cursors'); if (wrap && !pointLayer.parentNode) wrap.insertBefore(pointLayer, markLayer); }
     buildPointer();
-    toast(state.pointer ? 'Pointer on: a finger shows the next note' : 'Pointer off');
+    toast(state.pointer ? 'Bouncing ball on: it bounces on each count' : 'Bouncing ball off');
   });
 
   function gridTick(now) {

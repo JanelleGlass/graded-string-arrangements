@@ -300,19 +300,19 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   through the browser's audio node and alphaTab's public events, never alphaTab's underscore names.
 - Metronome is one button that cycles Off → On → On with count-in → Count-in only.
   A count-in before a pickup counts the missing beats of its bar ("1 2 3 1 2" before a one-beat pickup in 3/4). The player only counts whole beats and starts the music straight after, so a pickup shorter than a beat (the Wellerman's eighth in 4/4) came in on the beat, with an empty beat before it, and every click while playing fell on an "&" (Janelle heard the gap, 2026-11-03). The reader now puts an unseen half beat of silence in front of such a pickup (a MusicXML forward in each part's first bar, `padPickup`), laid out with no room, so it counts "1 2 3 4 1 2 3", the gap is 4 and the pickup lands on its "&". The counts and the start ring skip the gap. A count-in started anywhere in the first bar counts from the top of it, like any other bar.
-- Pointer (Janelle, 2026-11-05: for young students who can't read rhythms yet and don't know when the next note comes):
-  a small teal finger pointing down, above each part's staff (one finger per part on the page), clear of the stems,
-  beams and bow marks, and never up into the counts of the part above. It takes one hop per count toward the next
-  note (a half note: two hops, a whole note: four), a short arc, then stands still, and lands on the next note half a
-  count before it plays, so the eye gets there first; so it hops on the "&" and stands still on each count. Between
-  notes it lands in proportion to the time (a half note's middle hop lands where its count 2 is). Tied notes are one
-  note. Over a rest it is an open palm (wait), still hopping along; rests in a row are one wait. Eighth notes: always
-  one note ahead. Stopped, it sits on the note Play starts from; half a count before a loop's end it goes back to the
-  loop's first note; to the next line on pages, it hops to the end of the line, then jumps. Like everything that moves
-  with the music, it keeps time with the speaker. On by default, saved. Its switch is a round finger button at the top
-  right of the music, just left of Print (teal when on, grey and crossed out when off; a tap shows a toast), on every
-  screen: as a "Pointer: On / Off" button in the strip it pushed the strip to two rows on an iPhone SE on its side. Never printed. A bouncing ball (one bounce per count) is Janelle's second choice if the
-  finger doesn't work out.
+- Bouncing ball (Janelle, 2026-11-05/06: for young students who can't read rhythms yet and don't know when the next
+  note comes): a small teal ball above each part's staff (one per part on the page), clear of the stems, beams and bow
+  marks, and never up into the counts of the part above (its bounces stay below them too). It bounces once on every
+  count, landing as the count is heard (a ball reads as the beat, so landing early would teach clapping off the beat;
+  the eye sees where it's going while it flies), and on every note as it starts: on a held note it bounces in place (a
+  half note two bounces, a whole note four), then arcs to the next note, higher for a longer flight. Tied notes are one
+  note. Over a rest it is a hollow ring; rests in a row are one. Stopped, it sits on the note Play starts from; a loop's
+  last flight goes back to its first note; to the next line on pages, it flies off the end of the line and drops onto
+  the next. It keeps time with the speaker. On by default, saved. Its switch is a round button at the top right of the
+  music, just left of Print (a ball with a dotted arc; teal when on, grey and crossed out when off; a tap shows a
+  toast), on every screen: in the strip it pushed the strip to two rows on an iPhone SE on its side. Never printed.
+  History: it began as a pointing finger (an open palm over rests) that hopped once per count and landed half a count
+  before each note; Janelle found the hops too much, a smooth glide was tried, and she chose the ball (2026-11-06).
 - Tap a note to choose where Play starts: a thin, pale ring around the note head until the music
   starts. No flag.
 - Drag across bars (on touch: press, hold, then drag) to loop them. Tapping outside the loop clears
