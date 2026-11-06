@@ -3335,7 +3335,9 @@ body.following .host-only { display: none !important; }
     for (const run of pointRuns) { const s = run.stops[stopAt(run, Math.max(0, markTick || 0) + 1)]; putPointer(run, s.x, s.y, s.rest); }
   }
   // Playing: the ball lands on every count as it is heard, and on every note as it starts; between landings it flies
-  // in an arc, higher for a longer flight. On a held note it bounces in place, then flies to the next note.
+  // in an arc, higher for a longer flight. On a held note it travels forward a bounce at a time, each landing a share of
+  // the way to the next note in proportion to the time (a half note's second bounce lands halfway), then lands on the
+  // next note (Janelle, 2026-11-06: it bounced in place on the note before).
   function updatePointer(now) {
     if (!pointRuns.length) return;
     if (counting || now < pos.at) { idlePointer(); return; }
@@ -3354,12 +3356,19 @@ body.following .host-only { display: none !important; }
       const a = lands[i], b = i + 1 < lands.length ? lands[i + 1] : end, last = i + 1 >= lands.length;
       const p = Math.max(0, Math.min(1, (t - a) / Math.max(1, b - a)));
       const beats = (b - a) / 960; // length of this flight in quarter notes
-      let from = cur, to = last ? nxt : cur;
-      if (last && nxt.sys !== cur.sys) { // to the next line down the page: off the end of this line, then down onto the next
+      const other = nxt.sys !== cur.sys, ceil = Math.max(cur.ceil, nxt.ceil);
+      // Where each bounce on this note lands: a share of the way on, toward the end of the line if the next note is on
+      // the next line down the page.
+      const spot = (c) => {
+        const f = (c - cur.tick) / Math.max(1, end - cur.tick), tx = other ? cur.right - cur.space : nxt.x, ty = other ? cur.y : nxt.y;
+        return { x: cur.x + (tx - cur.x) * f, y: cur.y + (ty - cur.y) * f, ceil: f ? (other ? cur.ceil : ceil) : cur.ceil, space: cur.space };
+      };
+      let from = spot(a), to = last ? nxt : spot(b);
+      if (last && other) { // to the next line down the page: off the end of this line, then down onto the next
         if (p < 0.5) to = { x: cur.right, y: cur.y, ceil: cur.ceil, space: cur.space };
         else from = { x: nxt.x - nxt.space * 3, y: nxt.y, ceil: nxt.ceil, space: nxt.space };
       }
-      const q = last && nxt.sys !== cur.sys ? (p < 0.5 ? p * 2 : (p - 0.5) * 2) : p;
+      const q = last && other ? (p < 0.5 ? p * 2 : (p - 0.5) * 2) : p;
       const room = Math.min(from.y, to.y) - ballD(cur.space) - Math.max(from.ceil ?? -Infinity, to.ceil ?? -Infinity);
       const H = Math.max(cur.space * 0.4, Math.min(cur.space * (0.9 + 0.7 * Math.min(2, beats)), room));
       const x = from.x + (to.x - from.x) * q, y = from.y + (to.y - from.y) * q - H * 4 * q * (1 - q);
