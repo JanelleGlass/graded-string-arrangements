@@ -304,8 +304,9 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   note comes): a small teal ball above each part's staff (one per part on the page), clear of the stems, beams and bow
   marks, and never up into the counts of the part above (its bounces stay below them too). It bounces once on every
   count, landing as the count is heard (a ball reads as the beat, so landing early would teach clapping off the beat;
-  the eye sees where it's going while it flies), and on every note as it starts: on a held note it bounces in place (a
-  half note two bounces, a whole note four), then arcs to the next note, higher for a longer flight. Tied notes are one
+  the eye sees where it's going while it flies), and on every note as it starts: on a held note it travels forward a bounce at
+  a time (a half note two bounces, a whole note four), each landing a share of the way to the next note in proportion
+  to the time (Janelle, 2026-11-06: it bounced in place before), then lands on the next note, higher for a longer flight. Tied notes are one
   note. Over a rest it is a hollow ring; rests in a row are one. Stopped, it sits on the note Play starts from; a loop's
   last flight goes back to its first note; to the next line on pages, it flies off the end of the line and drops onto
   the next. It keeps time with the speaker. On by default, saved. Its switch is a round button at the top right of the
