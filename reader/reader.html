@@ -230,9 +230,8 @@ hr.div { border: 0; border-top: 1px solid var(--line); margin: 0; }
 /* The bouncing ball: a small teal ball above each part's staff, one bounce per count, from note to note; over a rest,
    a hollow ring (quiet) */
 .point-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; }
-/* No will-change: a layer of its own over the pulsing notes made the ball and the note under it blink on some screens
-   (Janelle, 2026-11-10) */
-.pointer { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; }
+/* A layer of its own (will-change): without it Janelle saw the ball and the note under it blink more, not less (2026-11-10) */
+.pointer { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; will-change: transform; }
 .pointer svg { position: absolute; display: block; overflow: visible; }
 .pointer .ring, .pointer.rest .ball { display: none; }
 .pointer.rest .ring { display: block; }
@@ -249,6 +248,9 @@ hr.div { border: 0; border-top: 1px solid var(--line); margin: 0; }
 .info-teach { margin: 2px 0 0; font-size: 0.86rem; }
 /* Counts switched off: the row goes blank (the music is drawn again without its room, so the lines close up) */
 #sheet.counts-off .count-layer { visibility: hidden; }
+/* Drawn again with room for the bouncing ball's bounces: out of sight until the new drawing is in */
+/* (transparent, not hidden: hidden music took no touches, so a second pinch right after the first did nothing) */
+#sheet.reflowing .at-surface, #sheet.reflowing .at-cursors, #sheet.reflowing + .line-head { opacity: 0; }
 /* Dynamics (mf, f…) are nudged down under the count row; let them draw past the edge of their svg if need be */
 #sheet .at-surface svg { overflow: visible; }
 
@@ -2358,7 +2360,11 @@ body.following .host-only { display: none !important; }
   tsTip.className = 'ts-tip'; tsTip.id = 'tsTip'; tsTip.hidden = true;
   tsTip.setAttribute('role', 'dialog'); tsTip.setAttribute('aria-label', 'What this sign means');
   let tsOpenBtn = null, tipMode = null, hoverTimer = 0;
-  const stopScore = (el) => ['mousedown', 'mouseup', 'pointerdown', 'pointerup', 'touchstart', 'touchend', 'click'].forEach(t => el.addEventListener(t, e => e.stopPropagation()));
+  // Two fingers go on to the music, so a pinch works over a clef or time signature too (a tap there still explains it).
+  const stopScore = (el) => ['mousedown', 'mouseup', 'pointerdown', 'pointerup', 'touchstart', 'touchend', 'click'].forEach(t => el.addEventListener(t, e => {
+    if (e.touches && (e.touches.length >= 2 || (t === 'touchend' && e.touches.length >= 1))) return;
+    e.stopPropagation();
+  }));
   stopScore(tsLayer);
   function setHot(btn, on) { for (const g of btn._glyphs || []) g.classList.toggle('sym-hot', on); }
   function closeTip() {
@@ -2694,6 +2700,11 @@ body.following .host-only { display: none !important; }
   // Each beat's note heads sit in an SVG group "g.b<beat id>"; the group is scaled about the head's centre,
   // so a finger number drawn inside the head grows with it.
   let activeBeats = [], playing = false, pos = { tick: 0, at: 0, bpm: BASE_TEMPO }, lastGrid = null, lastPulseAt = -1e9;
+  // When the first note after Play reaches the speaker: until then nothing moves or lights up. Kept apart from pos.at,
+  // the time of the player's latest report: a frame's time can be a moment before a report that came in during that
+  // frame, and checking against the report made the ball jump back to the first note and the lit note go dark for one
+  // frame, about every second (Janelle saw both flash, on her laptop and iPad, 2026-11-10).
+  let heardAt = 0;
   let pulsing = [];
   const pulseOn = () => state.follow !== 'line';
   const unitMs = () => (state.unit || 480) / (0.016 * (pos.bpm || BASE_TEMPO));
@@ -3421,6 +3432,12 @@ body.following .host-only { display: none !important; }
   var bounceRedraw = false, bounceWaiting = false, staleTimer = 0, livePieces = null;
   // Once the drawing settles (and again on Play): a piece of the page that isn't part of the latest drawing is removed,
   // and one still showing an earlier drawing than its own is emptied (its own arrives in its place).
+  let reflowTimer = 0;
+  function hideForRedraw() {
+    $('sheet').classList.add('reflowing');
+    clearTimeout(reflowTimer); reflowTimer = setTimeout(showAfterRedraw, 3000); // never left hidden
+  }
+  function showAfterRedraw() { clearTimeout(reflowTimer); $('sheet').classList.remove('reflowing'); }
   function clearStalePieces() {
     const c = api && api.canvasElement && api.canvasElement.element;
     if (!c || !livePieces || !livePieces.size || printing) return;
@@ -3455,7 +3472,8 @@ body.following .host-only { display: none !important; }
     if (bounceRoom.tries >= 3) return false;
     const scale = api.settings.display.scale, need = new Map();
     for (const run of pointRuns) {
-      const s = run.stops, hop = ballD(s[0].space) * 1.9;
+      // About three ball widths for each bounce (Janelle, 2026-11-10: two weren't enough to see the bounces apart).
+      const s = run.stops, hop = ballD(s[0].space) * 3;
       for (let k = 0; k + 1 < s.length; k++) {
         const cur = s[k], nxt = s[k + 1], flights = cur.lands.length;
         if (flights < 2 || nxt.sys !== cur.sys) continue;
@@ -3510,7 +3528,7 @@ body.following .host-only { display: none !important; }
   // next note (Janelle, 2026-11-06: it bounced in place on the note before).
   function updatePointer(now) {
     if (!pointRuns.length) return;
-    if (counting || now < pos.at) { ballClock = null; idlePointer(); return; }
+    if (counting || now < heardAt) { ballClock = null; idlePointer(); return; }
     const t = ballTick(now);
     if (t < 0) return;
     const r = loop && api.playbackRange;
@@ -3567,7 +3585,7 @@ body.following .host-only { display: none !important; }
         // Move the light to whatever is sounding now (nothing during the count-in) before any swell.
         let fresh = [];
         if (pulseOn()) {
-          fresh = setSounding(counting || now < pos.at ? [] : soundingBeats(est));
+          fresh = setSounding(counting || now < heardAt ? [] : soundingBeats(est));
           if (!newCount) fresh.forEach(hold); // a note that starts between counts just lights up
         }
         if (key !== lastGrid) {
@@ -4090,7 +4108,7 @@ body.following .host-only { display: none !important; }
     } else {
       // Count-in over: ease from the first note into the even motion.
       if (L.counting) { L.counting = false; glide(0, 2500); }
-      if (now >= pos.at) L.disp += rate * dt; // not before the first note is heard
+      if (now >= heardAt) L.disp += rate * dt; // not before the first note is heard
       const err = est - L.disp;
       if (Math.abs(err) > 480) {
         // A jump (loop back, seek): glide to the new spot instead of snapping.
@@ -4800,9 +4818,13 @@ body.following .host-only { display: none !important; }
       // takes the new widths with it).
       // alphaTab adds the drawing's pieces to the page a moment after it reports the drawing done, so this waits for the
       // last of them (postRenderFinished): a drawing started before then left those pieces on the screen, over the new one.
-      if (bounceRedraw) { bounceRedraw = false; bounceWaiting = !fitPending && !printing; } });
+      if (bounceRedraw) { bounceRedraw = false; bounceWaiting = !fitPending && !printing; }
+      // While it is drawn again wider, the music stays out of sight: the first drawing can come before the page's
+      // lettering has loaded, and the second then sits a little lower, so for a moment both showed (Janelle, 2026-11-10).
+      if (bounceWaiting) hideForRedraw(); });
     api.postRenderFinished.on(() => {
       if (bounceWaiting) { bounceWaiting = false; setTimeout(() => { if (api && !printing) api.render(); }, 80); }
+      else if ($('sheet').classList.contains('reflowing')) setTimeout(() => { clearStalePieces(); showAfterRedraw(); }, 150);
       // A piece of an earlier drawing left showing (drawings started close together, as when the music is drawn again
       // for the part names, the screen's height or the ball's bounces): Janelle saw bar numbers, tempo words and
       // dynamics doubled, a little apart, until a change of size drew everything afresh (2026-11-10). Once the drawing
@@ -4860,7 +4882,7 @@ body.following .host-only { display: none !important; }
       playing = e.state === 1;
       setPlaying(playing);
       // The first note reaches the speaker a moment after Play: until then the music waits (pos.at is that moment).
-      if (playing && !was) { clearStalePieces(); lastGrid = null; pos.at = performance.now() + soundLag(); requestAnimationFrame(gridTick); lineState = null; revealSheet(true, true); if (state.layout === 'line' && !lineRaf) lineRaf = requestAnimationFrame(lineFollow); }
+      if (playing && !was) { clearStalePieces(); lastGrid = null; pos.at = heardAt = performance.now() + soundLag(); requestAnimationFrame(gridTick); lineState = null; revealSheet(true, true); if (state.layout === 'line' && !lineRaf) lineRaf = requestAnimationFrame(lineFollow); }
       if (!playing) endCountIn();
       if (!playing && e.stopped) { activeBeats = []; trackNotes(); clearNow(); }
       // Stopped or paused: frame the note Play will start from (the player settles on its spot a moment later).

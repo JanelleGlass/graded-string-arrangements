@@ -353,7 +353,7 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   or late, and each one jolted the ball, which Janelle saw as flashes): it runs on at the tempo, eases toward the
   reported place and never moves backwards, except for a real jump (a loop going round, a tap on another note). Room
   for the bounces (Janelle, 2026-11-10: three bounces on a dotted quarter in 6/8 looked like the third went to the next
-  note): in one long line, after drawing, a note the ball bounces along gets at least about two ball widths per bounce;
+  note): in one long line, after drawing, a note the ball bounces along gets at least about three ball widths per bounce;
   a bar where one doesn't is drawn again just wide enough (alphaTab's `displayWidth`, which the horizontal layout
   honours; the extra goes most to the long notes), at most three times, and measured afresh whenever the layout changes
   (`bounceRoom`). That second drawing waits until alphaTab has put every piece of the first on the page
@@ -362,8 +362,15 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   whole second copy of the music about 50 px lower, and the ball and the note under it blinking (same day; neither
   reproduced in a Claude session, at laptop sizes, 125% scaling, dark mode, real fonts or resizing): the reader now
   keeps the ids of the latest drawing's pieces (`livePieces`, from `api.renderer`'s preRender, partialLayoutFinished and
-  renderFinished) and removes any other piece once the drawing settles and on Play (`clearStalePieces`), and the ball
-  no longer has `will-change` (a composited layer over the pulsing notes can blink on some screens). Switching the ball off or on draws the music again, so the bars go back to their own width without
+  renderFinished) and removes any other piece once the drawing settles and on Play (`clearStalePieces`). The likely
+  cause: the first drawing can come before the page's lettering (Google Fonts) has loaded, so the widened second one
+  sits about 50 px lower and both showed for a moment; now the music is hidden while it is drawn again (`reflowing`).
+  Dropping the ball's `will-change` made the blinking worse for her, so it is back. The blinking (laptop and iPad)
+  was the reader's own: "has the first note been heard yet?" was checked against the time of the player's latest
+  report, and a frame's time can come a moment before a report received during that frame, so about every second the
+  ball went back to its resting place on the first note (the "shadow") and the lit note went dark, for one frame. That
+  check now uses its own time, set once on Play (`heardAt`); a frame-by-frame trace shows no jumps.
+  The room per bounce was raised from about two ball widths to three (Janelle: the first bars got no more room). Switching the ball off or on draws the music again, so the bars go back to their own width without
   it. Pages lay out bars by alphaTab's rules (no `displayWidth`), so there the spacing is as always. On by default, saved. Its switch is a round button in the strip, after
   Counting (a ball with a dotted arc; teal when on, grey and crossed out when off; a tap shows a toast), on every
   screen. It sat at the top right, left of Print, until Janelle moved it down (2026-11-10), where Follow now sits.
@@ -428,7 +435,7 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   music font, and the page's Google Fonts, from the offline copy without internet), since a picture can't use the
   page's fonts. Where it fails, the card says to print and choose Save as PDF. Hidden in the Claude preview, like Print. Printing is free for now (Janelle, 2026-10-30,
   with the Payhip PDFs still to come).
-- Pinch to zoom on touch screens: two fingers on the music make it bigger or smaller. The music grows
+- Pinch to zoom on touch screens: two fingers on the music make it bigger or smaller, over a clef, key or time signature too (their explain buttons pass two-finger touches on to the music; they swallowed them until 2026-11-10). The music grows
   and shrinks under the fingers, then settles on the nearest − / + size. A second finger cancels a tap
   or a press-and-hold; the browser's own page zoom is kept off the music.
 - Open Strings parts show string colors but no finger numbers.
