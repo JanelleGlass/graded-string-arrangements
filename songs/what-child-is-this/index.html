@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Graded Strings">
 <style>body{margin:0;padding:0}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <script src="../../app/app.js?v=3a19f0d83d"></script>
-<script src="../../app/together.js?v=51d2cb70f0"></script>
+<script src="../../app/together.js?v=620cf383e5"></script>
 <title>What Child Is This</title>
 <meta name="description" content="Read and play along with What Child Is This in four levels for violin, viola, cello and bass.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2230,12 +2230,14 @@ body.following .host-only { display: none !important; }
     $('togetherLbl').textContent = label;
     g.title = conductor.hosting ? 'Stop conducting' : 'Play on everyone’s device at once: you set the tempo and press Play';
     const keen = conductor.following || (!!site && site.wantsFollow() && !conductor.hosting); // following from song to song
-    f.hidden = !(keen || (other && conductor.room));
+    const away = site && !conductor.hosting && site.teacherAt(); // the teacher is conducting another song (Janelle, 2026-11-10)
+    f.hidden = !(keen || (other && conductor.room) || away);
     f.classList.toggle('on', keen);
     f.setAttribute('aria-pressed', String(keen));
     f.textContent = keen ? 'Following' : 'Follow';
     f.title = conductor.following ? 'Stop following (sound is off while following)'
       : keen ? 'Waiting for the teacher. Tap to stop following'
+      : away && !other ? 'Follow the teacher' + (away.title ? ': your screen goes to ' + away.title : '')
       : 'Follow the teacher: start, stop and tempo come from the teacher; sound is off on this device';
     $('teachLine').hidden = !site;
     if (site) $('teachBtn').textContent = canLead && conductor.room ? 'Conducting: you’re signed in as the teacher' : 'Teacher? Sign in to conduct';

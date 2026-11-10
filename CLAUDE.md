@@ -146,6 +146,9 @@ one goes missing.
   for 10 s: when she opens another song the tab goes there and follows by itself once its player is ready. The home
   page shows a small Follow at the top right while she conducts (which takes the tab to her song), "Following, waiting
   for the teacher to choose a song" while she is on the home page, and on her device "Conducting: open a song · Stop".
+  A song page that isn't her song shows the same small Follow at the top while she conducts anywhere (Janelle,
+  2026-11-10: "followers ... see the follow button if they are on another song"); tapping it takes the tab to her song.
+  Janelle chose to keep the tap card (2026-11-10) over driving a follower's music from the teacher's timing without sound.
   A phone or iPad keeps a new page's sound asleep until it is touched, and the music can't move until then, so the
   page shows a big "Tap to follow your teacher" card; any tap wakes it and catches up. (Headless Chromium never
   sleeps; the test fakes it with a wrapped AudioContext.) A follower that arrives and asks the time before the teacher's

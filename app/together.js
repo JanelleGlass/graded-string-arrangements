@@ -399,6 +399,8 @@
     wantsConduct: () => tab.get(CONDUCT_KEY),
     setConducting,
     onSite(cb) { siteCbs.push(cb); },
+    // The song the teacher is conducting somewhere on the site (null: on the home page), or undefined: nobody conducting.
+    teacherAt: () => (siteHost && !siteHost.pending && !(teacher && tab.get(CONDUCT_KEY)) ? { song: siteHost.song, title: siteHost.title } : undefined),
     room,
     canLead: () => !!teacher,
     open,
