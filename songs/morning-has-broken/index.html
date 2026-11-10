@@ -636,7 +636,7 @@ body.following .host-only { display: none !important; }
     <output class="tempo-big" id="tempoOut" for="tempo"><svg class="qn" viewBox="0 0 10 24" aria-hidden="true"><ellipse cx="4.6" cy="19.2" rx="4.4" ry="3.1" transform="rotate(-22 4.6 19.2)"/><rect x="7.7" y="1" width="1.5" height="18.2"/></svg> = 100</output>
     <div class="tempo-row">
       <button class="step" id="slower" type="button" aria-label="Slower">−</button>
-      <input type="range" id="tempo" min="40" max="130" step="5" value="100" aria-label="Tempo, quarter notes per minute">
+      <input type="range" id="tempo" min="10" max="130" step="5" value="100" aria-label="Tempo, quarter notes per minute">
       <button class="step" id="faster" type="button" aria-label="Faster">+</button>
     </div>
     <div class="pop-line"><button class="link" id="tempoReset" type="button">Back to the written tempo (100)</button></div>
@@ -1257,14 +1257,32 @@ body.following .host-only { display: none !important; }
   }
   // The slider moves in steps of 5, but the written tempo is always reachable even when it isn't a multiple of 5,
   // and the range stretches to include it.
-  const TEMPO_MIN = Math.min(40, SPEED_BASE), TEMPO_MAX = Math.max(130, SPEED_BASE);
+  // Down to 10 (Janelle, 2026-11-10: "something outrageously slow"; it stopped at 40).
+  const TEMPO_MIN = Math.min(10, SPEED_BASE), TEMPO_MAX = Math.max(130, SPEED_BASE);
   $('tempo').min = TEMPO_MIN; $('tempo').max = TEMPO_MAX;
   if (SPEED_BASE % 5) $('tempo').step = 1; // so the slider can sit exactly on the written tempo
+  // The player plays from an eighth of the written tempo up (alphaTab's limit). Slower than that, the score's own
+  // tempo marks are halved (or quartered) and the player runs at a speed it allows on top: the marks' numbers are never
+  // drawn (EffectTempo is off), and everything that times the music reads them, so counts, clicks and the ball follow.
+  // The playback is made again from the score (loadMidiForScore) only when that halving changes.
+  let tempoScale = 1, writtenTempos = null;
+  function playSpeed(ratio) {
+    if (!api) return;
+    const scale = ratio >= 0.125 ? 1 : ratio >= 0.0625 ? 0.5 : 0.25;
+    if (scale !== tempoScale && score) {
+      if (!writtenTempos) writtenTempos = { score: score.tempo, bars: score.masterBars.map(mb => (mb.tempoAutomations || []).map(a => a.value)) };
+      tempoScale = scale;
+      score.tempo = writtenTempos.score * scale;
+      score.masterBars.forEach((mb, i) => (mb.tempoAutomations || []).forEach((a, k) => { a.value = writtenTempos.bars[i][k] * scale; }));
+      try { api.loadMidiForScore(); } catch {}
+    }
+    api.playbackSpeed = ratio / tempoScale;
+  }
   function setTempo(v) {
     const r = v === SPEED_BASE ? v : Math.round(v / 5) * 5;
     state.tempo = Math.min(TEMPO_MAX, Math.max(TEMPO_MIN, r));
     showTempo();
-    if (api) api.playbackSpeed = state.tempo / SPEED_BASE;
+    playSpeed(state.tempo / SPEED_BASE);
     save();
     if (conductor.hosting) conductSend({ type: 'tempo', speed: state.tempo / SPEED_BASE });
   }
@@ -1754,7 +1772,7 @@ body.following .host-only { display: none !important; }
     glideToTick(t, Math.min(LOOP_GLIDE_MS, rest - 120)); drawStartMark();
     api.countInVolume = countIn ? 1 : 0;
     clearTimers(); clearTimeout(loopGap);
-    if (conductor.hosting) conductSend({ type: 'play', startAt: clock() + rest, tick: t, speed: api.playbackSpeed, countIn, loop: true, range: rangeBars(), lag: Math.round(soundLag()) });
+    if (conductor.hosting) conductSend({ type: 'play', startAt: clock() + rest, tick: t, speed: state.tempo / SPEED_BASE, countIn, loop: true, range: rangeBars(), lag: Math.round(soundLag()) });
     setPlaying(true);
     loopGap = setTimeout(() => {
       loopGap = 0;
@@ -2001,7 +2019,7 @@ body.following .host-only { display: none !important; }
   const clock = () => performance.now();
   // The written tempo (quarter notes a minute) at a tick: the last tempo mark at or before it.
   function tempoAtTick(tick) {
-    let bpm = BASE_TEMPO;
+    let bpm = BASE_TEMPO * tempoScale;
     if (!score) return bpm;
     for (const mb of score.masterBars) {
       if (mb.start > tick) break;
@@ -2046,7 +2064,7 @@ body.following .host-only { display: none !important; }
     api.tickPosition = tick; markTick = tick; drawStartMark();
     centerOnTick(tick, true); revealSheet(true, true);
     const startAt = clock() + LEAD_MS;
-    conductSend({ type: 'play', startAt, tick, speed: api.playbackSpeed, countIn, loop: !!loop, range: rangeBars(), lag: Math.round(soundLag()) });
+    conductSend({ type: 'play', startAt, tick, speed: state.tempo / SPEED_BASE, countIn, loop: !!loop, range: rangeBars(), lag: Math.round(soundLag()) });
     $('playText').textContent = 'Starting';
     conductor.timers.push(setTimeout(() => { if (countIn) beginCountIn(); api.play(); }, LEAD_MS));
   }
@@ -2071,7 +2089,7 @@ body.following .host-only { display: none !important; }
     if (!conductor.following) return;
     if (cmd.type !== 'pos') { clearTimers(); conductor.errs = []; conductor.startedAt = clock(); conductor.lastFix = 0; }
     if (cmd.type === 'tempo' || cmd.type === 'play') {
-      api.playbackSpeed = cmd.speed;
+      playSpeed(cmd.speed);
       state.tempo = Math.round(cmd.speed * SPEED_BASE);
       showTempo();
     }
@@ -3355,6 +3373,29 @@ body.following .host-only { display: none !important; }
   pointLayer.className = 'point-layer';
   var pointRuns = []; // (var: drawStartMark can ask before this line has run) per part on the page: its finger and the notes (and rests) it stops on
   const ballD = (space) => Math.max(9, space * 1.05);
+  // The big beats of a bar (Janelle, 2026-11-10: when the music goes fast, bounce only on the big beats, so the eye
+  // can follow): a dotted quarter in 6/8, 9/8 and 12/8, the whole bar in 3/4 and 2/4, a half note in 4/4. Other
+  // time signatures keep their counts. Pickups are counted from the end of their bar, as the counts are.
+  function bigBeat(mb) {
+    const den = mb.timeSignatureDenominator, num = mb.timeSignatureNumerator, beat = 3840 / den;
+    if (den === 8 && num % 3 === 0 && num > 3) return beat * 3;
+    if (den === 4 && (num === 3 || num === 2)) return beat * num;
+    if (den === 4 && num === 4) return beat * 2;
+    return beat;
+  }
+  function bigTicks() {
+    const out = [];
+    for (const mb of score.masterBars) {
+      const g = bigBeat(mb), full = mb.timeSignatureNumerator * 3840 / mb.timeSignatureDenominator;
+      const lead = mb.isAnacrusis ? full - mb.calculateDuration() : 0;
+      for (let q = Math.ceil(lead / g) * g; q < full; q += g) out.push(mb.start + q - lead);
+    }
+    return out;
+  }
+  // Counts faster than this (a minute) and the ball bounces on the big beats instead; a little lower to go back, so
+  // it doesn't flick between the two at the edge.
+  const BIG_BEATS_FROM = 150, COUNTS_BELOW = 130;
+  let bigMode = false;
   // Every count in the piece (pickups counted from the end of their bar, as the counts do): where the ball lands.
   function countTicks() {
     const out = [];
@@ -3425,6 +3466,10 @@ body.following .host-only { display: none !important; }
         const a = stops[k].tick, b = stops[k + 1] ? stops[k + 1].tick : stops[k].end;
         stops[k].lands = [a, ...counts.filter(c => c > a + 1 && c < b - 1)];
       }
+      const lastEnd = stops[stops.length - 1].end;
+      // Where the ball lands: on every count and every note (counts), or only on the big beats (big).
+      const fine = stops.flatMap(st => st.lands);
+      const big = [stops[0].tick, ...bigTicks().filter(c => c > stops[0].tick + 1 && c < lastEnd - 1)];
       const d = ballD(stops[0].space), rr = d / 2;
       const el = document.createElement('div');
       el.className = 'pointer';
@@ -3432,9 +3477,11 @@ body.following .host-only { display: none !important; }
       el.innerHTML = ball('ball', `<circle r="${(rr + 1.2).toFixed(2)}" fill="#FFFFFF"/><circle r="${rr.toFixed(2)}" fill="#1D5B72"/>`)
         + ball('ring', `<circle r="${(rr + 1.2).toFixed(2)}" fill="#FFFFFF"/><circle r="${(rr - rr * 0.14).toFixed(2)}" fill="none" stroke="#1D5B72" stroke-width="${(rr * 0.28).toFixed(2)}" opacity="0.75"/>`);
       pointLayer.appendChild(el);
-      pointRuns.push({ ti, el, stops, k: 0 });
+      pointRuns.push({ ti, el, stops, k: 0, lands: { fine, big, end: lastEnd }, li: 0 });
     }
-    roomForBounces(); // may ask for the music to be drawn again with more room (at the end of renderFinished)
+    // Even spacing first (it changes every gap); the room for the bounces is measured on the drawing that follows.
+    if (evenSpacingReady()) { bounceRoom = { key: '', widths: new Map(), tries: 0 }; bounceRedraw = true; }
+    else roomForBounces(); // may ask for the music to be drawn again with more room (at the end of renderFinished)
     // Drawn again while playing (a setting changed): straight back to where the music is, not the start note.
     if (playing && !counting) updatePointer(performance.now()); else idlePointer();
   }
@@ -3466,6 +3513,58 @@ body.following .host-only { display: none !important; }
       if (!livePieces.has(ph.layoutResultId)) ph.remove();
       else if (ph.renderedResultId !== undefined && ph.renderedResultId !== ph.layoutResultId) ph.replaceChildren();
     }
+  }
+  // Even spacing (Janelle, 2026-11-10: "make the space between the notes equal to how many beats there are ... only
+  // when the bouncing ball is turned on"): the room after a note in proportion to its length, so a half note gets
+  // twice a quarter's and a dotted quarter three times an eighth's. alphaTab spaces notes by a spring per note whose
+  // give grows only with the logarithm of the length (1 + 0.85 log2 of length / its smallest length): a half note
+  // got about 1.85 times a quarter's room. It has no setting for this, so with the ball on the reader replaces that
+  // one formula: the same room for a quarter note as before, in proportion for everything else. alphaTab still keeps
+  // each note clear of the next (its least room for the glyphs), so nothing runs together. Its .min.js shortens the
+  // method's name, so the method is found by its formula, on the bar-spacing object of the first drawing; the music
+  // is then drawn again. Not on paper.
+  let evenSpacing = null; // { proto, name, orig } once found
+  const evenSpacingOn = () => state.pointer && !onPaper();
+  function findSpringFormula(root) {
+    const seen = new Set(), queue = [[root, 0]];
+    while (queue.length) {
+      const [o, d] = queue.shift();
+      if (!o || typeof o !== 'object' || seen.has(o) || d > 8) continue;
+      seen.add(o);
+      if (typeof Node !== 'undefined' && o instanceof Node) continue;
+      const li = o.layoutingInfo;
+      if (li && typeof li === 'object') {
+        const proto = Object.getPrototypeOf(li);
+        for (const n of Object.getOwnPropertyNames(proto)) {
+          const desc = Object.getOwnPropertyDescriptor(proto, n);
+          if (n !== 'constructor' && desc && typeof desc.value === 'function' && /\.85\s*\*\s*Math\.log2/.test(String(desc.value))) return { proto, name: n, orig: desc.value };
+        }
+      }
+      for (const k of Object.keys(o)) {
+        const v = o[k];
+        if (!v || typeof v !== 'object') continue;
+        if (Array.isArray(v)) { for (const x of v.slice(0, 40)) queue.push([x, d + 1]); }
+        else if (v instanceof Map) { let i = 0; for (const x of v.values()) { if (i++ > 40) break; queue.push([x, d + 1]); } }
+        else queue.push([v, d + 1]);
+      }
+    }
+    return null;
+  }
+  // True when the formula has just been replaced, so the music must be drawn again with it.
+  function evenSpacingReady() {
+    if (evenSpacing || !evenSpacingOn() || !api || !api.renderer) return false;
+    let found = null;
+    try { found = findSpringFormula(api.renderer); } catch {}
+    if (!found) { evenSpacing = { failed: true }; return false; } // the music stays spaced as alphaTab spaces it
+    const { orig } = found;
+    found.proto[found.name] = function (spring, duration, minDuration) {
+      const k = orig.call(this, spring, duration, minDuration);
+      if (!evenSpacingOn() || !(duration > 0) || !(minDuration > 0)) return k;
+      const give = 1 + 0.85 * Math.log2(duration / minDuration), quarter = 1 + 0.85 * Math.log2(960 / minDuration);
+      return k * give / Math.max(0.05, quarter * duration / 960);
+    };
+    evenSpacing = found;
+    return true;
   }
   const bounceRoomWanted = () => state.pointer && state.layout === 'line' && !onPaper() && !!score;
   const bounceRoomKey = () => JSON.stringify([state.seen, lookNow().id, state.fingers, state.countAlong, state.zoom, document.documentElement.classList.contains('small')]);
@@ -3545,42 +3644,60 @@ body.following .host-only { display: none !important; }
   // Playing: the ball lands on every count as it is heard, and on every note as it starts; between landings it flies
   // in an arc, higher for a longer flight. On a held note it travels forward a bounce at a time, each landing a share of
   // the way to the next note in proportion to the time (a half note's second bounce lands halfway), then lands on the
-  // next note (Janelle, 2026-11-06: it bounced in place on the note before).
+  // next note (Janelle, 2026-11-06: it bounced in place on the note before). Fast, it lands only on the big beats,
+  // skimming over the notes between (bigBeat). From the end of a line to the next line down the page it hops off the
+  // end, then drops straight down onto the next line's first note, falling faster as it goes, landing on the beat
+  // (Janelle, 2026-11-10: it floated down from above).
+  function ballSpot(run, T) {
+    const s = run.stops;
+    let lo = 0, hi = s.length - 1;
+    while (lo < hi) { const m = (lo + hi + 1) >> 1; if (s[m].tick <= T + 1) lo = m; else hi = m - 1; }
+    const cur = s[lo], nxt = s[lo + 1];
+    if (!nxt || T <= cur.tick + 1) return { ...cur, k: lo };
+    const f = (T - cur.tick) / Math.max(1, nxt.tick - cur.tick), other = nxt.sys !== cur.sys;
+    const tx = other ? cur.right - cur.space : nxt.x, ty = other ? cur.y : nxt.y;
+    return { x: cur.x + (tx - cur.x) * f, y: cur.y + (ty - cur.y) * f, ceil: other ? cur.ceil : Math.max(cur.ceil, nxt.ceil), space: cur.space, sys: cur.sys, right: cur.right, rest: cur.rest, k: lo };
+  }
   function updatePointer(now) {
     if (!pointRuns.length) return;
     if (counting || now < heardAt) { ballClock = null; idlePointer(); return; }
     const t = ballTick(now);
     if (t < 0) return;
     const r = loop && api.playbackRange;
+    // Counts a minute at the speed heard now, in the bar being played.
+    const mb = score.masterBars[barAtTick(t)], perMin = (pos.bpm || BASE_TEMPO) * 960 / (3840 / mb.timeSignatureDenominator);
+    if (!bigMode && perMin > BIG_BEATS_FROM) bigMode = true; else if (bigMode && perMin < COUNTS_BELOW) bigMode = false;
     for (const run of pointRuns) {
-      const s = run.stops, k = stopAt(run, t), cur = s[k];
-      let nxt = s[k + 1], end = nxt ? nxt.tick : cur.end;
+      const s = run.stops;
+      let L = bigMode ? run.lands.big : run.lands.fine, end = run.lands.end;
+      if (t < s[0].tick) { putPointer(run, s[0].x, s[0].y, s[0].rest); continue; }
       // The last flight of a loop goes back to the loop's first note, landing as the loop ends.
-      if (r && nxt && nxt.tick >= r.endTick) { nxt = s[stopAt(run, r.startTick + 1)]; run.k = k; end = r.endTick; }
-      if (t < cur.tick || !nxt) { putPointer(run, cur.x, cur.y, cur.rest); continue; }
-      const lands = cur.lands.filter(c => c < end - 1);
-      let i = 0;
-      while (i + 1 < lands.length && lands[i + 1] <= t) i++;
-      const a = lands[i], b = i + 1 < lands.length ? lands[i + 1] : end, last = i + 1 >= lands.length;
-      const p = Math.max(0, Math.min(1, (t - a) / Math.max(1, b - a)));
-      const beats = (b - a) / 960; // length of this flight in quarter notes
-      const other = nxt.sys !== cur.sys, ceil = Math.max(cur.ceil, nxt.ceil);
-      // Where each bounce on this note lands: a share of the way on, toward the end of the line if the next note is on
-      // the next line down the page.
-      const spot = (c) => {
-        const f = (c - cur.tick) / Math.max(1, end - cur.tick), tx = other ? cur.right - cur.space : nxt.x, ty = other ? cur.y : nxt.y;
-        return { x: cur.x + (tx - cur.x) * f, y: cur.y + (ty - cur.y) * f, ceil: f ? (other ? cur.ceil : ceil) : cur.ceil, space: cur.space };
-      };
-      let from = spot(a), to = last ? nxt : spot(b);
-      if (last && other) { // to the next line down the page: off the end of this line, then down onto the next
-        if (p < 0.5) to = { x: cur.right, y: cur.y, ceil: cur.ceil, space: cur.space };
-        else from = { x: nxt.x - nxt.space * 3, y: nxt.y, ceil: nxt.ceil, space: nxt.space };
+      const toLoop = r && r.endTick < end + 1;
+      if (toLoop) end = r.endTick;
+      let i = Math.min(run.li, L.length - 1);
+      if (L[i] > t) i = 0;
+      while (i + 1 < L.length && L[i + 1] <= t && L[i + 1] < end) i++;
+      run.li = i;
+      const a = L[i], b = i + 1 < L.length && L[i + 1] < end ? L[i + 1] : end;
+      if (!(b > a)) { const sp = ballSpot(run, a); putPointer(run, sp.x, sp.y, sp.rest); continue; }
+      const p = Math.max(0, Math.min(1, (t - a) / (b - a)));
+      const from = ballSpot(run, a), to = b === end && toLoop ? ballSpot(run, r.startTick) : ballSpot(run, b);
+      const beats = (b - a) / 960; // this flight, in quarter notes
+      if (to.sys !== from.sys) {
+        if (p < 0.35) { // off the end of the line
+          const q = p / 0.35, ex = from.right + from.space;
+          const H = Math.max(from.space * 0.4, Math.min(from.space * 1.4, from.y - ballD(from.space) - from.ceil));
+          putPointer(run, from.x + (ex - from.x) * q, from.y - H * 4 * q * (1 - q * 0.5) * 0.5, from.rest);
+        } else { // dropped onto the next line's first note, faster and faster
+          const q = (p - 0.35) / 0.65, Hd = Math.max(to.space, Math.min(to.space * 3, to.y - ballD(to.space) - to.ceil));
+          putPointer(run, to.x, to.y - Hd * (1 - q * q), to.rest);
+        }
+        continue;
       }
-      const q = last && other ? (p < 0.5 ? p * 2 : (p - 0.5) * 2) : p;
-      const room = Math.min(from.y, to.y) - ballD(cur.space) - Math.max(from.ceil ?? -Infinity, to.ceil ?? -Infinity);
-      const H = Math.max(cur.space * 0.4, Math.min(cur.space * (0.9 + 0.7 * Math.min(2, beats)), room));
-      const x = from.x + (to.x - from.x) * q, y = from.y + (to.y - from.y) * q - H * 4 * q * (1 - q);
-      putPointer(run, x, y, last && p >= 0.5 ? nxt.rest : cur.rest);
+      const room = Math.min(from.y, to.y) - ballD(from.space) - Math.max(from.ceil ?? -Infinity, to.ceil ?? -Infinity);
+      const H = Math.max(from.space * 0.4, Math.min(from.space * (0.9 + 0.7 * Math.min(2, beats)), room));
+      const x = from.x + (to.x - from.x) * p, y = from.y + (to.y - from.y) * p - H * 4 * p * (1 - p);
+      putPointer(run, x, y, p < 0.5 ? from.rest : to.rest);
     }
   }
   $('g-point').addEventListener('click', () => {
@@ -3588,8 +3705,9 @@ body.following .host-only { display: none !important; }
     state.pointer = !state.pointer;
     save(); renderCycles();
     if (state.pointer && api && score) { const wrap = $('sheet').querySelector('.at-cursors'); if (wrap && !pointLayer.parentNode) wrap.insertBefore(pointLayer, markLayer); }
-    // In one long line the bars the ball needed widened go back to their own width without it (and the other way).
-    if (api && score && state.layout === 'line') { holdPlace(); applySize(); api.render(); } else buildPointer();
+    // The music is drawn again: the even spacing (and in one long line the bars widened for the bounces) comes and
+    // goes with the ball.
+    if (api && score) { holdPlace(); applySize(); api.render(); } else buildPointer();
     toast(state.pointer ? 'Bouncing ball on: it bounces on each count' : 'Bouncing ball off');
   });
 
@@ -4860,7 +4978,7 @@ body.following .host-only { display: none !important; }
     api.renderer.renderFinished.on((r) => { if (livePieces && r) livePieces.add(r.id); });
     api.soundFontLoaded.on(() => { if (soundReady) { $('play').disabled = false; setPlaying(playing); } });
     api.activeBeatsChanged.on((e) => { activeBeats = e.activeBeats || []; trackNotes(); });
-    api.playerPositionChanged.on((e) => { pos = { tick: e.currentTick, at: performance.now(), bpm: e.modifiedTempo || BASE_TEMPO * api.playbackSpeed }; });
+    api.playerPositionChanged.on((e) => { pos = { tick: e.currentTick, at: performance.now(), bpm: e.modifiedTempo || BASE_TEMPO * tempoScale * api.playbackSpeed }; });
     api.midiLoad.on((midi) => {
       const T = alphaTab.midi.MidiEventType;
       const ts = pickupExtra && midi.events.find(e => e.type === T.TimeSignature && e.tick === 0);
@@ -4888,7 +5006,7 @@ body.following .host-only { display: none !important; }
     api.playerReady.on(() => {
       soundReady = true;
       $('play').disabled = false; setPlaying(false);
-      api.playbackSpeed = state.tempo / SPEED_BASE;
+      playSpeed(state.tempo / SPEED_BASE);
       applyMetro();
       api.midiEventsPlayedFilter = [alphaTab.midi.MidiEventType.AlphaTabMetronome];
       applyLoopMode();

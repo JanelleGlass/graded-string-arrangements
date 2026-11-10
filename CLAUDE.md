@@ -338,6 +338,10 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   speaker. No manual setting yet: if a speaker or TV reports its delay wrongly, a manual one like Soundslice's
   "Audio latency" is the next step. alphaTab's .min.js shortens its own internal names, so the reader measures
   through the browser's audio node and alphaTab's public events, never alphaTab's underscore names.
+- Tempo goes down to 10 (Janelle, 2026-11-10; it stopped at 40), in steps of 5. alphaTab plays no slower than an eighth
+  of the written tempo, so below that the reader halves (or quarters) the score's tempo marks and plays at a speed
+  alphaTab allows on top (`playSpeed`, `tempoScale`; the numbers are never drawn, and everything that times the music
+  reads the marks). The conductor sends the tempo as a share of the written one, not alphaTab's speed.
 - Metronome is one button that cycles Off → On → On with count-in → Count-in only.
   A count-in before a pickup counts the missing beats of its bar ("1 2 3 1 2" before a one-beat pickup in 3/4). The player only counts whole beats and starts the music straight after, so a pickup shorter than a beat (the Wellerman's eighth in 4/4) came in on the beat, with an empty beat before it, and every click while playing fell on an "&" (Janelle heard the gap, 2026-11-03). The reader now puts an unseen half beat of silence in front of such a pickup (a MusicXML forward in each part's first bar, `padPickup`), laid out with no room, so it counts "1 2 3 4 1 2 3", the gap is 4 and the pickup lands on its "&". The counts and the start ring skip the gap. A count-in started anywhere in the first bar counts from the top of it, like any other bar.
 - Bouncing ball (Janelle, 2026-11-05/06: for young students who can't read rhythms yet and don't know when the next
@@ -375,6 +379,21 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   Counting (a ball with a dotted arc; teal when on, grey and crossed out when off; a tap shows a toast), on every
   screen. It sat at the top right, left of Print, until Janelle moved it down (2026-11-10), where Follow now sits.
   Never printed.
+  Even spacing (Janelle, 2026-11-10: "make the space between the notes equal to how many beats there are ... only when
+  the bouncing ball is turned on"): with the ball on, the room after each note is in proportion to its length (a
+  half note twice a quarter's, a dotted quarter three eighths'), on pages too, never on paper. alphaTab spaces notes
+  by a spring each whose give grows with the log of the length (`1 + 0.85 log2(length / smallest)`, a half note got
+  about 1.85 quarters) and has no setting for it, so the reader replaces that one method on alphaTab's bar-spacing
+  object (`evenSpacing`): found after the first drawing by searching from `api.renderer` for an object with a
+  `layoutingInfo` whose prototype has a method (not the constructor) containing `.85*Math.log2`, since the .min.js
+  shortens the name; then drawn again. A quarter note keeps the room it had; alphaTab still keeps every note clear of
+  the next. If alphaTab changes and the method isn't found, the music is simply spaced as before.
+  Big beats when fast (Janelle, 2026-11-10): when the counts come faster than 150 a minute at the speed being played
+  (back below 130), the ball bounces only on the big beats, skimming over the notes between: a dotted quarter in 6/8,
+  9/8 and 12/8, the whole bar in 3/4 and 2/4, a half note in 4/4 (`bigBeat`); other time signatures keep their counts.
+  So each song switches at its own speed (The Butterfly at its written ♩=120 bounces on dotted quarters; slowed to 60,
+  on every eighth). Line changes on pages: it hops off the end of the line, then drops straight down onto the next
+  line's first note, faster as it falls, landing on the beat (she saw it float down from above).
   History: it began as a pointing finger (an open palm over rests) that hopped once per count and landed half a count
   before each note; Janelle found the hops too much, a smooth glide was tried, and she chose the ball (2026-11-06).
 - Tap a note to choose where Play starts: a thin, pale ring around the note head until the music
