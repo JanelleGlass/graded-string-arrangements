@@ -2695,6 +2695,11 @@ body.following .host-only { display: none !important; }
   // Each beat's note heads sit in an SVG group "g.b<beat id>"; the group is scaled about the head's centre,
   // so a finger number drawn inside the head grows with it.
   let activeBeats = [], playing = false, pos = { tick: 0, at: 0, bpm: BASE_TEMPO }, lastGrid = null, lastPulseAt = -1e9;
+  // When the first note after Play reaches the speaker: until then nothing moves or lights up. Kept apart from pos.at,
+  // the time of the player's latest report: a frame's time can be a moment before a report that came in during that
+  // frame, and checking against the report made the ball jump back to the first note and the lit note go dark for one
+  // frame, about every second (Janelle saw both flash, on her laptop and iPad, 2026-11-10).
+  let heardAt = 0;
   let pulsing = [];
   const pulseOn = () => state.follow !== 'line';
   const unitMs = () => (state.unit || 480) / (0.016 * (pos.bpm || BASE_TEMPO));
@@ -3518,7 +3523,7 @@ body.following .host-only { display: none !important; }
   // next note (Janelle, 2026-11-06: it bounced in place on the note before).
   function updatePointer(now) {
     if (!pointRuns.length) return;
-    if (counting || now < pos.at) { ballClock = null; idlePointer(); return; }
+    if (counting || now < heardAt) { ballClock = null; idlePointer(); return; }
     const t = ballTick(now);
     if (t < 0) return;
     const r = loop && api.playbackRange;
@@ -3575,7 +3580,7 @@ body.following .host-only { display: none !important; }
         // Move the light to whatever is sounding now (nothing during the count-in) before any swell.
         let fresh = [];
         if (pulseOn()) {
-          fresh = setSounding(counting || now < pos.at ? [] : soundingBeats(est));
+          fresh = setSounding(counting || now < heardAt ? [] : soundingBeats(est));
           if (!newCount) fresh.forEach(hold); // a note that starts between counts just lights up
         }
         if (key !== lastGrid) {
@@ -4098,7 +4103,7 @@ body.following .host-only { display: none !important; }
     } else {
       // Count-in over: ease from the first note into the even motion.
       if (L.counting) { L.counting = false; glide(0, 2500); }
-      if (now >= pos.at) L.disp += rate * dt; // not before the first note is heard
+      if (now >= heardAt) L.disp += rate * dt; // not before the first note is heard
       const err = est - L.disp;
       if (Math.abs(err) > 480) {
         // A jump (loop back, seek): glide to the new spot instead of snapping.
@@ -4872,7 +4877,7 @@ body.following .host-only { display: none !important; }
       playing = e.state === 1;
       setPlaying(playing);
       // The first note reaches the speaker a moment after Play: until then the music waits (pos.at is that moment).
-      if (playing && !was) { clearStalePieces(); lastGrid = null; pos.at = performance.now() + soundLag(); requestAnimationFrame(gridTick); lineState = null; revealSheet(true, true); if (state.layout === 'line' && !lineRaf) lineRaf = requestAnimationFrame(lineFollow); }
+      if (playing && !was) { clearStalePieces(); lastGrid = null; pos.at = heardAt = performance.now() + soundLag(); requestAnimationFrame(gridTick); lineState = null; revealSheet(true, true); if (state.layout === 'line' && !lineRaf) lineRaf = requestAnimationFrame(lineFollow); }
       if (!playing) endCountIn();
       if (!playing && e.stopped) { activeBeats = []; trackNotes(); clearNow(); }
       // Stopped or paused: frame the note Play will start from (the player settles on its spot a moment later).

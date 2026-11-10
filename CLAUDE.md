@@ -365,7 +365,11 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   renderFinished) and removes any other piece once the drawing settles and on Play (`clearStalePieces`). The likely
   cause: the first drawing can come before the page's lettering (Google Fonts) has loaded, so the widened second one
   sits about 50 px lower and both showed for a moment; now the music is hidden while it is drawn again (`reflowing`).
-  Dropping the ball's `will-change` made the blinking worse for her, so it is back; the blinking is not yet found.
+  Dropping the ball's `will-change` made the blinking worse for her, so it is back. The blinking (laptop and iPad)
+  was the reader's own: "has the first note been heard yet?" was checked against the time of the player's latest
+  report, and a frame's time can come a moment before a report received during that frame, so about every second the
+  ball went back to its resting place on the first note (the "shadow") and the lit note went dark, for one frame. That
+  check now uses its own time, set once on Play (`heardAt`); a frame-by-frame trace shows no jumps.
   The room per bounce was raised from about two ball widths to three (Janelle: the first bars got no more room). Switching the ball off or on draws the music again, so the bars go back to their own width without
   it. Pages lay out bars by alphaTab's rules (no `displayWidth`), so there the spacing is as always. On by default, saved. Its switch is a round button in the strip, after
   Counting (a ball with a dotted arc; teal when on, grey and crossed out when off; a tap shows a toast), on every
