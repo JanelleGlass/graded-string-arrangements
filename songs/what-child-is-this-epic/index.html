@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Graded Strings">
 <style>body{margin:0;padding:0}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <script src="../../app/app.js?v=3a19f0d83d"></script>
-<script src="../../app/together.js?v=f3ffe4674d"></script>
+<script src="../../app/together.js?v=85821347bb"></script>
 <title>What Child Is This — Epic</title>
 <meta name="description" content="Read and play along with What Child Is This — Epic in four levels for violin, viola, cello and bass.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -254,6 +254,10 @@ hr.div { border: 0; border-top: 1px solid var(--line); margin: 0; }
 /* Its switch, at the top beside Print: the ball, teal when on, grey and crossed out when off */
 .fab-btn svg.pt-ico { width: 22px; height: 22px; fill: none; }
 #g-point[aria-pressed="true"] { border-color: #1D5B72; }
+/* Follow: a small quiet word at the top, there only while a teacher conducts this piece (Janelle, 2026-11-10). */
+.top-tools .follow-btn { min-width: 0; padding: 0 12px; font-size: 0.86rem; font-weight: 600; color: var(--muted); }
+.top-tools .follow-btn.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+.info-teach { margin: 2px 0 0; font-size: 0.86rem; }
 /* Counts switched off: the row goes blank (the music is drawn again without its room, so the lines close up) */
 #sheet.counts-off .count-layer { visibility: hidden; }
 /* Dynamics (mf, f…) are nudged down under the count row; let them draw past the edge of their svg if need be */
@@ -572,6 +576,7 @@ body.following .host-only { display: none !important; }
           <div><dt>Length</dt><dd>69 bars</dd></div>
         </dl>
         <p class="lede">Four levels for violin, viola, cello and bass, each with a melody, an inner part and a bass line, plus a countermelody and a concert part for violin and viola. Pick your part, choose who plays along, and follow the music as it plays.</p>
+        <p class="info-teach" id="teachLine" hidden><button class="link" id="teachBtn" type="button">Teacher? Conduct your class</button></p>
       </div>
     </div>
     <div class="buy">
@@ -594,7 +599,7 @@ body.following .host-only { display: none !important; }
   <p class="err" id="err" role="alert"></p>
 
   <div class="sheet-wrap">
-    <div class="tools-dock"><div class="top-tools" id="topTools"><button class="fab-btn round" id="g-point" type="button" aria-pressed="true"></button><button class="fab-btn round host-only" id="printBtn" type="button" aria-label="Print the music" title="Print the music"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg></button><button class="fab-btn round host-only" id="pdfBtn" type="button" aria-label="Download the music as a PDF" title="Download a PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/></svg></button><div class="zoom-pill" role="group" aria-label="Size of the music"><button type="button" id="zoomOut" aria-label="Smaller music" title="Smaller">−</button><button type="button" id="zoomIn" aria-label="Bigger music" title="Bigger">+</button></div><button class="fab-btn big-only cyc" id="g-layout" type="button"></button></div></div>
+    <div class="tools-dock"><div class="top-tools" id="topTools"><button class="fab-btn follow-btn" id="g-follow" type="button" aria-pressed="false" hidden>Follow</button><button class="fab-btn round host-only" id="printBtn" type="button" aria-label="Print the music" title="Print the music"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg></button><button class="fab-btn round host-only" id="pdfBtn" type="button" aria-label="Download the music as a PDF" title="Download a PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/></svg></button><div class="zoom-pill" role="group" aria-label="Size of the music"><button type="button" id="zoomOut" aria-label="Smaller music" title="Smaller">−</button><button type="button" id="zoomIn" aria-label="Bigger music" title="Bigger">+</button></div><button class="fab-btn big-only cyc" id="g-layout" type="button"></button></div></div>
     <div class="key-dock"><div class="key" id="legend" role="note" aria-label="String colors"></div></div>
     <div class="sheet" id="sheet"></div>
     <div class="loading" id="loading">Setting out the music…</div>
@@ -644,6 +649,7 @@ body.following .host-only { display: none !important; }
     <button class="fab-btn cyc" id="g-colors" type="button"></button>
     <button class="fab-btn cyc" id="g-look" type="button"></button>
     <button class="fab-btn cyc" id="g-count" type="button"></button>
+    <button class="fab-btn" id="g-point" type="button" aria-pressed="true"></button>
     </div>
     <div class="fab-set" role="group" aria-label="Playback settings">
     <button class="fab-btn host-only" id="g-tempo" type="button" aria-expanded="false" aria-controls="pop-tempo" title="Tempo"><svg class="qn" viewBox="0 0 10 24" aria-hidden="true"><ellipse cx="4.6" cy="19.2" rx="4.4" ry="3.1" transform="rotate(-22 4.6 19.2)"/><rect x="7.7" y="1" width="1.5" height="18.2"/></svg><span id="tempoChip">100</span></button>
@@ -2167,29 +2173,31 @@ body.following .host-only { display: none !important; }
     conductorUi();
   }
   // Play together is a single on/off button:
-  //   the teacher sees "Conduct" (in the settings) and, once on, "Conducting · 2" next to Play;
-  //   a student sees "Follow the conductor" as soon as someone conducts, and "Following" once on.
+  //   the teacher sees "Conduct" (in the strip) and, once on, "Conducting · 2" next to Play;
+  //   a student sees a small "Follow" at the top of the music as soon as someone conducts, and "Following" once on
+  //   (Janelle, 2026-11-10: quiet, at the top; it was "Follow the conductor" in the strip).
   function conductorUi() {
     const other = !!conductor.hostPeer && !conductor.hosting;   // someone else is conducting
     const canLead = conductor.canLead !== false;                 // students who can't conduct never see Conduct
-    const site = conductor.site;                                 // the website's Play together (window.playTogether)
-    const g = $('g-together');
-    let label = '', on = false, offer = false, show = !!conductor.room;
+    const site = conductor.site;                                 // the website (window.playTogether)
+    const g = $('g-together'), f = $('g-follow');
+    let label = '', on = false, show = !!conductor.room && canLead && (conductor.hosting || (!other && !conductor.following && moreOpen));
     if (conductor.hosting) { on = true; label = conductor.followers ? 'Conducting · ' + conductor.followers : 'Conducting'; }
-    else if (conductor.following) { on = true; label = 'Following'; }
-    else if (other) { offer = true; label = 'Follow the conductor'; }
-    else if (site) { label = conductor.room && canLead ? 'Conduct' : 'Play together'; show = moreOpen; }
-    else if (canLead) { label = 'Conduct'; show = show && moreOpen; }
-    else show = false;
+    else label = 'Conduct';
     g.hidden = !show;
     g.classList.toggle('on', on);
-    g.classList.toggle('offer', offer);
+    g.classList.remove('offer');
     g.setAttribute('aria-pressed', String(on));
     $('togetherLbl').textContent = label;
-    g.title = conductor.hosting ? 'Stop conducting' : conductor.following ? 'Stop following (sound is off while following)'
-      : other ? 'Start, stop and tempo come from the conductor; sound is off on this device'
-      : site && !(conductor.room && canLead) ? (site.code() ? 'Class ' + site.code() + ': waiting for the teacher to conduct' : 'Follow your teacher, or conduct a class')
-      : 'Play on everyone’s device at once: you set the tempo and press Play';
+    g.title = conductor.hosting ? 'Stop conducting' : 'Play on everyone’s device at once: you set the tempo and press Play';
+    f.hidden = !(conductor.following || (other && conductor.room));
+    f.classList.toggle('on', conductor.following);
+    f.setAttribute('aria-pressed', String(conductor.following));
+    f.textContent = conductor.following ? 'Following' : 'Follow';
+    f.title = conductor.following ? 'Stop following (sound is off while following)'
+      : 'Follow the teacher: start, stop and tempo come from the teacher; sound is off on this device';
+    $('teachLine').hidden = !site;
+    if (site) $('teachBtn').textContent = canLead && conductor.room ? 'Conducting: you’re signed in as the teacher' : 'Teacher? Sign in to conduct';
     setDockH();
   }
   function stopHosting() {
@@ -2198,27 +2206,27 @@ body.following .host-only { display: none !important; }
     if (conductor.room) conductor.room.presence({ conducting: null }).catch(() => {});
   }
   async function startHosting() {
-    if (conductor.joining) await conductor.joining; // the website: just signed in, still joining the class
+    if (conductor.joining) await conductor.joining; // the website: just signed in, still connecting
     if (!conductor.room || conductor.hosting) return;
     try { await conductor.room.emit('conduct', { type: 'hello', seq: ++conductor.seq }); }
-    catch (e) { conductor.canLead = false; conductorUi(); if (conductor.site) toast('Couldn’t reach the class. Check the internet.', 2600); return; }
+    catch (e) { conductor.canLead = false; conductorUi(); if (conductor.site) toast('Couldn’t reach the students. Check the internet.', 2600); return; }
     conductor.hosting = true;
     conductor.room.presence({ conducting: true }).catch(() => {});
     clearInterval(conductor.posTimer);
     conductor.posTimer = setInterval(hostReport, 500);
     conductorUi();
-    if (conductor.site && conductor.room.code) toast('Conducting class ' + conductor.room.code, 2600);
   }
-  $('g-together').addEventListener('click', async () => {
-    const site = conductor.site;
-    if (conductor.following) { stopFollowing(); return; }
-    if (conductor.room && conductor.hostPeer && !conductor.hosting) { startFollowing(); return; }
+  $('g-together').addEventListener('click', () => {
     if (conductor.hosting) { stopHosting(); conductorUi(); return; }
-    // The website: the box with the class code (a student joins with it; a signed-in teacher reads it out and starts).
-    if (site) { site.open({ conduct: startHosting }); return; }
     if (!conductor.room) return;
     startHosting();
   });
+  $('g-follow').addEventListener('click', () => {
+    if (conductor.following) { stopFollowing(); return; }
+    if (conductor.room && conductor.hostPeer && !conductor.hosting) startFollowing();
+  });
+  // The website: the teacher signs in from the About box (students need nothing: Follow appears by itself).
+  $('teachBtn').addEventListener('click', () => { if (conductor.site) conductor.site.open({ conduct: startHosting, conducting: conductor.hosting }); });
 
   async function connectRoom() {
     if (!(window.claude && window.claude.use)) {

@@ -299,7 +299,7 @@ async def song_checks(browser, base):
                 on = False
             check(off and on, f'{label}: the Counting button in the strip hides and shows the counts')
             await pg.wait_for_timeout(1000)
-            # The bouncing ball: above the part, on at first, switched off and on again with its button at the top.
+            # The bouncing ball: above the part, on at first, switched off and on again with its button in the strip.
             fingers = "() => document.querySelectorAll('#sheet .pointer').length"
             had = await pg.evaluate(fingers)
             await pg.click('#g-point'); await pg.wait_for_timeout(300)
@@ -1004,7 +1004,7 @@ async def preview_checks(browser, base):
     teacher = await open_reader(ctx, f'{base}/reader/__preview.html', errors, 'teacher')
     student = await open_reader(ctx, f'{base}/reader/__preview.html?student', errors, 'student')
     await teacher.click('#g-together'); await teacher.wait_for_timeout(1000)
-    await student.click('#g-together'); await student.wait_for_timeout(2500)
+    await student.click('#g-follow'); await student.wait_for_timeout(2500)  # Follow sits at the top of the music
     following = await student.evaluate("() => document.body.classList.contains('following')")
     check(following, 'student joins the teacher')
     await teacher.click('#play'); await teacher.wait_for_timeout(4000)
