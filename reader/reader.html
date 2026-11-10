@@ -230,7 +230,9 @@ hr.div { border: 0; border-top: 1px solid var(--line); margin: 0; }
 /* The bouncing ball: a small teal ball above each part's staff, one bounce per count, from note to note; over a rest,
    a hollow ring (quiet) */
 .point-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; }
-.pointer { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; will-change: transform; }
+/* No will-change: a layer of its own over the pulsing notes made the ball and the note under it blink on some screens
+   (Janelle, 2026-11-10) */
+.pointer { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; }
 .pointer svg { position: absolute; display: block; overflow: visible; }
 .pointer .ring, .pointer.rest .ball { display: none; }
 .pointer.rest .ring { display: block; }
@@ -3416,7 +3418,18 @@ body.following .host-only { display: none !important; }
   // The music is drawn again only once everything after a drawing is done (renderFinished), and not when something
   // else there already asked for a drawing: a drawing started on top of another left both on the screen, the second
   // offset from the first (Janelle saw doubled bar numbers and dynamics, 2026-11-10).
-  var bounceRedraw = false, bounceWaiting = false, staleTimer = 0;
+  var bounceRedraw = false, bounceWaiting = false, staleTimer = 0, livePieces = null;
+  // Once the drawing settles (and again on Play): a piece of the page that isn't part of the latest drawing is removed,
+  // and one still showing an earlier drawing than its own is emptied (its own arrives in its place).
+  function clearStalePieces() {
+    const c = api && api.canvasElement && api.canvasElement.element;
+    if (!c || !livePieces || !livePieces.size || printing) return;
+    for (const ph of [...c.children]) {
+      if (!('layoutResultId' in ph)) continue;
+      if (!livePieces.has(ph.layoutResultId)) ph.remove();
+      else if (ph.renderedResultId !== undefined && ph.renderedResultId !== ph.layoutResultId) ph.replaceChildren();
+    }
+  }
   const bounceRoomWanted = () => state.pointer && state.layout === 'line' && !onPaper() && !!score;
   const bounceRoomKey = () => JSON.stringify([state.seen, lookNow().id, state.fingers, state.countAlong, state.zoom, document.documentElement.classList.contains('small')]);
   // Called by applySize, just before each drawing: the widths this layout wants, or none.
@@ -4795,11 +4808,14 @@ body.following .host-only { display: none !important; }
       // dynamics doubled, a little apart, until a change of size drew everything afresh (2026-11-10). Once the drawing
       // settles, a piece still holding another drawing than its own is emptied; its own arrives in its place.
       clearTimeout(staleTimer);
-      staleTimer = setTimeout(() => {
-        const c = api && api.canvasElement && api.canvasElement.element;
-        if (c) for (const ph of c.children) if ('layoutResultId' in ph && ph.renderedResultId !== undefined && ph.renderedResultId !== ph.layoutResultId) ph.replaceChildren();
-      }, 400);
+      staleTimer = setTimeout(clearStalePieces, 400);
+      setTimeout(clearStalePieces, 1500);
     });
+    // The pieces of the latest drawing, as alphaTab lays them out: anything else on the page is left over from an
+    // earlier one (Janelle's screenshot, 2026-11-10: a whole second copy of the music a little lower than the first).
+    api.renderer.preRender.on(() => { livePieces = new Set(); });
+    api.renderer.partialLayoutFinished.on((r) => { if (livePieces && r) livePieces.add(r.id); });
+    api.renderer.renderFinished.on((r) => { if (livePieces && r) livePieces.add(r.id); });
     api.soundFontLoaded.on(() => { if (soundReady) { $('play').disabled = false; setPlaying(playing); } });
     api.activeBeatsChanged.on((e) => { activeBeats = e.activeBeats || []; trackNotes(); });
     api.playerPositionChanged.on((e) => { pos = { tick: e.currentTick, at: performance.now(), bpm: e.modifiedTempo || BASE_TEMPO * api.playbackSpeed }; });
@@ -4844,7 +4860,7 @@ body.following .host-only { display: none !important; }
       playing = e.state === 1;
       setPlaying(playing);
       // The first note reaches the speaker a moment after Play: until then the music waits (pos.at is that moment).
-      if (playing && !was) { lastGrid = null; pos.at = performance.now() + soundLag(); requestAnimationFrame(gridTick); lineState = null; revealSheet(true, true); if (state.layout === 'line' && !lineRaf) lineRaf = requestAnimationFrame(lineFollow); }
+      if (playing && !was) { clearStalePieces(); lastGrid = null; pos.at = performance.now() + soundLag(); requestAnimationFrame(gridTick); lineState = null; revealSheet(true, true); if (state.layout === 'line' && !lineRaf) lineRaf = requestAnimationFrame(lineFollow); }
       if (!playing) endCountIn();
       if (!playing && e.stopped) { activeBeats = []; trackNotes(); clearNow(); }
       // Stopped or paused: frame the note Play will start from (the player settles on its spot a moment later).
