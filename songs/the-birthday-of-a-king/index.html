@@ -13,6 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Graded Strings">
 <style>body{margin:0;padding:0}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <script src="../../app/app.js?v=3a19f0d83d"></script>
+<script src="../../app/together.js?v=f3ffe4674d"></script>
 <title>The Birthday of a King</title>
 <meta name="description" content="Read and play along with The Birthday of a King in four levels for violin, viola, cello and bass.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2171,11 +2172,13 @@ body.following .host-only { display: none !important; }
   function conductorUi() {
     const other = !!conductor.hostPeer && !conductor.hosting;   // someone else is conducting
     const canLead = conductor.canLead !== false;                 // students who can't conduct never see Conduct
+    const site = conductor.site;                                 // the website's Play together (window.playTogether)
     const g = $('g-together');
     let label = '', on = false, offer = false, show = !!conductor.room;
     if (conductor.hosting) { on = true; label = conductor.followers ? 'Conducting · ' + conductor.followers : 'Conducting'; }
     else if (conductor.following) { on = true; label = 'Following'; }
     else if (other) { offer = true; label = 'Follow the conductor'; }
+    else if (site) { label = conductor.room && canLead ? 'Conduct' : 'Play together'; show = moreOpen; }
     else if (canLead) { label = 'Conduct'; show = show && moreOpen; }
     else show = false;
     g.hidden = !show;
@@ -2185,35 +2188,73 @@ body.following .host-only { display: none !important; }
     $('togetherLbl').textContent = label;
     g.title = conductor.hosting ? 'Stop conducting' : conductor.following ? 'Stop following (sound is off while following)'
       : other ? 'Start, stop and tempo come from the conductor; sound is off on this device'
+      : site && !(conductor.room && canLead) ? (site.code() ? 'Class ' + site.code() + ': waiting for the teacher to conduct' : 'Follow your teacher, or conduct a class')
       : 'Play on everyone’s device at once: you set the tempo and press Play';
     setDockH();
   }
-  $('g-together').addEventListener('click', async () => {
-    if (!conductor.room) return;
-    if (conductor.following) { stopFollowing(); return; }
-    if (conductor.hostPeer && !conductor.hosting) { startFollowing(); return; }
-    if (conductor.hosting) {
-      conductSend({ type: 'stop', tick: 0 });
-      conductor.hosting = false; clearInterval(conductor.posTimer);
-      conductor.room.presence({ conducting: null }).catch(() => {});
-      conductorUi();
-      return;
-    }
+  function stopHosting() {
+    conductSend({ type: 'stop', tick: 0 });
+    conductor.hosting = false; clearInterval(conductor.posTimer);
+    if (conductor.room) conductor.room.presence({ conducting: null }).catch(() => {});
+  }
+  async function startHosting() {
+    if (conductor.joining) await conductor.joining; // the website: just signed in, still joining the class
+    if (!conductor.room || conductor.hosting) return;
     try { await conductor.room.emit('conduct', { type: 'hello', seq: ++conductor.seq }); }
-    catch (e) { conductor.canLead = false; conductorUi(); return; }
+    catch (e) { conductor.canLead = false; conductorUi(); if (conductor.site) toast('Couldn’t reach the class. Check the internet.', 2600); return; }
     conductor.hosting = true;
     conductor.room.presence({ conducting: true }).catch(() => {});
     clearInterval(conductor.posTimer);
     conductor.posTimer = setInterval(hostReport, 500);
     conductorUi();
+    if (conductor.site && conductor.room.code) toast('Conducting class ' + conductor.room.code, 2600);
+  }
+  $('g-together').addEventListener('click', async () => {
+    const site = conductor.site;
+    if (conductor.following) { stopFollowing(); return; }
+    if (conductor.room && conductor.hostPeer && !conductor.hosting) { startFollowing(); return; }
+    if (conductor.hosting) { stopHosting(); conductorUi(); return; }
+    // The website: the box with the class code (a student joins with it; a signed-in teacher reads it out and starts).
+    if (site) { site.open({ conduct: startHosting }); return; }
+    if (!conductor.room) return;
+    startHosting();
   });
 
   async function connectRoom() {
-    const room = window.claude && window.claude.use ? await window.claude.use('room').catch(() => null) : null;
+    if (!(window.claude && window.claude.use)) {
+      // The website: Play together through window.playTogether (app/together.js), joined with a class code.
+      const site = window.playTogether;
+      if (!site) return;
+      conductor.site = site;
+      let turn = 0;
+      const join = async () => {
+        const mine = ++turn;
+        if (conductor.following) stopFollowing();
+        if (conductor.hosting) stopHosting();
+        conductor.room = null; conductor.hostPeer = null; conductor.followers = 0; conductor.me = null; conductor.last = null;
+        conductorUi();
+        const room = await site.room().catch(() => null);
+        if (mine !== turn) { if (room) room.leave(); return; }
+        conductor.canLead = site.canLead();
+        if (room) attachRoom(room);
+        conductorUi();
+      };
+      const rejoin = () => {
+        const p = join().finally(() => { if (conductor.joining === p) conductor.joining = null; });
+        conductor.joining = p;
+      };
+      site.onChange(rejoin);
+      rejoin();
+      return;
+    }
+    const room = await window.claude.use('room').catch(() => null);
     if (!room) return;
-    conductor.room = room;
+    attachRoom(room);
     // Sending to the room is reserved for people who can edit this page, so only they are offered Conduct.
     window.claude.use('user').then((u) => (u ? u.canEdit() : null)).then((v) => { conductor.canLead = v; conductorUi(); }).catch(() => {});
+  }
+  function attachRoom(room) {
+    conductor.room = room;
     room.on('conduct', (msg) => {
       if (msg.sameTab || !msg.data) return;
       const cmd = msg.data;
