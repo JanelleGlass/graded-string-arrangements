@@ -309,7 +309,15 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   to the time (Janelle, 2026-11-06: it bounced in place before), then lands on the next note, higher for a longer flight. Tied notes are one
   note. Over a rest it is a hollow ring; rests in a row are one. Stopped, it sits on the note Play starts from; a loop's
   last flight goes back to its first note; to the next line on pages, it flies off the end of the line and drops onto
-  the next. It keeps time with the speaker. On by default, saved. Its switch is a round button at the top right of the
+  the next. It keeps time with the speaker, on a smoothed clock (2026-11-10: the player's reports come a little early
+  or late, and each one jolted the ball, which Janelle saw as flashes): it runs on at the tempo, eases toward the
+  reported place and never moves backwards, except for a real jump (a loop going round, a tap on another note). Room
+  for the bounces (Janelle, 2026-11-10: three bounces on a dotted quarter in 6/8 looked like the third went to the next
+  note): in one long line, after drawing, a note the ball bounces along gets at least about two ball widths per bounce;
+  a bar where one doesn't is drawn again just wide enough (alphaTab's `displayWidth`, which the horizontal layout
+  honours; the extra goes most to the long notes), at most three times, and measured afresh whenever the layout changes
+  (`bounceRoom`). Switching the ball off or on draws the music again, so the bars go back to their own width without
+  it. Pages lay out bars by alphaTab's rules (no `displayWidth`), so there the spacing is as always. On by default, saved. Its switch is a round button at the top right of the
   music, just left of Print (a ball with a dotted arc; teal when on, grey and crossed out when off; a tap shows a
   toast), on every screen: in the strip it pushed the strip to two rows on an iPhone SE on its side. Never printed.
   History: it began as a pointing finger (an open palm over rests) that hopped once per count and landed half a count
