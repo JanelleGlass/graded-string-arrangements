@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Graded Strings">
 <style>body{margin:0;padding:0}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <script src="../../app/app.js?v=3a19f0d83d"></script>
-<script src="../../app/together.js?v=85821347bb"></script>
+<script src="../../app/together.js?v=51d2cb70f0"></script>
 <title>The Birthday of a King</title>
 <meta name="description" content="Read and play along with The Birthday of a King in four levels for violin, viola, cello and bass.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -254,6 +254,9 @@ hr.div { border: 0; border-top: 1px solid var(--line); margin: 0; }
 /* Its switch, at the top beside Print: the ball, teal when on, grey and crossed out when off */
 .fab-btn svg.pt-ico { width: 22px; height: 22px; fill: none; }
 #g-point[aria-pressed="true"] { border-color: #1D5B72; }
+.wake-card { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 950; padding: 18px 28px; border: 0; border-radius: 16px;
+  background: var(--accent); color: var(--accent-ink); font: inherit; font-size: 1.15rem; font-weight: 700; box-shadow: 0 20px 50px -18px rgba(0, 0, 0, 0.6); cursor: pointer; }
+.wake-card[hidden] { display: none; }
 /* Follow: a small quiet word at the top, there only while a teacher conducts this piece (Janelle, 2026-11-10). */
 .top-tools .follow-btn { min-width: 0; padding: 0 12px; font-size: 0.86rem; font-weight: 600; color: var(--muted); }
 .top-tools .follow-btn.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
@@ -2150,7 +2153,35 @@ body.following .host-only { display: none !important; }
     if (locked && ['hear', 'tempo'].includes(openPop)) setPop(null);
     setDockH();
   }
-  function startFollowing() {
+  // After the website takes a following device to the teacher's next song, its sound system starts asleep until the
+  // page is touched (phones and iPads insist), and the music can't move until then: a card asks for one tap.
+  function wakeCard(show) {
+    let card = $('wakeCard');
+    if (!show) { if (card) card.hidden = true; return; }
+    if (!card) {
+      card = document.createElement('button');
+      card.id = 'wakeCard'; card.type = 'button'; card.className = 'wake-card';
+      document.body.append(card);
+    }
+    card.textContent = 'Tap to follow your teacher';
+    card.hidden = false;
+  }
+  function wakeAudio() {
+    const ctx = audioCtx();
+    if (!ctx || ctx.state === 'running') { wakeCard(false); return Promise.resolve(); }
+    return ctx.resume().catch(() => {}).then(() => { if (ctx.state === 'running') wakeCard(false); });
+  }
+  document.addEventListener('pointerdown', () => {
+    if (!$('wakeCard') || $('wakeCard').hidden) return;
+    wakeAudio().then(() => { if (conductor.following && conductor.synced && conductor.last) applyCommand(conductor.last, true); });
+  }, true);
+  // The website: a device that followed the teacher here from another page follows again by itself, once its player
+  // is ready (before that, a start from the teacher can't be kept).
+  function autoFollow() {
+    if (!soundReady || !conductor.site || !conductor.site.wantsFollow()) return;
+    if (conductor.room && conductor.hostPeer && !conductor.following && !conductor.hosting) startFollowing(true);
+  }
+  function startFollowing(auto) {
     if (!conductor.room || !conductor.hostPeer) return;
     conductor.following = true;
     conductor.offset = 0; conductor.bestRtt = Infinity; conductor.pongs = 0; conductor.synced = false; conductor.pings.clear();
@@ -2161,7 +2192,14 @@ body.following .host-only { display: none !important; }
     followerControls(true);
     conductor.room.presence({ following: true }).catch(() => {});
     pingHost(8);
+    // No answer yet (the conductor hadn't seen this device arrive): ask again, until it answers.
+    clearInterval(conductor.repingTimer);
+    conductor.repingTimer = setInterval(() => {
+      if (!conductor.following || conductor.synced) { clearInterval(conductor.repingTimer); return; }
+      pingHost(8);
+    }, 3000);
     conductorUi();
+    if (auto) { const ctx = audioCtx(); if (ctx && ctx.state !== 'running') wakeCard(true); }
   }
   function stopFollowing() {
     conductor.following = false;
@@ -2169,6 +2207,7 @@ body.following .host-only { display: none !important; }
     if (playing) api.pause();
     api.masterVolume = conductor.volume || 1;
     followerControls(false);
+    wakeCard(false);
     if (conductor.room) conductor.room.presence({ following: null, ping: null, t: null }).catch(() => {});
     conductorUi();
   }
@@ -2190,11 +2229,13 @@ body.following .host-only { display: none !important; }
     g.setAttribute('aria-pressed', String(on));
     $('togetherLbl').textContent = label;
     g.title = conductor.hosting ? 'Stop conducting' : 'Play on everyone’s device at once: you set the tempo and press Play';
-    f.hidden = !(conductor.following || (other && conductor.room));
-    f.classList.toggle('on', conductor.following);
-    f.setAttribute('aria-pressed', String(conductor.following));
-    f.textContent = conductor.following ? 'Following' : 'Follow';
+    const keen = conductor.following || (!!site && site.wantsFollow() && !conductor.hosting); // following from song to song
+    f.hidden = !(keen || (other && conductor.room));
+    f.classList.toggle('on', keen);
+    f.setAttribute('aria-pressed', String(keen));
+    f.textContent = keen ? 'Following' : 'Follow';
     f.title = conductor.following ? 'Stop following (sound is off while following)'
+      : keen ? 'Waiting for the teacher. Tap to stop following'
       : 'Follow the teacher: start, stop and tempo come from the teacher; sound is off on this device';
     $('teachLine').hidden = !site;
     if (site) $('teachBtn').textContent = canLead && conductor.room ? 'Conducting: you’re signed in as the teacher' : 'Teacher? Sign in to conduct';
@@ -2208,21 +2249,29 @@ body.following .host-only { display: none !important; }
   async function startHosting() {
     if (conductor.joining) await conductor.joining; // the website: just signed in, still connecting
     if (!conductor.room || conductor.hosting) return;
-    try { await conductor.room.emit('conduct', { type: 'hello', seq: ++conductor.seq }); }
+    const room = conductor.room;
+    try { await room.emit('conduct', { type: 'hello', seq: ++conductor.seq }); if (room !== conductor.room || conductor.hosting) return; }
     catch (e) { conductor.canLead = false; conductorUi(); if (conductor.site) toast('Couldn’t reach the students. Check the internet.', 2600); return; }
     conductor.hosting = true;
     conductor.room.presence({ conducting: true }).catch(() => {});
     clearInterval(conductor.posTimer);
     conductor.posTimer = setInterval(hostReport, 500);
+    if (conductor.site) conductor.site.setConducting(true); // carries on when the teacher opens another song
     conductorUi();
   }
   $('g-together').addEventListener('click', () => {
-    if (conductor.hosting) { stopHosting(); conductorUi(); return; }
+    if (conductor.hosting) { stopHosting(); if (conductor.site) conductor.site.setConducting(false); conductorUi(); return; }
     if (!conductor.room) return;
     startHosting();
   });
   $('g-follow').addEventListener('click', () => {
-    if (conductor.following) { stopFollowing(); return; }
+    const site = conductor.site;
+    if (conductor.following || (site && site.wantsFollow())) {
+      if (site) site.setFollow(false);
+      if (conductor.following) stopFollowing(); else conductorUi();
+      return;
+    }
+    if (site) site.setFollow(true); // keeps following when the teacher changes songs
     if (conductor.room && conductor.hostPeer && !conductor.hosting) startFollowing();
   });
   // The website: the teacher signs in from the About box (students need nothing: Follow appears by itself).
@@ -2246,12 +2295,15 @@ body.following .host-only { display: none !important; }
         conductor.canLead = site.canLead();
         if (room) attachRoom(room);
         conductorUi();
+        // The teacher was conducting on the page before: carry on here.
+        if (room && conductor.canLead && site.wantsConduct()) startHosting();
       };
       const rejoin = () => {
         const p = join().finally(() => { if (conductor.joining === p) conductor.joining = null; });
         conductor.joining = p;
       };
       site.onChange(rejoin);
+      site.onSite(() => conductorUi());
       rejoin();
       return;
     }
@@ -2292,6 +2344,8 @@ body.following .host-only { display: none !important; }
       if (hostPeer !== conductor.hostPeer) {
         if (conductor.following && !hostPeer) stopFollowing();
         conductor.hostPeer = hostPeer;
+        // The website: this device followed the teacher here from another page, so it follows again by itself.
+        if (hostPeer) setTimeout(autoFollow, 0);
       }
       if (conductor.hosting) {
         // Answer pings, and bring newcomers up to date.
@@ -4708,6 +4762,7 @@ body.following .host-only { display: none !important; }
       api.midiEventsPlayedFilter = [alphaTab.midi.MidiEventType.AlphaTabMetronome];
       applyLoopMode();
       applyAudio();
+      autoFollow();
     });
     // The end of a pass of a loop: rest a beat and go round again (the conductor restarts everyone).
     api.playerFinished.on(() => { if (loop && !conductor.following) setTimeout(restartLoop, 40); });

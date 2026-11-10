@@ -128,8 +128,10 @@ def serve(keep=False):
 
 
 async def setup(ctx):
+    # Play together on test channels of their own, so a test never meets a real class (app/together.js).
+    await ctx.add_init_script("try { localStorage.setItem('gsa-together-test', '1'); } catch (e) {}")
     if os.environ.get('ALPHATAB_JS'):
-        await ctx.route('https://cdn.jsdelivr.net/**', lambda r: r.fulfill(
+        await ctx.route('https://cdn.jsdelivr.net/npm/@coderline/**', lambda r: r.fulfill(
             path=os.environ['ALPHATAB_JS'], content_type='application/javascript', headers={'Access-Control-Allow-Origin': '*'}))
     if os.environ.get('NO_WEBFONTS'):
         await ctx.route('https://fonts.googleapis.com/**', lambda r: r.fulfill(body='', content_type='text/css'))
