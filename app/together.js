@@ -3,15 +3,15 @@
 //
 // The reader's conductor was written for the Claude preview's shared "room". This file gives the website the same
 // kind of room, through Supabase Realtime (Janelle's violin-studio project), as window.playTogether; the reader uses
-// it wherever window.claude doesn't exist. Song pages load it; it does nothing until someone opens Play together, or
-// has a class code or a teacher sign-in saved, so a page that never uses it never downloads Supabase.
+// it wherever window.claude doesn't exist.
 //
-// How a class meets: the teacher signs in (her violin-studio email and password) and has a class code
-// (public.conduct_classes). Students type the code once; it is saved on their device. Everyone on the same song page
-// with the same code is in one room, made of two channels:
-//   conduct:<CODE>:<song>     only the code's teacher may send (the database's rules on realtime.messages check it)
-//   conduct-in:<CODE>:<song>  anyone may send: who is here (presence) and the students' clock pings
-// So a student can't take over the class: only messages on the teacher's channel ever move a student's music.
+// No class code (Janelle, 2026-11-10): every song page is one room, and any page that has it open watches for a
+// teacher conducting it; the reader then shows a small "Follow" at the top. Nobody follows unless they tap it. The
+// teacher signs in (her violin-studio email and password) from the About box. Each room is two channels:
+//   conduct:<song>     only a teacher listed in public.conduct_classes may send (the database's rules on
+//                      realtime.messages check it)
+//   conduct-in:<song>  anyone may send: who is here (presence) and the students' clock pings
+// So a student can't take over: only messages on the teacher's channel ever move a student's music.
 (() => {
   const song = (location.pathname.match(/\/songs\/([^/]+)/) || [])[1];
   if (!song || window.claude) return;
@@ -19,7 +19,7 @@
   const SUPABASE_URL = 'https://wjzzdiuenlisxueaxqjq.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_M4bWNkME8l7LTKIrQ_iCfw_JgsRZQlL'; // public by design: the database's rules guard everything
   const LIB = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js';
-  const CODE_KEY = 'gsa-class-code';
+  const START_MS = 1500;      // connect this long after the page starts, so the music loads first
   const AUTH_KEY = 'gsa-teacher';
   const BEAT_MS = 2000;       // a conducting teacher says so this often, so a student who arrives late finds her
   const HOST_GONE_MS = 7000;  // a teacher not heard from for this long has stopped conducting
@@ -28,12 +28,12 @@
     get(k) { try { return localStorage.getItem(k); } catch { return null; } },
     set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} },
   };
-  const cleanCode = (s) => String(s || '').toUpperCase().replace(/[^A-Z]/g, '');
   const hadTeacher = () => !!store.get(AUTH_KEY);
 
   let sb = null, libLoading = null;
-  let teacher = null;                 // { code } once signed in with a class
-  let signedInNoClass = false;        // signed in, but this account has no class code
+  let teacher = false;                // signed in as a teacher who may conduct
+  let signedInNoClass = false;        // signed in, but this account may not conduct
+  let started = false;
   let current = null;                 // the room the reader holds
   const changeCbs = [];
   const changed = () => changeCbs.forEach((cb) => { try { cb(); } catch {} });
@@ -62,21 +62,21 @@
   }
 
   async function loadTeacher() {
-    teacher = null; signedInNoClass = false;
+    teacher = false; signedInNoClass = false;
     const { data } = await sb.auth.getSession();
     if (!data || !data.session) return;
-    const { data: rows, error } = await sb.from('conduct_classes').select('code').limit(1);
+    const { data: rows, error } = await sb.from('conduct_classes').select('teacher_id').limit(1);
     if (error) throw error;
-    if (rows && rows[0]) teacher = { code: rows[0].code };
+    if (rows && rows[0]) teacher = true;
     else signedInNoClass = true;
   }
 
   // ---- The room, shaped like the Claude preview's: emit / on / presence / onPeers / onConnection ----
-  async function openRoom(code, lead) {
+  async function openRoom(lead) {
     await sb.realtime.setAuth();
     const me = 'p' + Math.random().toString(36).slice(2, 10);
-    const main = sb.channel(`conduct:${code}:${song}`, { config: { private: true, broadcast: { self: false } } });
-    const inn = sb.channel(`conduct-in:${code}:${song}`, { config: { private: true, broadcast: { self: false }, presence: { key: me } } });
+    const main = sb.channel(`conduct:${song}`, { config: { private: true, broadcast: { self: false } } });
+    const inn = sb.channel(`conduct-in:${song}`, { config: { private: true, broadcast: { self: false }, presence: { key: me } } });
     const handlers = new Map(), peerCbs = [], connCbs = [];
     const hosts = new Map();    // peer -> when last heard on the teacher's channel
     let here = new Map();       // peer -> presence on the students' channel
@@ -154,7 +154,7 @@
     await track();
 
     const room = {
-      code, lead,
+      lead,
       emit(event, data) {
         if (!lead) return Promise.reject(new Error('Only the teacher conducts'));
         return sendMain(event, data).then((r) => { if (r !== 'ok') throw new Error(String(r)); });
@@ -184,17 +184,17 @@
   }
 
   // ---- What the reader asks for ----
+  // Every song page joins its room by itself; offline it has none, and tries again when the internet comes back.
   async function room() {
     if (current) { current.leave(); current = null; }
-    const code = teacher ? teacher.code : cleanCode(store.get(CODE_KEY));
-    if (!teacher && !code && !hadTeacher()) return null;
+    if (!started) { started = true; await new Promise((r) => setTimeout(r, START_MS)); }
     await client();
     if (!teacher && hadTeacher()) await loadTeacher().catch(() => {});
-    const useCode = teacher ? teacher.code : code;
-    if (!useCode) return null;
-    current = await openRoom(useCode, !!teacher);
+    current = await openRoom(!!teacher);
     return current;
   }
+  addEventListener('online', () => { if (!current) changed(); });
+  try { localStorage.removeItem('gsa-class-code'); } catch {} // from the first version, which had class codes
 
   // ---- The Play together box ----
   const CSS = `
@@ -206,14 +206,11 @@
 .pt-box label { display: block; margin: 0 0 4px; font-size: 0.86rem; font-weight: 600; }
 .pt-box input { box-sizing: border-box; width: 100%; margin: 0 0 10px; padding: 9px 11px; border: 1px solid var(--line, #C9D2CE); border-radius: 8px;
   background: var(--paper, #fff); color: var(--paper-ink, #121614); font: inherit; font-size: 16px; }
-.pt-box input.pt-code { text-transform: uppercase; letter-spacing: 0.25em; font-weight: 700; font-size: 1.3rem; text-align: center; }
 .pt-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 .pt-btn { flex: 1 1 auto; padding: 10px 14px; border: 1px solid var(--line, #C9D2CE); border-radius: 999px; background: var(--paper, #fff);
   color: var(--paper-ink, #121614); font: inherit; font-weight: 600; cursor: pointer; }
 .pt-btn.main { background: var(--accent, #1D5B72); border-color: var(--accent, #1D5B72); color: var(--accent-ink, #fff); }
 .pt-btn:disabled { opacity: 0.55; cursor: default; }
-.pt-link { display: inline-block; margin-top: 14px; padding: 0; border: 0; background: none; color: var(--accent, #1D5B72); font: inherit; font-size: 0.9rem; font-weight: 600; cursor: pointer; text-decoration: underline; }
-.pt-big { margin: 4px 0 12px; font-size: 2.4rem; font-weight: 700; letter-spacing: 0.2em; text-align: center; color: var(--ink, #17201C); }
 .pt-msg { min-height: 1.2em; margin: 2px 0 8px; font-size: 0.88rem; font-weight: 600; color: #B42318; }
 .pt-x { float: right; margin: -6px -8px 0 0; padding: 4px 10px; border: 0; background: none; color: var(--muted, #55615B); font-size: 1.5rem; line-height: 1; cursor: pointer; }`;
   let styled = false;
@@ -246,45 +243,20 @@
       btn.disabled = false;
     };
 
-    function studentView() {
-      const saved = cleanCode(store.get(CODE_KEY));
-      if (saved) {
-        return show(...head('Play together'),
-          el('p', {}, 'You’re in class ', el('strong', {}, saved), '. When your teacher conducts this piece, a “Follow the conductor” button appears at the bottom of the screen. Your teacher’s device plays the sound.'),
-          el('div', { class: 'pt-row' },
-            el('button', { class: 'pt-btn main', type: 'button', on: close }, 'OK'),
-            el('button', { class: 'pt-btn', type: 'button', on: () => { store.set(CODE_KEY, null); changed(); studentView(); } }, 'Leave the class')),
-          el('button', { class: 'pt-link', type: 'button', on: teacherView }, 'Teacher? Sign in to conduct'));
-      }
-      const input = el('input', { class: 'pt-code', id: 'pt-code', inputmode: 'text', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', maxlength: '8' });
-      const go = el('button', { class: 'pt-btn main', type: 'submit' }, 'Join');
-      const form = el('form', {}, el('label', { for: 'pt-code' }, 'Class code'), input, msg, el('div', { class: 'pt-row' }, go));
-      form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const code = cleanCode(input.value);
-        if (code.length < 4) { msg.textContent = 'Type the four letters your teacher gives you.'; return; }
-        store.set(CODE_KEY, code); changed(); studentView();
-      });
-      show(...head('Play together'),
-        el('p', {}, 'Follow your teacher: the music starts, stops and keeps time on every screen at once. Everyone opens this same piece; the sound plays on the teacher’s device.'),
-        form,
-        el('button', { class: 'pt-link', type: 'button', on: teacherView }, 'Teacher? Sign in to conduct'));
-    }
-
     function teacherView() {
+      const signOut = (e) => busy(e.currentTarget, async () => { await sb.auth.signOut(); teacher = false; signedInNoClass = false; changed(); close(); });
       if (teacher) {
         return show(...head('Play together'),
-          el('p', {}, 'Your class code. Students open this piece, tap Play together and type it:'),
-          el('div', { class: 'pt-big' }, teacher.code),
+          el('p', {}, 'You’re signed in as the teacher. Press Conduct (at the bottom) or Start conducting: students with this piece open see a small Follow button at the top, and tap it to follow you. The sound plays on your device.'),
           el('div', { class: 'pt-row' },
             opts.conducting ? el('button', { class: 'pt-btn main', type: 'button', on: close }, 'OK')
               : el('button', { class: 'pt-btn main', type: 'button', on: () => { close(); if (opts.conduct) opts.conduct(); } }, 'Start conducting'),
-            el('button', { class: 'pt-btn', type: 'button', on: (e) => busy(e.currentTarget, async () => { await sb.auth.signOut(); teacher = null; signedInNoClass = false; changed(); close(); }) }, 'Sign out')));
+            el('button', { class: 'pt-btn', type: 'button', on: signOut }, 'Sign out')));
       }
       if (signedInNoClass) {
         return show(...head('Play together'),
-          el('p', {}, 'This account isn’t set up to conduct. Students follow with a class code instead.'),
-          el('div', { class: 'pt-row' }, el('button', { class: 'pt-btn', type: 'button', on: (e) => busy(e.currentTarget, async () => { await sb.auth.signOut(); signedInNoClass = false; changed(); studentView(); }) }, 'Sign out')));
+          el('p', {}, 'This account isn’t set up to conduct. Students don’t need to sign in: a Follow button appears at the top when the teacher conducts.'),
+          el('div', { class: 'pt-row' }, el('button', { class: 'pt-btn', type: 'button', on: signOut }, 'Sign out')));
       }
       const email = el('input', { id: 'pt-email', type: 'email', autocomplete: 'username', autocapitalize: 'off' });
       const pass = el('input', { id: 'pt-pass', type: 'password', autocomplete: 'current-password' });
@@ -302,9 +274,8 @@
         });
       });
       show(...head('Conduct the class'),
-        el('p', {}, 'Sign in with your studio account (the same email and password).'),
-        form,
-        el('button', { class: 'pt-link', type: 'button', on: studentView }, 'I’m a student'));
+        el('p', {}, 'Sign in with your studio account (the same email and password). Students don’t sign in: a Follow button appears at the top of their music while you conduct this piece.'),
+        form);
     }
 
     if (hadTeacher() && !teacher && !signedInNoClass) {
@@ -312,13 +283,12 @@
       try { await client(); await loadTeacher(); } catch {}
       if (box !== back) return;
     }
-    if (teacher || signedInNoClass) teacherView(); else studentView();
+    teacherView();
   }
 
   window.playTogether = {
     room,
     canLead: () => !!teacher,
-    code: () => (teacher ? teacher.code : cleanCode(store.get(CODE_KEY))),
     open,
     onChange(cb) { changeCbs.push(cb); },
   };

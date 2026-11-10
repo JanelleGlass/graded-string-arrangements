@@ -115,27 +115,31 @@ one goes missing.
 - **Claude preview** (the artifact above): plays The First Noel (four levels, 40 parts), and has the conductor ("Play
   together": the teacher's device leads, students' devices follow) through `window.claude`.
 - **Public site**: the same reader built per song, with Play together through `app/together.js` (Janelle asked
-  for it on her iPad, 2026-11-10). `window.claude` doesn't exist there, so the reader takes its room from
+  for it on her iPad, 2026-11-10; Follow at the top, no class code). `window.claude` doesn't exist there, so the reader takes its room from
   `window.playTogether` instead; the conductor code is the same. Also planned: a separate door for her own students, linked from
   her teaching site, and Buy buttons once PDFs are on Payhip (`pdf_url`).
 
 ## Play together on the website (2026-11-10)
 
-- A "Play together" button in the strip opens a box. A student types the class code once (saved on the device);
-  when the teacher conducts the same piece, "Follow the conductor" appears, as in the preview. "Teacher? Sign in to
-  conduct" takes Janelle's violin-studio email and password (her studio app's account); signed in, the box shows her
-  class code (JKDB) with "Start conducting" and "Sign out", and the button says "Conduct".
-- Backend: her Supabase project `violin-studio` (wjzzdiuenlisxueaxqjq), Realtime only. `public.conduct_classes` maps a
-  teacher to her code. Each song page in a class is two private channels: `conduct:<CODE>:<slug>`, where only the
-  code's teacher may send (policies on `realtime.messages` check it), and `conduct-in:<CODE>:<slug>`, where anyone may
-  send presence and clock pings. So a student can't move anyone's music. The teacher says she's conducting every 2 s
-  on her channel; a follower drops her after 7 s of silence.
+- No class code (Janelle: "is it necessary to have to type in a student code?"; she's fine with anyone on the same
+  piece seeing it). Every song page is one room and joins it by itself 1.5 s after loading. While a teacher conducts
+  that piece, a small "Follow" appears at the top of the music, left of Print ("Following", teal, once on; tap to
+  stop). Nothing follows unless it is tapped. The teacher signs in from the About box ("Teacher? Sign in to
+  conduct", with her violin-studio email and password, her studio app's account); signed in, "Conduct" is in the
+  strip on her device only, and the box has "Start conducting" and "Sign out". The first version (same day) had a
+  class code typed into a "Play together" box; its saved code is cleared.
+- Backend: her Supabase project `violin-studio` (wjzzdiuenlisxueaxqjq), Realtime only. `public.conduct_classes`
+  lists who may conduct (its `code` column is no longer used). Each song is two private channels: `conduct:<slug>`,
+  where only a listed teacher may send (policies on `realtime.messages` check it), and `conduct-in:<slug>`, where
+  anyone may send presence and clock pings. So a student can't move anyone's music. The teacher says she's
+  conducting every 2 s on her channel; a follower drops her after 7 s of silence.
 - The publishable key is in `app/together.js` on purpose (it is public; the database rules guard everything).
-  supabase-js (2.118.0, jsdelivr) loads only when someone opens the box or has a code or sign-in saved.
-- Free plan limits: about 200 devices at once and 100 messages a second for the project; a class of 20 uses about
-  40 a second while playing. `eventsPerSecond: 60` lifts the script's own limit of 10 a device (with 10, a second
-  student starting to follow at once missed the start).
-- Everyone must be on the same piece. A class code with no teacher conducting just waits.
+  supabase-js is 2.118.0 from jsdelivr. Offline, a page has no room and tries again when the internet comes back.
+- Free plan limits: about 200 devices at once (every open song page is one) and 100 messages a second for the
+  project; a class of 20 uses about 40 a second while playing. `eventsPerSecond: 60` lifts the script's own limit
+  of 10 a device (with 10, a second student starting to follow at once missed the start).
+- Testing needs a teacher account: make a throwaway one in `auth.users` with a row in `conduct_classes`, and delete it
+  afterwards (done that way on 2026-11-10).
 
 ## The app version (home screen, offline)
 
@@ -328,9 +332,10 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   to the time (Janelle, 2026-11-06: it bounced in place before), then lands on the next note, higher for a longer flight. Tied notes are one
   note. Over a rest it is a hollow ring; rests in a row are one. Stopped, it sits on the note Play starts from; a loop's
   last flight goes back to its first note; to the next line on pages, it flies off the end of the line and drops onto
-  the next. It keeps time with the speaker. On by default, saved. Its switch is a round button at the top right of the
-  music, just left of Print (a ball with a dotted arc; teal when on, grey and crossed out when off; a tap shows a
-  toast), on every screen: in the strip it pushed the strip to two rows on an iPhone SE on its side. Never printed.
+  the next. It keeps time with the speaker. On by default, saved. Its switch is a round button in the strip, after
+  Counting (a ball with a dotted arc; teal when on, grey and crossed out when off; a tap shows a toast), on every
+  screen. It sat at the top right, left of Print, until Janelle moved it down (2026-11-10), where Follow now sits.
+  Never printed.
   History: it began as a pointing finger (an open palm over rests) that hopped once per count and landed half a count
   before each note; Janelle found the hops too much, a smooth glide was tried, and she chose the ball (2026-11-06).
 - Tap a note to choose where Play starts: a thin, pale ring around the note head until the music
