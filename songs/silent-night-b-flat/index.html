@@ -3316,7 +3316,7 @@ body.following .host-only { display: none !important; }
       pointLayer.appendChild(el);
       pointRuns.push({ ti, el, stops, k: 0 });
     }
-    if (roomForBounces()) return; // drawn again with more room; the ball is built again then
+    roomForBounces(); // may ask for the music to be drawn again with more room (at the end of renderFinished)
     // Drawn again while playing (a setting changed): straight back to where the music is, not the start note.
     if (playing && !counting) updatePointer(performance.now()); else idlePointer();
   }
@@ -3328,6 +3328,10 @@ body.following .host-only { display: none !important; }
   // music is as always. The widths are dropped whenever the music is laid out differently (other parts, another look
   // on the notes) and measured again.
   let bounceRoom = { key: '', widths: new Map(), tries: 0 };
+  // The music is drawn again only once everything after a drawing is done (renderFinished), and not when something
+  // else there already asked for a drawing: a drawing started on top of another left both on the screen, the second
+  // offset from the first (Janelle saw doubled bar numbers and dynamics, 2026-11-10).
+  var bounceRedraw = false, bounceWaiting = false, staleTimer = 0;
   const bounceRoomWanted = () => state.pointer && state.layout === 'line' && !onPaper() && !!score;
   const bounceRoomKey = () => JSON.stringify([state.seen, lookNow().id, state.fingers, state.countAlong, state.zoom, document.documentElement.classList.contains('small')]);
   // Called by applySize, just before each drawing: the widths this layout wants, or none.
@@ -3348,7 +3352,7 @@ body.following .host-only { display: none !important; }
     if (bounceRoom.key !== bounceRoomKey()) {
       const had = bounceRoom.widths.size > 0;
       bounceRoom = { key: bounceRoomKey(), widths: new Map(), tries: 0 };
-      if (had) { applyBounceRoom(); api.render(); return true; }
+      if (had) { applyBounceRoom(); bounceRedraw = true; return true; }
     }
     if (bounceRoom.tries >= 3) return false;
     const scale = api.settings.display.scale, need = new Map();
@@ -3370,7 +3374,7 @@ body.following .host-only { display: none !important; }
     if (!grew) return false;
     bounceRoom.tries++;
     applyBounceRoom();
-    api.render();
+    bounceRedraw = true;
     return true;
   }
   function putPointer(run, x, y, rest) {
@@ -4693,7 +4697,24 @@ body.following .host-only { display: none !important; }
       fitPending = false;
       if (!fitToHeight() && shortLand.matches && state.layout === 'line' && !playing) revealSheet(false, true);
       // Printing: once the last pieces of the drawing are in (they arrive a moment after the render is reported done).
-      if (printing && !fitPending) printTimer = setTimeout(printStep, 60); });
+      if (printing && !fitPending) printTimer = setTimeout(printStep, 60);
+      // Room for the bouncing ball's bounces: drawn again wider, last of all (a fit to the screen already drawing again
+      // takes the new widths with it).
+      // alphaTab adds the drawing's pieces to the page a moment after it reports the drawing done, so this waits for the
+      // last of them (postRenderFinished): a drawing started before then left those pieces on the screen, over the new one.
+      if (bounceRedraw) { bounceRedraw = false; bounceWaiting = !fitPending && !printing; } });
+    api.postRenderFinished.on(() => {
+      if (bounceWaiting) { bounceWaiting = false; setTimeout(() => { if (api && !printing) api.render(); }, 80); }
+      // A piece of an earlier drawing left showing (drawings started close together, as when the music is drawn again
+      // for the part names, the screen's height or the ball's bounces): Janelle saw bar numbers, tempo words and
+      // dynamics doubled, a little apart, until a change of size drew everything afresh (2026-11-10). Once the drawing
+      // settles, a piece still holding another drawing than its own is emptied; its own arrives in its place.
+      clearTimeout(staleTimer);
+      staleTimer = setTimeout(() => {
+        const c = api && api.canvasElement && api.canvasElement.element;
+        if (c) for (const ph of c.children) if ('layoutResultId' in ph && ph.renderedResultId !== undefined && ph.renderedResultId !== ph.layoutResultId) ph.replaceChildren();
+      }, 400);
+    });
     api.soundFontLoaded.on(() => { if (soundReady) { $('play').disabled = false; setPlaying(playing); } });
     api.activeBeatsChanged.on((e) => { activeBeats = e.activeBeats || []; trackNotes(); });
     api.playerPositionChanged.on((e) => { pos = { tick: e.currentTick, at: performance.now(), bpm: e.modifiedTempo || BASE_TEMPO * api.playbackSpeed }; });

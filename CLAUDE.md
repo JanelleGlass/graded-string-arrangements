@@ -316,7 +316,9 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   note): in one long line, after drawing, a note the ball bounces along gets at least about two ball widths per bounce;
   a bar where one doesn't is drawn again just wide enough (alphaTab's `displayWidth`, which the horizontal layout
   honours; the extra goes most to the long notes), at most three times, and measured afresh whenever the layout changes
-  (`bounceRoom`). Switching the ball off or on draws the music again, so the bars go back to their own width without
+  (`bounceRoom`). That second drawing waits until alphaTab has put every piece of the first on the page
+  (`postRenderFinished`), and once the drawing settles any piece still showing an earlier drawing is emptied: Janelle saw
+  bar numbers, tempo words and dynamics doubled a little apart until a change of size (2026-11-10). Switching the ball off or on draws the music again, so the bars go back to their own width without
   it. Pages lay out bars by alphaTab's rules (no `displayWidth`), so there the spacing is as always. On by default, saved. Its switch is a round button at the top right of the
   music, just left of Print (a ball with a dotted arc; teal when on, grey and crossed out when off; a tap shows a
   toast), on every screen: in the strip it pushed the strip to two rows on an iPhone SE on its side. Never printed.
