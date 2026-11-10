@@ -3403,7 +3403,7 @@ body.following .host-only { display: none !important; }
           // Never up into the counts (or notes) of the part above: the ball sits in the room between, and bounces no higher.
           const ceil = roomAbove(bb.barBounds) + 2;
           top = Math.max(top, ceil + ballD(space));
-          stops.push({ tick, end, x: rest ? bb.visualBounds.x + bb.visualBounds.w / 2 : hb.x + hb.w / 2, y: top, rest, sys, right: sv.x + sv.w, space, ceil });
+          stops.push({ tick, end, x: rest ? bb.visualBounds.x + bb.visualBounds.w / 2 : hb.x + hb.w / 2, y: top, rest, sys, right: sv.x + sv.w, space, ceil, bi, barW: bb.barBounds.masterBarBounds.realBounds.w });
         }
       });
       if (!stops.length) continue;
@@ -3421,7 +3421,66 @@ body.following .host-only { display: none !important; }
       pointLayer.appendChild(el);
       pointRuns.push({ ti, el, stops, k: 0 });
     }
-    idlePointer();
+    roomForBounces(); // may ask for the music to be drawn again with more room (at the end of renderFinished)
+    // Drawn again while playing (a setting changed): straight back to where the music is, not the start note.
+    if (playing && !counting) updatePointer(performance.now()); else idlePointer();
+  }
+  // Room for the bounces (Janelle, 2026-11-10: three bounces on a dotted quarter in 6/8 had too little room, so the
+  // third looked like it was going to the next note). In one long line alphaTab can draw any bar wider than it would
+  // (displayWidth), and the extra room goes most to the longest notes. After drawing, each note the ball bounces along
+  // gets at least a ball and a bit for each bounce; a bar where one doesn't is drawn again wider, just enough (twice
+  // more at most, as the room grows a little less than the bar). Pages lay out bars by their own rules, so there the
+  // music is as always. The widths are dropped whenever the music is laid out differently (other parts, another look
+  // on the notes) and measured again.
+  let bounceRoom = { key: '', widths: new Map(), tries: 0 };
+  // The music is drawn again only once everything after a drawing is done (renderFinished), and not when something
+  // else there already asked for a drawing: a drawing started on top of another left both on the screen, the second
+  // offset from the first (Janelle saw doubled bar numbers and dynamics, 2026-11-10).
+  var bounceRedraw = false, bounceWaiting = false, staleTimer = 0;
+  const bounceRoomWanted = () => state.pointer && state.layout === 'line' && !onPaper() && !!score;
+  const bounceRoomKey = () => JSON.stringify([state.seen, lookNow().id, state.fingers, state.countAlong, state.zoom, document.documentElement.classList.contains('small')]);
+  // Called by applySize, just before each drawing: the widths this layout wants, or none.
+  function applyBounceRoom() {
+    if (!score) return;
+    const want = bounceRoomWanted(), key = bounceRoomKey();
+    if (!want || key !== bounceRoom.key) bounceRoom = { key: want ? key : '', widths: new Map(), tries: 0 };
+    score.masterBars.forEach((mb, i) => {
+      const w = bounceRoom.widths.get(i) || -1;
+      mb.displayWidth = w;
+      for (const t of score.tracks) for (const st of t.staves) if (st.bars[i]) st.bars[i].displayWidth = w;
+    });
+  }
+  function roomForBounces() {
+    if (!bounceRoomWanted()) return false;
+    // The layout changed since the widths were set (or a part was put on the page as the score loaded): start again
+    // from the music's own widths.
+    if (bounceRoom.key !== bounceRoomKey()) {
+      const had = bounceRoom.widths.size > 0;
+      bounceRoom = { key: bounceRoomKey(), widths: new Map(), tries: 0 };
+      if (had) { applyBounceRoom(); bounceRedraw = true; return true; }
+    }
+    if (bounceRoom.tries >= 3) return false;
+    const scale = api.settings.display.scale, need = new Map();
+    for (const run of pointRuns) {
+      const s = run.stops, hop = ballD(s[0].space) * 1.9;
+      for (let k = 0; k + 1 < s.length; k++) {
+        const cur = s[k], nxt = s[k + 1], flights = cur.lands.length;
+        if (flights < 2 || nxt.sys !== cur.sys) continue;
+        const gap = nxt.x - cur.x, want = flights * hop;
+        if (gap > 0 && gap < want * 0.97) {
+          const f = Math.min(2.5, want / gap), had = need.get(cur.bi);
+          if (!had || f > had.f) need.set(cur.bi, { f, w: cur.barW });
+        }
+      }
+    }
+    // The bar's width as alphaTab counts it (before the music's size is applied), times what it needs.
+    for (const [i, n] of need) bounceRoom.widths.set(i, n.w / scale * n.f);
+    const grew = need.size > 0;
+    if (!grew) return false;
+    bounceRoom.tries++;
+    applyBounceRoom();
+    bounceRedraw = true;
+    return true;
   }
   function putPointer(run, x, y, rest) {
     run.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
@@ -3439,14 +3498,27 @@ body.following .host-only { display: none !important; }
   function idlePointer() {
     for (const run of pointRuns) { const s = run.stops[stopAt(run, Math.max(0, markTick || 0) + 1)]; putPointer(run, s.x, s.y, s.rest); }
   }
+  // The music's clock for the ball, smoothed: the player's reports come a little early or late, and each one moved the
+  // ball back or on with a jump that showed as a flash (Janelle, 2026-11-10). The ball runs on at the tempo and eases
+  // toward the reported place, never backwards; a real jump (a loop going round, a tap on another note) is followed at once.
+  let ballClock = null;
+  function ballTick(now) {
+    const raw = playedTick(now), rate = 0.016 * (pos.bpm || BASE_TEMPO);
+    if (raw < 0) return raw;
+    if (!ballClock) { ballClock = { t: raw, at: now }; return raw; }
+    const guess = ballClock.t + (now - ballClock.at) * rate;
+    let t = Math.abs(raw - guess) > 480 ? raw : Math.max(ballClock.t, guess + (raw - guess) * 0.12);
+    ballClock = { t, at: now };
+    return t;
+  }
   // Playing: the ball lands on every count as it is heard, and on every note as it starts; between landings it flies
   // in an arc, higher for a longer flight. On a held note it travels forward a bounce at a time, each landing a share of
   // the way to the next note in proportion to the time (a half note's second bounce lands halfway), then lands on the
   // next note (Janelle, 2026-11-06: it bounced in place on the note before).
   function updatePointer(now) {
     if (!pointRuns.length) return;
-    if (counting || now < pos.at) { idlePointer(); return; }
-    const t = playedTick(now);
+    if (counting || now < pos.at) { ballClock = null; idlePointer(); return; }
+    const t = ballTick(now);
     if (t < 0) return;
     const r = loop && api.playbackRange;
     for (const run of pointRuns) {
@@ -3485,7 +3557,8 @@ body.following .host-only { display: none !important; }
     state.pointer = !state.pointer;
     save(); renderCycles();
     if (state.pointer && api && score) { const wrap = $('sheet').querySelector('.at-cursors'); if (wrap && !pointLayer.parentNode) wrap.insertBefore(pointLayer, markLayer); }
-    buildPointer();
+    // In one long line the bars the ball needed widened go back to their own width without it (and the other way).
+    if (api && score && state.layout === 'line') { holdPlace(); applySize(); api.render(); } else buildPointer();
     toast(state.pointer ? 'Bouncing ball on: it bounces on each count' : 'Bouncing ball off');
   });
 
@@ -3622,6 +3695,7 @@ body.following .host-only { display: none !important; }
     d.padding = left ? [10 + left, v, 10, v] : [10, v]; // left, top, right, bottom
     d.stretchForce = (BIG() && fingerSpot() !== 'inside' ? 1.35 : 1) * (onPaper() ? 0.5 : 1);
     setSpacing(d);
+    applyBounceRoom();
     api.updateSettings();
   }
   // The space under each staff and between the lines of music, kept tight so more lines fit on the screen (Janelle,
@@ -4728,7 +4802,24 @@ body.following .host-only { display: none !important; }
       fitPending = false;
       if (!fitToHeight() && shortLand.matches && state.layout === 'line' && !playing) revealSheet(false, true);
       // Printing: once the last pieces of the drawing are in (they arrive a moment after the render is reported done).
-      if (printing && !fitPending) printTimer = setTimeout(printStep, 60); });
+      if (printing && !fitPending) printTimer = setTimeout(printStep, 60);
+      // Room for the bouncing ball's bounces: drawn again wider, last of all (a fit to the screen already drawing again
+      // takes the new widths with it).
+      // alphaTab adds the drawing's pieces to the page a moment after it reports the drawing done, so this waits for the
+      // last of them (postRenderFinished): a drawing started before then left those pieces on the screen, over the new one.
+      if (bounceRedraw) { bounceRedraw = false; bounceWaiting = !fitPending && !printing; } });
+    api.postRenderFinished.on(() => {
+      if (bounceWaiting) { bounceWaiting = false; setTimeout(() => { if (api && !printing) api.render(); }, 80); }
+      // A piece of an earlier drawing left showing (drawings started close together, as when the music is drawn again
+      // for the part names, the screen's height or the ball's bounces): Janelle saw bar numbers, tempo words and
+      // dynamics doubled, a little apart, until a change of size drew everything afresh (2026-11-10). Once the drawing
+      // settles, a piece still holding another drawing than its own is emptied; its own arrives in its place.
+      clearTimeout(staleTimer);
+      staleTimer = setTimeout(() => {
+        const c = api && api.canvasElement && api.canvasElement.element;
+        if (c) for (const ph of c.children) if ('layoutResultId' in ph && ph.renderedResultId !== undefined && ph.renderedResultId !== ph.layoutResultId) ph.replaceChildren();
+      }, 400);
+    });
     api.soundFontLoaded.on(() => { if (soundReady) { $('play').disabled = false; setPlaying(playing); } });
     api.activeBeatsChanged.on((e) => { activeBeats = e.activeBeats || []; trackNotes(); });
     api.playerPositionChanged.on((e) => { pos = { tick: e.currentTick, at: performance.now(), bpm: e.modifiedTempo || BASE_TEMPO * api.playbackSpeed }; });
