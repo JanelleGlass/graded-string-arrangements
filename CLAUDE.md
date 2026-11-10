@@ -353,7 +353,7 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   or late, and each one jolted the ball, which Janelle saw as flashes): it runs on at the tempo, eases toward the
   reported place and never moves backwards, except for a real jump (a loop going round, a tap on another note). Room
   for the bounces (Janelle, 2026-11-10: three bounces on a dotted quarter in 6/8 looked like the third went to the next
-  note): in one long line, after drawing, a note the ball bounces along gets at least about two ball widths per bounce;
+  note): in one long line, after drawing, a note the ball bounces along gets at least about three ball widths per bounce;
   a bar where one doesn't is drawn again just wide enough (alphaTab's `displayWidth`, which the horizontal layout
   honours; the extra goes most to the long notes), at most three times, and measured afresh whenever the layout changes
   (`bounceRoom`). That second drawing waits until alphaTab has put every piece of the first on the page
@@ -362,8 +362,11 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   whole second copy of the music about 50 px lower, and the ball and the note under it blinking (same day; neither
   reproduced in a Claude session, at laptop sizes, 125% scaling, dark mode, real fonts or resizing): the reader now
   keeps the ids of the latest drawing's pieces (`livePieces`, from `api.renderer`'s preRender, partialLayoutFinished and
-  renderFinished) and removes any other piece once the drawing settles and on Play (`clearStalePieces`), and the ball
-  no longer has `will-change` (a composited layer over the pulsing notes can blink on some screens). Switching the ball off or on draws the music again, so the bars go back to their own width without
+  renderFinished) and removes any other piece once the drawing settles and on Play (`clearStalePieces`). The likely
+  cause: the first drawing can come before the page's lettering (Google Fonts) has loaded, so the widened second one
+  sits about 50 px lower and both showed for a moment; now the music is hidden while it is drawn again (`reflowing`).
+  Dropping the ball's `will-change` made the blinking worse for her, so it is back; the blinking is not yet found.
+  The room per bounce was raised from about two ball widths to three (Janelle: the first bars got no more room). Switching the ball off or on draws the music again, so the bars go back to their own width without
   it. Pages lay out bars by alphaTab's rules (no `displayWidth`), so there the spacing is as always. On by default, saved. Its switch is a round button in the strip, after
   Counting (a ball with a dotted arc; teal when on, grey and crossed out when off; a tap shows a toast), on every
   screen. It sat at the top right, left of Print, until Janelle moved it down (2026-11-10), where Follow now sits.
