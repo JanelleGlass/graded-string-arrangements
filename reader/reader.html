@@ -249,7 +249,8 @@ hr.div { border: 0; border-top: 1px solid var(--line); margin: 0; }
 /* Counts switched off: the row goes blank (the music is drawn again without its room, so the lines close up) */
 #sheet.counts-off .count-layer { visibility: hidden; }
 /* Drawn again with room for the bouncing ball's bounces: out of sight until the new drawing is in */
-#sheet.reflowing .at-surface, #sheet.reflowing .at-cursors, #sheet.reflowing + .line-head { visibility: hidden; }
+/* (transparent, not hidden: hidden music took no touches, so a second pinch right after the first did nothing) */
+#sheet.reflowing .at-surface, #sheet.reflowing .at-cursors, #sheet.reflowing + .line-head { opacity: 0; }
 /* Dynamics (mf, f…) are nudged down under the count row; let them draw past the edge of their svg if need be */
 #sheet .at-surface svg { overflow: visible; }
 
