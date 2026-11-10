@@ -358,7 +358,12 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   honours; the extra goes most to the long notes), at most three times, and measured afresh whenever the layout changes
   (`bounceRoom`). That second drawing waits until alphaTab has put every piece of the first on the page
   (`postRenderFinished`), and once the drawing settles any piece still showing an earlier drawing is emptied: Janelle saw
-  bar numbers, tempo words and dynamics doubled a little apart until a change of size (2026-11-10). Switching the ball off or on draws the music again, so the bars go back to their own width without
+  bar numbers, tempo words and dynamics doubled a little apart until a change of size (2026-11-10). Then she saw a
+  whole second copy of the music about 50 px lower, and the ball and the note under it blinking (same day; neither
+  reproduced in a Claude session, at laptop sizes, 125% scaling, dark mode, real fonts or resizing): the reader now
+  keeps the ids of the latest drawing's pieces (`livePieces`, from `api.renderer`'s preRender, partialLayoutFinished and
+  renderFinished) and removes any other piece once the drawing settles and on Play (`clearStalePieces`), and the ball
+  no longer has `will-change` (a composited layer over the pulsing notes can blink on some screens). Switching the ball off or on draws the music again, so the bars go back to their own width without
   it. Pages lay out bars by alphaTab's rules (no `displayWidth`), so there the spacing is as always. On by default, saved. Its switch is a round button in the strip, after
   Counting (a ball with a dotted arc; teal when on, grey and crossed out when off; a tap shows a toast), on every
   screen. It sat at the top right, left of Print, until Janelle moved it down (2026-11-10), where Follow now sits.
