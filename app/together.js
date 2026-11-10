@@ -12,9 +12,17 @@
 //                      realtime.messages check it)
 //   conduct-in:<song>  anyone may send: who is here (presence) and the students' clock pings
 // So a student can't take over: only messages on the teacher's channel ever move a student's music.
+//
+// Changing songs (Janelle, 2026-11-10): the teacher's conducting carries on from page to page in her tab until she
+// stops it, and she says on one site-wide channel, conduct:__site, which song she has open (or none, on the home
+// page). A device that tapped Follow keeps following from page to page in its tab: when the teacher opens another
+// song, it goes there too, from a song page or the home page. Stopping (her "Conducting", their "Following") ends it.
 (() => {
-  const song = (location.pathname.match(/\/songs\/([^/]+)/) || [])[1];
-  if (!song || window.claude) return;
+  if (window.claude) return;
+  const root = new URL('../', document.currentScript.src); // this file is app/together.js
+  const song = (location.pathname.match(/\/songs\/([^/]+)/) || [])[1] || null;
+  const home = !song && new URL('./', location.href).href === root.href;
+  if (!song && !home) return;
 
   const SUPABASE_URL = 'https://wjzzdiuenlisxueaxqjq.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_M4bWNkME8l7LTKIrQ_iCfw_JgsRZQlL'; // public by design: the database's rules guard everything
@@ -24,6 +32,14 @@
   const BEAT_MS = 2000;       // a conducting teacher says so this often, so a student who arrives late finds her
   const HOST_GONE_MS = 7000;  // a teacher not heard from for this long has stopped conducting
 
+  const SITE_GONE_MS = 10000; // a following device stops following when the teacher hasn't been heard for this long
+  const FOLLOW_KEY = 'gsa-follow', CONDUCT_KEY = 'gsa-conduct'; // in this tab only (sessionStorage)
+  const tab = {
+    get(k) { try { return sessionStorage.getItem(k) === '1'; } catch { return false; } },
+    set(k, on) { try { on ? sessionStorage.setItem(k, '1') : sessionStorage.removeItem(k); } catch {} },
+  };
+  // Tests run on channels of their own, so they never meet a real class (set by tests/smoke.py and Claude's checks).
+  let TEST = ''; try { if (localStorage.getItem('gsa-together-test')) TEST = 'test-'; } catch {}
   const store = {
     get(k) { try { return localStorage.getItem(k); } catch { return null; } },
     set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} },
@@ -75,8 +91,8 @@
   async function openRoom(lead) {
     await sb.realtime.setAuth();
     const me = 'p' + Math.random().toString(36).slice(2, 10);
-    const main = sb.channel(`conduct:${song}`, { config: { private: true, broadcast: { self: false } } });
-    const inn = sb.channel(`conduct-in:${song}`, { config: { private: true, broadcast: { self: false }, presence: { key: me } } });
+    const main = sb.channel(`conduct:${TEST}${song}`, { config: { private: true, broadcast: { self: false } } });
+    const inn = sb.channel(`conduct-in:${TEST}${song}`, { config: { private: true, broadcast: { self: false }, presence: { key: me } } });
     const handlers = new Map(), peerCbs = [], connCbs = [];
     const hosts = new Map();    // peer -> when last heard on the teacher's channel
     let here = new Map();       // peer -> presence on the students' channel
@@ -84,7 +100,7 @@
     let mine = {}, tracked = null, beatTimer = 0, gcTimer = 0, last = new Map(), closed = false;
 
     function peers() {
-      const ids = new Set([me, ...here.keys(), ...hosts.keys()]);
+      const ids = new Set([me, ...here.keys(), ...hosts.keys(), ...pings.keys()]); // a ping can arrive before its sender's presence
       return [...ids].map((peer) => {
         const presence = { ...(peer === me ? mine : here.get(peer) || {}) };
         delete presence.conducting;
@@ -156,11 +172,13 @@
     const room = {
       lead,
       emit(event, data) {
+        if (closed) return Promise.reject(new Error('This room was closed'));
         if (!lead) return Promise.reject(new Error('Only the teacher conducts'));
         return sendMain(event, data).then((r) => { if (r !== 'ok') throw new Error(String(r)); });
       },
       on(event, cb) { if (!handlers.has(event)) handlers.set(event, []); handlers.get(event).push(cb); },
       presence(obj) {
+        if (closed) return Promise.resolve(); // a room that was replaced says nothing more (no stray "I'm conducting")
         const was = !!mine.conducting;
         for (const [k, v] of Object.entries(obj || {})) { if (v == null) delete mine[k]; else mine[k] = v; }
         if (obj && obj.ping != null) inn.send({ type: 'broadcast', event: 'ping', payload: { from: me, id: obj.ping } });
@@ -193,7 +211,89 @@
     current = await openRoom(!!teacher);
     return current;
   }
-  addEventListener('online', () => { if (!current) changed(); });
+  addEventListener('online', () => { if (!current) changed(); if (!site) startSite(); });
+
+  // ---- Which song the teacher has open (conduct:__site) ----
+  let site = null, siteHost = null, siteTimer = 0, siteSeen = 0;
+  const siteCbs = [];
+  const siteChanged = () => { siteCbs.forEach((cb) => { try { cb(); } catch {} }); if (home) homeUi(); };
+  const songUrl = (slug) => new URL('songs/' + slug + '/', root).href;
+  function goTo(slug) {
+    if (!slug || slug === song) return;
+    tab.set(FOLLOW_KEY, true);
+    location.href = songUrl(slug);
+  }
+  function sayHere() {
+    if (!site || !teacher || !tab.get(CONDUCT_KEY)) return;
+    const title = song ? document.title : null;
+    site.send({ type: 'broadcast', event: 'here', payload: { song, title } });
+  }
+  async function startSite() {
+    if (site) return;
+    try { await client(); } catch { return; }
+    if (!teacher && hadTeacher()) await loadTeacher().catch(() => {});
+    await sb.realtime.setAuth().catch(() => {});
+    const ch = sb.channel(`conduct:${TEST}__site`, { config: { private: true, broadcast: { self: false } } });
+    ch.on('broadcast', { event: 'here' }, ({ payload }) => {
+      if (!payload) return;
+      const was = siteHost && siteHost.song;
+      siteHost = { song: payload.song || null, title: payload.title || null };
+      siteSeen = Date.now();
+      if (tab.get(FOLLOW_KEY) && siteHost.song && siteHost.song !== song) { goTo(siteHost.song); return; }
+      if (was !== siteHost.song || !was) siteChanged();
+    });
+    ch.on('broadcast', { event: 'off' }, () => { siteHost = null; tab.set(FOLLOW_KEY, false); siteChanged(); });
+    ch.subscribe((status) => { if (status === 'SUBSCRIBED') sayHere(); });
+    site = ch;
+    clearInterval(siteTimer);
+    siteTimer = setInterval(() => {
+      sayHere();
+      if (siteHost && Date.now() - siteSeen > SITE_GONE_MS) {
+        siteHost = null;
+        tab.set(FOLLOW_KEY, false);
+        siteChanged();
+      }
+    }, BEAT_MS);
+    // A following tab that arrives with nobody conducting gives up after a while too.
+    if (tab.get(FOLLOW_KEY)) siteSeen = Date.now(), siteHost = siteHost || { song: null, title: null, pending: true };
+    if (home) homeUi();
+  }
+  function setConducting(on) {
+    tab.set(CONDUCT_KEY, on);
+    if (on) sayHere();
+    else if (site) site.send({ type: 'broadcast', event: 'off', payload: {} });
+    if (home) homeUi();
+  }
+  function setFollow(on) {
+    tab.set(FOLLOW_KEY, on);
+    if (on && siteHost && siteHost.song && siteHost.song !== song) goTo(siteHost.song);
+    siteChanged();
+  }
+
+  // ---- The home page: Follow, or the teacher's Conducting · Stop, at the top right ----
+  let pill = null;
+  function homeUi() {
+    if (!home || !document.body) return;
+    if (!pill) {
+      if (!styled) { document.head.append(el('style', {}, CSS)); styled = true; }
+      pill = el('div', { class: 'pt-pill', role: 'group', 'aria-label': 'Play together' });
+      document.body.append(pill);
+    }
+    const kids = [];
+    if (teacher && tab.get(CONDUCT_KEY)) {
+      kids.push(el('span', { class: 'pt-pill-txt' }, 'Conducting: open a song'),
+        el('button', { class: 'pt-pill-btn', type: 'button', on: () => setConducting(false) }, 'Stop'));
+    } else if (tab.get(FOLLOW_KEY) && siteHost) {
+      kids.push(el('button', { class: 'pt-pill-btn on', type: 'button', title: 'Stop following', on: () => setFollow(false) }, 'Following'),
+        el('span', { class: 'pt-pill-txt' }, 'waiting for the teacher to choose a song'));
+    } else if (siteHost && !siteHost.pending) {
+      kids.push(el('button', { class: 'pt-pill-btn', type: 'button', title: 'Follow the teacher: your screen goes to the song the teacher plays',
+        on: () => setFollow(true) }, 'Follow'));
+    }
+    pill.replaceChildren(...kids);
+    pill.hidden = !kids.length;
+  }
+  if (home) setTimeout(startSite, START_MS); else if (song) setTimeout(() => { startSite(); }, START_MS);
   try { localStorage.removeItem('gsa-class-code'); } catch {} // from the first version, which had class codes
 
   // ---- The Play together box ----
@@ -212,6 +312,13 @@
 .pt-btn.main { background: var(--accent, #1D5B72); border-color: var(--accent, #1D5B72); color: var(--accent-ink, #fff); }
 .pt-btn:disabled { opacity: 0.55; cursor: default; }
 .pt-msg { min-height: 1.2em; margin: 2px 0 8px; font-size: 0.88rem; font-weight: 600; color: #B42318; }
+.pt-pill { position: fixed; top: 12px; right: 12px; z-index: 900; display: flex; align-items: center; gap: 8px; padding: 4px; border-radius: 999px;
+  background: var(--panel, #F5F7F6); border: 1px solid var(--line, #C9D2CE); box-shadow: 0 6px 18px -10px rgba(0,0,0,.4); font-family: var(--font-body, system-ui, sans-serif); }
+.pt-pill[hidden] { display: none; }
+.pt-pill-txt { padding: 0 8px 0 4px; font-size: 0.86rem; color: var(--muted, #55615B); }
+.pt-pill-btn { padding: 6px 14px; border: 1px solid var(--line, #C9D2CE); border-radius: 999px; background: var(--paper, #fff); color: var(--ink, #17201C);
+  font: inherit; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+.pt-pill-btn.on { background: var(--accent, #1D5B72); border-color: var(--accent, #1D5B72); color: var(--accent-ink, #fff); }
 .pt-x { float: right; margin: -6px -8px 0 0; padding: 4px 10px; border: 0; background: none; color: var(--muted, #55615B); font-size: 1.5rem; line-height: 1; cursor: pointer; }`;
   let styled = false;
   function el(tag, attrs = {}, ...kids) {
@@ -287,6 +394,11 @@
   }
 
   window.playTogether = {
+    wantsFollow: () => tab.get(FOLLOW_KEY),
+    setFollow,
+    wantsConduct: () => tab.get(CONDUCT_KEY),
+    setConducting,
+    onSite(cb) { siteCbs.push(cb); },
     room,
     canLead: () => !!teacher,
     open,

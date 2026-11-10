@@ -118,7 +118,7 @@ def fingerprint(data):
 
 def app_script(up, app_rev, together_rev=None):
     """The tag that starts the app layer (offline copy, iPhone sound). up: the way to the site root.
-    together_rev: on a song page, also Play together on the website (app/together.js)."""
+    together_rev: also Play together on the website (app/together.js), on song pages and the home page."""
     tags = f'<script src="{up}app/app.js?v={app_rev}"></script>\n'
     if together_rev:
         tags += f'<script src="{up}app/together.js?v={together_rev}"></script>\n'
@@ -427,7 +427,7 @@ def main():
         fail('index.html: app script markers missing from <head>')
     i = home.index('\n', home.index(a)) + 1
     j = home.index(z)
-    home = home[:i] + app_script('', app_rev) + home[j:]
+    home = home[:i] + app_script('', app_rev, together_rev) + home[j:]  # Follow on the home page too
     (ROOT / 'index.html').write_text(home, encoding='utf-8', newline='\n')
     offline['./'] = fingerprint(home)
 
