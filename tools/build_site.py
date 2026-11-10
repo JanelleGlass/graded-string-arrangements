@@ -57,7 +57,7 @@ SOUNDFONT = 'assets/soundfont/strings-generaluser-sf2.b64.txt'
 PIANO_SOUNDFONT = 'assets/soundfont/piano-generaluser-sf2.b64.txt'  # loaded only by a page with a Piano part
 ALPHATAB = 'https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/alphaTab.min.js'
 # Kept offline besides the pages, scores, font, sounds and reader: the small files the pages ask for.
-APP_FILES = ['app/app.js', 'manifest.webmanifest', 'assets/icon.svg', 'assets/apple-touch-icon.png',
+APP_FILES = ['app/app.js', 'app/together.js', 'manifest.webmanifest', 'assets/icon.svg', 'assets/apple-touch-icon.png',
              'assets/icon-192.png', 'assets/icon-512.png', 'assets/icon-maskable-512.png']
 # The home page's sections, in page order. A section with no songs is left off the page.
 SECTIONS = ['Christmas', 'Hymns', 'Solos', 'Other']
@@ -116,9 +116,13 @@ def fingerprint(data):
     return hashlib.sha256(data).hexdigest()[:10]
 
 
-def app_script(up, app_rev):
-    """The tag that starts the app layer (offline copy, iPhone sound). up: the way to the site root."""
-    return f'<script src="{up}app/app.js?v={app_rev}"></script>\n'
+def app_script(up, app_rev, together_rev=None):
+    """The tag that starts the app layer (offline copy, iPhone sound). up: the way to the site root.
+    together_rev: on a song page, also Play together on the website (app/together.js)."""
+    tags = f'<script src="{up}app/app.js?v={app_rev}"></script>\n'
+    if together_rev:
+        tags += f'<script src="{up}app/together.js?v={together_rev}"></script>\n'
+    return tags
 
 
 def read_score(path):
@@ -370,6 +374,7 @@ def main():
     if (ROOT / PIANO_SOUNDFONT).exists():
         shared['piano'] = fingerprint(ROOT / PIANO_SOUNDFONT)
     app_rev = fingerprint(ROOT / 'app/app.js')
+    together_rev = fingerprint(ROOT / 'app/together.js')
     offline = {f: fingerprint(ROOT / f) for f in APP_FILES}
     offline[f"{FONT}?v={shared['font']}"] = shared['font']
     offline[f"{SOUNDFONT}?v={shared['soundfont']}"] = shared['soundfont']
@@ -399,7 +404,7 @@ def main():
                 fail(f'{slug} has a Piano part but {PIANO_SOUNDFONT} is missing (make it with tools/sf2_subset.py)')
             offline[f"{PIANO_SOUNDFONT}?v={shared['piano']}"] = shared['piano']
         score_rev = fingerprint(score)
-        page = song_page(reader, s, facts[slug], app_script('../../', app_rev), {**shared, 'score': score_rev})
+        page = song_page(reader, s, facts[slug], app_script('../../', app_rev, together_rev), {**shared, 'score': score_rev})
         (ROOT / 'songs' / slug / 'index.html').write_text(page, encoding='utf-8', newline='\n')
         offline[f'songs/{slug}/'] = fingerprint(page)
         offline[f'songs/{slug}/{slug}.xml?v={score_rev}'] = score_rev
