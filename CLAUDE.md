@@ -435,7 +435,7 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   music font, and the page's Google Fonts, from the offline copy without internet), since a picture can't use the
   page's fonts. Where it fails, the card says to print and choose Save as PDF. Hidden in the Claude preview, like Print. Printing is free for now (Janelle, 2026-10-30,
   with the Payhip PDFs still to come).
-- Pinch to zoom on touch screens: two fingers on the music make it bigger or smaller. The music grows
+- Pinch to zoom on touch screens: two fingers on the music make it bigger or smaller, over a clef, key or time signature too (their explain buttons pass two-finger touches on to the music; they swallowed them until 2026-11-10). The music grows
   and shrinks under the fingers, then settles on the nearest − / + size. A second finger cancels a tap
   or a press-and-hold; the browser's own page zoom is kept off the music.
 - Open Strings parts show string colors but no finger numbers.

@@ -2380,7 +2380,11 @@ body.following .host-only { display: none !important; }
   tsTip.className = 'ts-tip'; tsTip.id = 'tsTip'; tsTip.hidden = true;
   tsTip.setAttribute('role', 'dialog'); tsTip.setAttribute('aria-label', 'What this sign means');
   let tsOpenBtn = null, tipMode = null, hoverTimer = 0;
-  const stopScore = (el) => ['mousedown', 'mouseup', 'pointerdown', 'pointerup', 'touchstart', 'touchend', 'click'].forEach(t => el.addEventListener(t, e => e.stopPropagation()));
+  // Two fingers go on to the music, so a pinch works over a clef or time signature too (a tap there still explains it).
+  const stopScore = (el) => ['mousedown', 'mouseup', 'pointerdown', 'pointerup', 'touchstart', 'touchend', 'click'].forEach(t => el.addEventListener(t, e => {
+    if (e.touches && (e.touches.length >= 2 || (t === 'touchend' && e.touches.length >= 1))) return;
+    e.stopPropagation();
+  }));
   stopScore(tsLayer);
   function setHot(btn, on) { for (const g of btn._glyphs || []) g.classList.toggle('sym-hot', on); }
   function closeTip() {
