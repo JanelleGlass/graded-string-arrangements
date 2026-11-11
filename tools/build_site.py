@@ -99,8 +99,13 @@ HEAD = '''<!doctype html>
 <meta name="apple-mobile-web-app-title" content="Graded Strings">
 <style>body{margin:0;padding:0}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 '''
-HOME_LINK_CSS = ('.home-link { display: inline-block; margin: 0 0 6px; color: var(--muted); font-size: 0.86rem; '
-                 'font-weight: 600; text-decoration: none; }\n.home-link:hover { color: var(--accent); }\n')
+# The "All songs" link over the title: a teal outlined button, easy to see and to tap (Janelle, 2026-11-11: the small
+# grey words were hard to find). The house at the top right of the music (the reader's homeBtn) is the way back once
+# the title has scrolled away.
+HOME_LINK_CSS = ('.home-link { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 10px; padding: 6px 15px 6px 12px; '
+                 'border: 1.5px solid var(--accent); border-radius: 999px; background: var(--paper); color: #1D5B72; '
+                 'font-size: 0.95rem; font-weight: 700; text-decoration: none; }\n'
+                 '.home-link:hover { background: var(--accent); color: var(--accent-ink); }\n')
 
 
 def fail(msg):
@@ -316,6 +321,7 @@ def song_page(reader, song, facts, app, revs):
                 "  else { $('buyPending').hidden = true; $('buyNote').textContent = 'Free to read and play along.'; }")
     # A way back to the song list.
     b = replace(b, '    <div class="title-wrap">\n', '    <div class="title-wrap">\n      <a class="home-link" href="../../">← All songs</a>\n')
+    b = replace(b, 'aria-label="All songs" title="All songs" hidden>', 'aria-label="All songs" title="All songs">')
     return HEAD + app + head + '\n</head>\n<body>\n' + b.lstrip('\n') + '\n</body>\n</html>\n'
 
 
