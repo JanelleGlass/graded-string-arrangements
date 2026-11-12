@@ -73,6 +73,10 @@ What it checks
      streak and three in a row move up a level; the level, streak and best are still there after a reload; Not yet
      starts the streak again; − and + change the level; Violin / Viola is kept with the sight-reading page's. The
      sight-reading page's Flash a bar button opens it on the same book page.
+     Listen (Flash a bar, laptop): with no microphone it says so and stays off; with a made-up microphone
+     (tests/listen_takes.js) it asks for the timing check first and keeps its answer, marks a round played as written
+     with a tick on every note and "Every note right", marks a wrong note with a cross and a late one "late", and is
+     still on after a reload.
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
      the teacher conducts, a student follows, and the student's music keeps up with the teacher's.
   4. The app layer: the browser can install the site, every file is saved after one visit, every song (and the
@@ -1030,6 +1034,80 @@ async def flash_checks(browser, base):
         await ctx.close()
 
 
+MIC_STUB = """window.__mistakes = {};
+window.flashMicStub = (round) => {
+  const lat = 0.15, sr = 48000, start = round.t0 - 0.3, m = window.__mistakes;
+  const clicks = round.clicks.map((t, i) => ({ t: t - start + lat, strong: i % 4 === 0 }));
+  let notes;
+  if (round.kind === 'timing') notes = round.playOn.map(t => ({ midi: 69, t: t - start + lat + 0.01, dur: round.beat * 0.7 }));
+  else {
+    const p = round.pattern;
+    notes = p.midis.map((midi, i) => ({ midi: midi + (m.wrong === i ? 1 : 0), t: round.T0 + p.starts[i] * round.beat - start + lat + (m.late === i ? 0.35 * round.beat : 0),
+      dur: ((p.starts[i + 1] ?? p.beats) - p.starts[i]) * round.beat - (m.late === i ? 0.35 * round.beat : 0) }));
+  }
+  const end = (round.kind === 'timing' ? round.clicks[7] : round.T0 + round.pattern.beats * round.beat) - start + 1;
+  return { samples: ListenTakes.take({ notes, clicks, length: end, seed: 5 }), sampleRate: sr, start };
+};"""
+
+
+async def listen_checks(browser, base):
+    """Flash a bar's Listen, with no microphone and with a made-up one."""
+    print('Sight-reading: Flash a bar, Listen')
+    ck = lambda ok, what: check(ok, f'Listen: {what}')
+    ready = "() => window.flash && flash.state().phase === 'ready' && flash.state().drawn"
+    # No microphone in this browser: Listen says so and stays off.
+    ctx = await browser.new_context(device_scale_factor=1, viewport={'width': 1366, 'height': 860})
+    await setup(ctx)
+    pg = await ctx.new_page()
+    await pg.goto(f'{base}/sight-reading/flash/?page=v1-02')
+    await pg.wait_for_function(ready, timeout=60000)
+    await pg.click('#listen')
+    await pg.wait_for_timeout(1500)
+    st = await pg.evaluate("() => ({ on: flash.state().listen, toast: document.getElementById('toast').textContent })")
+    ck(not st['on'] and 'microphone' in st['toast'], f"with no microphone it says so and stays off ({st})")
+    await ctx.close()
+    # A made-up microphone (the round's own sound, made by tests/listen_takes.js).
+    ctx = await browser.new_context(device_scale_factor=1, viewport={'width': 1366, 'height': 860})
+    await setup(ctx)
+    await ctx.add_init_script("localStorage.setItem('sight-reading-flash', JSON.stringify({ level: { 'v1-02': 3 } }));")  # 1 second, one look
+    await ctx.add_init_script(MIC_STUB)
+    errors = []
+    pg = await ctx.new_page()
+    pg.on('pageerror', lambda e: errors.append(str(e)))
+    await pg.goto(f'{base}/sight-reading/flash/?page=v1-02')
+    await pg.add_script_tag(url=f'{base}/tests/listen_takes.js')
+    await pg.wait_for_function(ready, timeout=60000)
+    await pg.click('#listen')
+    await pg.wait_for_function(ready, timeout=15000)
+    st = await pg.evaluate("() => ({ say: document.getElementById('say').textContent, label: document.getElementById('startLbl').textContent, on: flash.state().listen })")
+    ck(st['on'] and 'Timing check' in st['say'] and st['label'] == 'Check', f"turned on, it asks for the timing check first ({st})")
+    await pg.click('#start')
+    await pg.wait_for_function("() => flash.state().offset != null", timeout=40000)
+    await pg.wait_for_function(ready, timeout=15000)
+    off = await pg.evaluate('() => flash.state().offset')
+    ck(0.1 < off < 0.3, f'the timing check finds the delay (made up as 0.15 s; read {round(off, 3)} s)')
+    for mistakes, want in [({}, 'right'), ({'wrong': 1, 'late': 0}, 'mistakes')]:
+        await pg.evaluate('(m) => { window.__mistakes = m; }', mistakes)
+        await pg.click('#start')
+        await pg.wait_for_function("() => flash.state().phase === 'check'", timeout=40000)
+        await pg.wait_for_timeout(300)
+        st = await pg.evaluate('() => flash.state()')
+        n = len(st['pattern']['midis'])
+        if want == 'right':
+            ck(st['marks'] == ['mark right:✓'] * n and 'Every note right' in (st['heard'] or ''), f"a round played as written: a tick on every note ({st['marks']}, {st['heard']})")
+        else:
+            ck('mark wrong:✗' in st['marks'] and 'when:late' in st['marks'], f"a wrong note gets a cross, a late one 'late' ({st['marks']}, {st['heard']})")
+        await pg.click('#gotIt')
+        await pg.wait_for_function(ready, timeout=15000)
+    await pg.reload()
+    await pg.add_script_tag(url=f'{base}/tests/listen_takes.js')
+    await pg.wait_for_function(ready, timeout=60000)
+    st = await pg.evaluate("() => ({ on: flash.state().listen, offset: flash.state().offset, label: document.getElementById('listenLbl').textContent })")
+    ck(st['on'] and st['offset'] == off and st['label'] == 'Listening', f'after a reload Listen is still on, with its timing ({st})')
+    ck(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
+    await ctx.close()
+
+
 async def sheets_printed(pg):
     pdf = await pg.pdf(format='Letter', prefer_css_page_size=True, print_background=True)
     return len(re.findall(rb'/Type\s*/Page(?![a-zA-Z])', pdf))
@@ -1678,6 +1756,7 @@ async def main():
         await sight_reading_checks(browser, base)
         await look_ahead_checks(browser, base)
         await flash_checks(browser, base)
+        await listen_checks(browser, base)
         await print_checks(browser, base)
         await extras_checks(browser, base)
         await piano_checks(browser, base)

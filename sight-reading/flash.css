@@ -54,6 +54,24 @@ button { cursor: pointer; }
 .fl-yes { background: var(--sun); color: #3A2A00; }
 .fl-no { background: #FFFFFF; color: var(--ink); border: 2px solid var(--line); }
 
+/* Listen: the microphone (teal when on), and the timing check under it */
+.fl-mic { display: inline-flex; align-items: center; gap: 8px; }
+.fl-listen { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px 0 12px; border-radius: 999px; border: 1px solid var(--line); background: #FFFFFF; font-weight: 800; }
+.fl-listen svg { width: 20px; height: 20px; fill: #8A948F; }
+.fl-listen[aria-pressed="true"] { background: var(--teal); border-color: var(--teal); color: #FFFFFF; }
+.fl-listen[aria-pressed="true"] svg { fill: #FFFFFF; }
+.fl-listen[disabled] { opacity: 0.5; cursor: default; }
+.fl-recheck { border: 0; background: none; padding: 4px 2px; color: var(--teal); font-weight: 700; font-size: 0.82rem; text-decoration: underline; text-underline-offset: 3px; }
+.fl-recheck[disabled] { color: #9AA5A0; text-decoration: none; cursor: default; }
+/* After a round with Listen on: a tick or a cross over each note, early or late under it, and one sentence */
+.fl-marks { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; }
+.fl-mark, .fl-when { position: absolute; transform: translateX(-50%); font-family: var(--font-body); font-weight: 900; line-height: 1; white-space: nowrap; }
+.fl-mark.right { color: #15803D; }
+.fl-mark.wrong { color: #DC2626; }
+.fl-mark.unheard { color: #8A948F; }
+.fl-when { color: #8A5A00; font-weight: 800; }
+.fl-heard { position: absolute; left: 12px; right: 12px; top: 8px; margin: 0; text-align: center; font-weight: 700; color: var(--ink); font-size: 1rem; }
+.fl-heard[hidden] { display: none; }
 /* The streak (a star) and the level (− / +) */
 .fl-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
 .fl-streak { display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px 6px 10px; border-radius: 999px; background: var(--sun-soft); }
@@ -95,6 +113,8 @@ button { cursor: pointer; }
   .fl-streak svg { width: 22px; height: 22px; }
   .fl-streak > b { font-size: 1.3rem; }
   .fl-level button { width: 34px; height: 34px; }
+  .fl-listen { height: 34px; padding: 0 12px 0 9px; font-size: 0.9rem; }
+  .fl-heard { top: 4px; font-size: 0.86rem; }
   .fl-how { display: none; }
   .fl-beat { font-size: 3rem; }
 }

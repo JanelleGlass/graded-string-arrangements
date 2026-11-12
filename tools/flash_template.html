@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="../flash.css?v={{FLASH_CSS}}">
 <script>window.SIGHT_READING_PAGES = {{PAGES}}; window.FLASH_FONT = '{{FONT_URL}}';</script>
 <script src="../generator.js?v={{GENERATOR}}"></script>
+<script src="../listen.js?v={{LISTEN}}"></script>
 </head>
 <body>
 <a class="fl-back" id="back" href="../">&larr; Sight-reading</a>
@@ -23,6 +24,7 @@
     <div class="fl-music" id="music"><div id="score"></div></div>
     <div class="fl-cover" id="cover"><p class="fl-say" id="say">Setting out the music…</p><div class="fl-beat" id="beat" hidden><span id="beatNum"></span></div></div>
     <div class="fl-timer" id="timer"><span id="timerBar"></span></div>
+    <p class="fl-heard" id="heard" hidden></p>
   </section>
 
   <div class="fl-actions">
@@ -33,6 +35,10 @@
 
   <div class="fl-status">
     <div class="fl-streak" id="streakBox" title="Got it, in a row"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg><b id="streak">0</b><span>in a row</span><small>Best <b id="best">0</b></small></div>
+    <div class="fl-mic">
+      <button type="button" class="fl-listen" id="listen" aria-pressed="false" title="Listen: the microphone hears you play and marks each note (nothing is recorded or saved)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg><span id="listenLbl">Listen</span></button>
+      <button type="button" class="fl-recheck" id="recheck" disabled>Timing check</button>
+    </div>
     <div class="fl-level">
       <button type="button" id="lvDown" aria-label="Easier">−</button>
       <div class="fl-level-txt"><b id="level">Level 1</b><small id="levelSay"></small></div>

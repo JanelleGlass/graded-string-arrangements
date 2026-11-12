@@ -321,7 +321,7 @@ def song_page(reader, song, facts, app, revs):
 
 
 SIGHT = 'sight-reading'
-SIGHT_FILES = ['generator.js', 'practice.js', 'practice.css', 'flash.js', 'flash.css']  # served beside its pages; pages.json goes into them
+SIGHT_FILES = ['generator.js', 'practice.js', 'practice.css', 'flash.js', 'flash.css', 'listen.js']  # served beside its pages; pages.json goes into them
 FLASH_TEMPLATE = ROOT / 'tools' / 'flash_template.html'  # Flash a bar (round 3): its page, from this template
 FLASH_ICON = ('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12z"/></svg>')
 NEW_ICON = ('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 '
@@ -364,7 +364,7 @@ def flash_page(pages, app, revs):
     page = FLASH_TEMPLATE.read_text(encoding='utf-8')
     data = json.dumps(pages, ensure_ascii=False, separators=(',', ':')).replace('</', '<\\/')
     for k, v in [('PAGES', data), ('FONT_URL', f"../../{FONT}?v={revs['font']}"), ('GENERATOR', revs['generator.js']),
-                 ('FLASH_CSS', revs['flash.css']), ('FLASH_JS', revs['flash.js'])]:
+                 ('FLASH_CSS', revs['flash.css']), ('FLASH_JS', revs['flash.js']), ('LISTEN', revs['listen.js'])]:
         if page.count('{{' + k + '}}') != 1:
             fail(f'tools/flash_template.html: expected one {{{{{k}}}}}')
         page = page.replace('{{' + k + '}}', v)

@@ -26,7 +26,8 @@ left out by `.vercelignore`). `CLAUDE.md` has the full how-to.
 the works: `generator.js` makes each exercise from a book page's rules (`pages.json`, four placeholder pages for now),
 and the reader plays it. Look ahead (a button in its strip) makes each note vanish a little before it sounds, so the
 eyes stay ahead of the hands. `sight-reading/flash/` is Flash a bar: a short pattern shows, hides, and the student plays
-it from that glance, with a streak and levels. `tests/sight_reading.py` checks 1,000 exercises per page and instrument against the rules.
+it from that glance, with a streak and levels; with Listen on, the microphone marks each note right or wrong, early or
+late (worked out in the browser; nothing is recorded or saved). `tests/listening.py` checks the listening. `tests/sight_reading.py` checks 1,000 exercises per page and instrument against the rules.
 
 ## Adding a piece
 

@@ -547,6 +547,8 @@
       return {
         xml: toXml(R, plan, picks, tempo), page: page.id, inst, n, shape, length, time, bars, tempo, key: R.key.name,
         notes: picks.map(x => x.name), colors: picks.map(x => x.color), rhythm: barSeqs.map(b => b.join(' ')),
+        midis: picks.map(x => x.midi), // what each note sounds, for listening (round 4)
+        starts: at.map(i => (events[i].bar * len + events[i].pos) / 2), // when each note starts, in quarter notes
         beats: bars * len / 2, // the pattern's length, in quarter notes
         countIn: beats * 4 / beatType, // one bar of the page's time, in quarter notes
       };
