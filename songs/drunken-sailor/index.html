@@ -3480,7 +3480,7 @@ body.following .host-only { display: none !important; }
           // A little higher over a high-finger arrow drawn above the head. A rest: just above the rest.
           const arrow = !rest && beat.notes.some(n => (n.finger || '').includes('↑'));
           let top = rest ? bb.visualBounds.y : hb.cy - hb.h / 2;
-          top -= space * (arrow ? 1.3 : 0.4); // a little air between the note and the ball (Janelle, 2026-11-12)
+          top -= space * (arrow ? 1.7 : 0.8); // air between the note and the ball (Janelle, 2026-11-12: 0.4, then twice that)
           // Never up into the counts (or notes) of the part above: the ball sits in the room between, and bounces no higher.
           const ceil = roomAbove(bb.barBounds) + 2;
           top = Math.max(top, ceil + ballD(space));
@@ -3554,7 +3554,7 @@ body.following .host-only { display: none !important; }
   // How much wider than alphaTab's quarter: with finger numbers beside the notes, room for the next note's number after a
   // short note's flag; otherwise a little (Janelle, 2026-11-12: 1.3 everywhere was a little too wide; at 1.15 a number
   // beside the next note touched an eighth note's flag).
-  const evenRoom = () => (state.fingerMode !== 'off' && fingerSpot() === 'left' ? 1.25 : 1.1);
+  const evenRoom = () => (state.fingerMode !== 'off' && fingerSpot() === 'left' ? 1.35 : 1.2); // then a tiny bit wider (2026-11-12)
   const evenSpacingOn = () => state.pointer && !onPaper();
   function findSpringFormula(root) {
     const seen = new Set(), queue = [[root, 0]];
@@ -3626,7 +3626,7 @@ body.following .host-only { display: none !important; }
     for (const run of pointRuns) {
       // About two and a half ball widths for each bounce (Janelle, 2026-11-10: two weren't enough to see the bounces
       // apart; 2026-11-12: three, with the even spacing, a little too wide).
-      const s = run.stops, hop = ballD(s[0].space) * 2.5;
+      const s = run.stops, hop = ballD(s[0].space) * 2.7; // then a tiny bit wider (2026-11-12)
       for (let k = 0; k + 1 < s.length; k++) {
         const cur = s[k], nxt = s[k + 1], flights = cur.lands.length;
         if (flights < 2 || nxt.sys !== cur.sys) continue;
