@@ -276,7 +276,8 @@
     phase = 'flash'; setButtons();
     let t = 0;
     for (let k = 0; k < L.looks; k++) {
-      later(() => { cover(false); timerRun(look); }, t);
+      const show = () => { cover(false); timerRun(look); };
+      if (t === 0) show(); else later(show, t); // the first look comes with the tap
       t += look;
       later(() => { cover(true); $('timer').classList.remove('run'); say(k + 1 < L.looks ? 'Once more\u2026' : 'Get ready to play'); }, t);
       t += k + 1 < L.looks ? gap : ms(500);
