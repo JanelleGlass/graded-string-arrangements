@@ -198,8 +198,8 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   It is a copy of the start as drawn, so at the start it sits exactly on it. When it is wider than
   half the screen (big music), the playing note sits just past it instead (Janelle, 2026-10-17).
 - Pages: every line of music names its parts beside the staves, not just the first line (2026-10-17). While playing,
-  the page glides to each new line in about 1.3 seconds (up to 2.4 for a longer way), easing in and out
-  (`glidePage`; Janelle, 2026-11-12: the browser's own smooth scroll was fast and jumpy, then a second was a little fast); a scroll of the reader's own stops it.
+  the page glides to each new line in about 1.3 seconds (up to 2.4 for a longer way), easing in and out with
+  smootherstep, so it starts and ends almost imperceptibly (`glidePage`; Janelle, 2026-11-12: the browser's own smooth scroll was fast and jumpy, then a second was a little fast); a scroll of the reader's own stops it.
 - Every setting is always visible in a strip at the bottom, on phones too, never covering notes.
   Phone-landscape buttons are compact so the strip fits one row on regular iPhones. Sideways on a phone the long
   labels take two short lines ("Note names / and fingers", "Count-in / only", "Counting: / On"), so it fits on an
