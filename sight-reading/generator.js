@@ -545,9 +545,10 @@
   function partnerRhythm(R2, plan1, rng) {
     const len = plan1.len, B = plan1.bars.length, ph = plan1.phrases, last = plan1.bars[B - 1];
     const ending = last.every(t => R2.rhythms.includes(t)) ? last : ENDINGS[len].find(e => e.every(t => R2.rhythms.includes(t)));
-    const options = fillings(R2.rhythms.filter(t => t !== 'w' || len === 8), len);
+    let options = fillings(R2.rhythms.filter(t => t !== 'w' || len === 8), len);
     if (!ending || !options.length) throw new Error('Part 2\u2019s rhythms cannot fill a bar of ' + plan1.time);
-    if (R2.widened === 5) options.push([{ 8: 'wr', 6: 'h.r', 4: 'hr' }[len]]); // a bar's rest, as a last resort
+    // A bar's rest, as a last resort (on a copy: fillings keeps its lists for every exercise after this one).
+    if (R2.widened === 5) options = options.concat([[{ 8: 'wr', 6: 'h.r', 4: 'hr' }[len]]]);
     const attacks = (seq) => eventsOf([seq]).filter(e => !e.rest).map(e => e.pos);
     const weight = (seq, b, role, before) => {
       let w = 1;

@@ -539,6 +539,10 @@ async def main():
             if said:
                 failures.append(f"{page['id']}: {said}")
         pages = PAGES + TRY_PAGES
+        # The first exercises of every page, made now and again at the end: making duets or patterns in between must not
+        # change them (nothing left behind from one piece of music to the next).
+        SAME_JS = '(pages) => pages.flatMap(p => ["violin", "viola"].flatMap(i => Array.from({ length: 40 }, (_, k) => SightReading.exercise(p, i, k + 1).xml)))'
+        first_made = await pg.evaluate(SAME_JS, pages)
         for page in pages:
             bad = {}
             for start in range(1, COUNT + 1, 250):
@@ -629,6 +633,11 @@ async def main():
                       f"the same way {round(100 * similar)}%; bars with the same rhythm {round(100 * same_rhythm)}%; "
                       f"with a few notes from outside Part 2's page {round(100 * widened / max(1, made))}%)")
             done += made
+        again = await pg.evaluate(SAME_JS, pages)
+        kept = again == first_made
+        print(('  ok    ' if kept else '  FAIL  ') + 'after all the duets and patterns, every exercise number still gives the same music')
+        if not kept:
+            failures.append(f'exercises changed after making duets and patterns ({sum(a != b for a, b in zip(again, first_made))} of {len(again)})')
         # Violin and viola with one number: the same exercise, a fifth apart (when the page has no viola notes of its own).
         same = await pg.evaluate('''(page) => { const v = SightReading.exercise(page, 'violin', 42), a = SightReading.exercise(page, 'viola', 42);
           return v.rhythm.join() === a.rhythm.join() && v.notes.length === a.notes.length; }''', PAGES[0])
