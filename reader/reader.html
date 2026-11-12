@@ -4286,7 +4286,7 @@ body.following .host-only { display: none !important; }
     cancelAnimationFrame(pageGlide); pageGlide = 0;
     const from = window.scrollY, d = to - from;
     if (reduceMotion || Math.abs(d) < 2) { window.scrollTo(0, to); return; }
-    const ms = Math.min(2400, 1300 + Math.abs(d) * 1.2), t0 = performance.now(); // a little slower again (2026-11-12)
+    const ms = Math.min(3000, 1800 + Math.abs(d) * 1.4), t0 = performance.now(); // slower again, twice (2026-11-12)
     const step = (now) => {
       // Smootherstep: starts and ends with no speed and no push, so the first moment of movement is barely noticeable
       // (Janelle, 2026-11-12: "start almost imperceptibly, gradually faster, then gradually slower").
