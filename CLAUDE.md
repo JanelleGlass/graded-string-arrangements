@@ -180,7 +180,9 @@ flash a bar, the mic listening, duets, book codes) is in Janelle's brief, which 
   big New exercise. On a phone turned sideways (no title) it is pinned along the top beside "All songs", and the reader
   keeps the music below it (practice.css makes `#topInset` taller by the row's height).
 - Same page and number, same music on every device (seeded random numbers), so a teacher can put one exercise on every
-  stand. The address carries both (`?page=v1-02&n=4821`). Violin and viola with one number get the same exercise a fifth
+  stand. The address carries both (`?page=v1-02&n=4821`). The Exercise box in the row is on trial (Janelle, 2026-11-12:
+  "I'll leave it for now ... we'll remove it if I don't end up using it"); without it the number would still be in the
+  address, on the title card and on printed copies. Violin and viola with one number get the same exercise a fifth
   apart. The instrument is kept on the device (`localStorage` `sight-reading`), not in the address, so one link works for
   both. Changing the generator changes what a number plays: fine while the pages are placeholders, but once the book is
   out a change to the rules should keep the old numbers' music or be a deliberate choice.
