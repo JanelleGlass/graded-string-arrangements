@@ -63,7 +63,11 @@ In a Claude cloud session the network may block cdn.jsdelivr.net (2026-11-02): t
 loads (TimeoutError)", the reader never having got alphaTab. Fetch the same file from npm and point the test at it:
 `npm pack @coderline/alphatab@1.8.4` in the scratchpad, untar `package/dist/alphaTab.min.js`, and run the test with
 `ALPHATAB_JS=<that path>`. Python's Playwright there must match the browser already installed (`pip install
-playwright==` the version `node -e "console.log(require('playwright/package.json').version)"` prints).
+playwright==` the version `node -e "console.log(require('playwright/package.json').version)"` prints). The Play
+together library (supabase-js, also from jsdelivr) can't load there either, and the piano check counts the failed
+download as a script error ("silent-night: no script errors: ... ERR_TUNNEL_CONNECTION_FAILED", twice; 2026-11-12):
+that is the session's network, not the site. Play together on a slow or patchy connection: `node tests/together_sim.js`
+(see "Play together on the website").
 
 The test needs Playwright once per computer: `python -m pip install playwright` then
 `python -m playwright install chromium`. To look at a page yourself: `python -m http.server 8000`
@@ -160,6 +164,22 @@ one goes missing.
   page shows a big "Tap to follow your teacher" card; any tap wakes it and catches up. (Headless Chromium never
   sleeps; the test fakes it with a wrapped AudioContext.) A follower that arrives and asks the time before the teacher's
   device has seen it arrive is answered anyway, and asks again every 3 s until answered (it once never lined up).
+- Patchy connections (Janelle tried it on her phone's hotspot, 2026-11-12: "very glitchy"). It needs the internet on
+  every device (no internet: each device plays on its own, and Follow doesn't appear). A phone's connection is slow and
+  uneven and freezes for seconds at a time, so messages come late, in bunches, or (when the connection is made again) not
+  at all. So: every command carries `ver`, a number that goes up with each change, and the teacher's reports (`pos`,
+  twice a second while playing, every 2 s while stopped: `st` 'moving' or 'still', none while starting, counting in or
+  between passes of a loop) carry it with the whole state (tempo, bars, count-in, where). A student that sees a newer
+  `ver` than its last command missed one and catches up from the report (`catchUp`); two reports in a row where the
+  teacher moves and the student doesn't (or the other way) do the same. A student ignores a command it already had: the
+  teacher sends her latest one again whenever someone starts following, and until then the others started over from it
+  (back to where Play was pressed, at the tempo then: seen even on good Wi-Fi). In a loop a student goes round by itself
+  too, so it doesn't sit at the loop's end waiting for a late word. A student keeps following through 25 s of silence
+  (others drop the teacher after 7 s), and a following tab keeps following through 30 s on `conduct:__site`; after a
+  reconnect `app/together.js` tracks presence again (supabase-js doesn't). A report that seems to arrive before it was
+  sent moves the student's idea of the teacher's clock up (its pings met a slow patch). Checked with a stand-in for
+  Supabase that delays, bunches and drops messages per device (Wi-Fi, hotspot, and freezes of 3 to 9 s), with a teacher
+  and two students: Play, Pause, tempo, a second student joining, a loop.
 - Tests use their own channels (`conduct:test-...`) when localStorage has `gsa-together-test` (tests/smoke.py sets it):
   on 2026-11-10 a local test on Silent Night met Janelle conducting it on the live site, and its students followed her.
 - Testing needs a teacher account: make a throwaway one in `auth.users` with a row in `conduct_classes`, and delete it
