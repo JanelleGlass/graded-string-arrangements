@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Graded Strings">
 <style>body{margin:0;padding:0}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <script src="../../app/app.js?v=3a19f0d83d"></script>
-<script src="../../app/together.js?v=620cf383e5"></script>
+<script src="../../app/together.js?v=88e840cfab"></script>
 <title>The Butterfly</title>
 <meta name="description" content="Read and play along with The Butterfly in four levels for violin, viola, cello and bass.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1807,19 +1807,25 @@ body.following .host-only { display: none !important; }
   // at once, like Play does). Play/Pause during that moment stops the loop there.
   let loopGap = 0;
   function restartLoop() {
-    if (!loop || !api || playing || conductor.following) return; // a follower waits for the conductor to restart everyone
+    if (!loop || !api || playing) return;
+    // A follower goes round by itself too, in time with the conductor, so it doesn't sit still when the conductor's
+    // word comes late on a slow connection; when the word comes, it starts exactly with the conductor instead (or, if
+    // it has started already, just moves to the conductor's place). Not when that word is already here.
+    if (conductor.following && conductor.waiting) return;
     const t = api.playbackRange ? api.playbackRange.startTick : loopTicks(loop.from, loop.to).startTick;
     const countIn = countInOn(), rest = loopRestMs();
     api.tickPosition = t; markTick = t;
     glideToTick(t, Math.min(LOOP_GLIDE_MS, rest - 120)); drawStartMark();
     api.countInVolume = countIn ? 1 : 0;
-    clearTimers(); clearTimeout(loopGap);
+    if (!conductor.following) clearTimers();
+    clearTimeout(loopGap);
     if (conductor.hosting) conductSend({ type: 'play', startAt: clock() + rest, tick: t, speed: state.tempo / SPEED_BASE, countIn, loop: true, range: rangeBars(), lag: Math.round(soundLag()) });
     setPlaying(true);
     loopGap = setTimeout(() => {
       loopGap = 0;
       if (!loop || playing) { setPlaying(playing); return; }
       if (countIn) beginCountIn();
+      conductor.startingUntil = clock() + 2000; // until the player says it has started
       api.play();
     }, rest);
   }
@@ -2052,12 +2058,19 @@ body.following .host-only { display: none !important; }
   // device that follows starts at the same moment with its sound off. Followers learn the difference
   // between their clock and the host's by pinging it, so "start at host time T" means the same instant
   // everywhere. While playing, the host reports where it is and followers nudge themselves back in line.
+  // On a patchy connection (a phone's hotspot, Janelle, 2026-11-12) a message can come late or not at all. Every
+  // command carries a number that goes up with each change (ver), and the host's reports (twice a second while
+  // playing, every 2 s while stopped) carry that number and the whole state: tempo, bars, playing or not, where.
+  // A follower that sees a newer number than the last command it got missed one, and takes the report's word for it.
+  // A follower also ignores a command it has already had: the host sends its latest one again whenever someone
+  // starts following, and the others used to start over from it (back to where Play was pressed, at the tempo then).
   const LEAD_MS = 1200;            // how far ahead a start is scheduled, so the message reaches everyone first
   const DRIFT_MS = 40;             // followers correct themselves when steadily further off than this
   const LOOP_LEAD_MS = 600;        // the shortest rest between passes of a loop (the music slides back, and everyone restarts together)
   const LOOP_GLIDE_MS = 450;       // how long the slide back to the loop's first note takes
   const conductor = { room: null, me: null, hosting: false, following: false, hostPeer: null, offset: 0, bestRtt: Infinity, pongs: 0, synced: false,
-    pings: new Map(), last: null, seq: 0, timers: [], posTimer: 0, pingTimer: 0, followers: 0, volume: 1, errs: [], startedAt: 0, lastFix: 0 };
+    pings: new Map(), last: null, seq: 0, timers: [], posTimer: 0, pingTimer: 0, followers: 0, volume: 1, errs: [], startedAt: 0, lastFix: 0,
+    sentVer: 0, seenVer: -1, startingUntil: 0, quiet: 0, waiting: false };
   const clock = () => performance.now();
   // The written tempo (quarter notes a minute) at a tick: the last tempo mark at or before it.
   function tempoAtTick(tick) {
@@ -2075,6 +2088,7 @@ body.following .host-only { display: none !important; }
   function conductSend(cmd) {
     if (!conductor.room || !conductor.hosting) return;
     cmd.seq = ++conductor.seq;
+    cmd.ver = cmd.type === 'pos' ? conductor.sentVer : ++conductor.sentVer;
     if (cmd.type !== 'pos' && cmd.type !== 'tempo') conductor.last = cmd;
     conductor.room.emit('conduct', cmd).catch(() => {});
   }
@@ -2088,7 +2102,7 @@ body.following .host-only { display: none !important; }
     if (countIn && tick - score.masterBars[bi].start > 10) tick = score.masterBars[bi].start;
     return tick;
   }
-  function clearTimers() { conductor.timers.forEach(clearTimeout); conductor.timers = []; }
+  function clearTimers() { conductor.timers.forEach(clearTimeout); conductor.timers = []; conductor.waiting = false; }
   const rangeBars = () => (loop ? [loop.from + 1, loop.to + 1] : null);
 
   // Host: Play schedules everyone (including itself) LEAD_MS from now.
@@ -2106,6 +2120,7 @@ body.following .host-only { display: none !important; }
     api.tickPosition = tick; markTick = tick; drawStartMark();
     centerOnTick(tick, true); revealSheet(true, true);
     const startAt = clock() + LEAD_MS;
+    conductor.startingUntil = startAt + 2000;
     conductSend({ type: 'play', startAt, tick, speed: state.tempo / SPEED_BASE, countIn, loop: !!loop, range: rangeBars(), lag: Math.round(soundLag()) });
     $('playText').textContent = 'Starting';
     conductor.timers.push(setTimeout(() => { if (countIn) beginCountIn(); api.play(); }, LEAD_MS));
@@ -2116,11 +2131,22 @@ body.following .host-only { display: none !important; }
     const r = rangeBars();
     conductSend({ type: 'seek', tick: Math.round(playing ? api.tickPosition : markTick), h: clock(), playing, range: r, loop: !!loop, countIn: countInSet(), lag: Math.round(soundLag()) });
   }
-  // Host: while playing, say where we are a couple of times a second.
+  // What the host's music is doing: 'moving', or 'still' (stopped, paused or finished); nothing while it is about to
+  // move (a start scheduled, counting in, resting between passes of a loop), when a report would mislead.
+  function hostPhase() {
+    if (clock() < conductor.startingUntil || loopGap || counting) return '';
+    return playing ? 'moving' : 'still';
+  }
+  // Host: say where we are, twice a second while playing and every 2 s while still, with everything a follower that
+  // missed a command needs to catch up.
   function hostReport() {
-    if (!conductor.hosting || !playing) return;
+    const st = conductor.hosting && hostPhase();
+    if (!st) return;
+    if (st === 'still' && conductor.quiet++ % 4) return;
+    if (st === 'moving') conductor.quiet = 0;
     const now = clock();
-    conductSend({ type: 'pos', h: now, tick: playedTick(now) });
+    conductSend({ type: 'pos', st, h: now, tick: st === 'moving' ? playedTick(now) : Math.round(markTick || 0), speed: state.tempo / SPEED_BASE,
+      range: rangeBars(), countIn: countInSet(), lag: Math.round(soundLag()) });
   }
 
   // A follower's sound is off, so its music keeps time with the host's speaker: it runs this much behind the host's
@@ -2129,7 +2155,12 @@ body.following .host-only { display: none !important; }
   // Follower: apply a command from the host.
   function applyCommand(cmd, late) {
     if (!conductor.following) return;
-    if (cmd.type !== 'pos') { clearTimers(); conductor.errs = []; conductor.startedAt = clock(); conductor.lastFix = 0; }
+    if (cmd.type !== 'pos') {
+      clearTimers(); conductor.errs = []; conductor.startedAt = clock(); conductor.lastFix = 0;
+      if (typeof cmd.ver === 'number') conductor.seenVer = cmd.ver;
+      // Stopped by the conductor: not round the loop by itself either.
+      if (loopGap && (cmd.type === 'pause' || cmd.type === 'stop' || (cmd.type === 'seek' && !cmd.playing))) { clearTimeout(loopGap); loopGap = 0; setPlaying(playing); }
+    } else if (cmd.st && typeof cmd.ver === 'number' && cmd.ver !== conductor.seenVer) { catchUp(cmd); return; }
     if (cmd.type === 'tempo' || cmd.type === 'play') {
       playSpeed(cmd.speed);
       state.tempo = Math.round(cmd.speed * SPEED_BASE);
@@ -2138,25 +2169,35 @@ body.following .host-only { display: none !important; }
     if (cmd.type === 'play' || (cmd.type === 'seek' && 'countIn' in cmd)) conductor.countIn = !!cmd.countIn;
     if (cmd.type === 'play') {
       if (cmd.range) setLoop(cmd.range[0] - 1, cmd.range[1] - 1); else setLoop(null);
-      if (playing) api.pause();
-      api.tickPosition = cmd.tick; markTick = cmd.tick; drawStartMark();
+      clearTimeout(loopGap); loopGap = 0; // this device going round a loop by itself gives way to the conductor
       const localStart = cmd.startAt - conductor.offset + lagGap(cmd);
-      glideToTick(cmd.tick, Math.max(0, Math.min(LOOP_GLIDE_MS, localStart - clock() - 80))); revealSheet(true, true);
-      const countMs = cmd.countIn ? countInBeats(cmd.tick) * clickMs(barAtTick(cmd.tick), cmd.speed) : 0;
+      const countMs = cmd.countIn ? countInBeats(cmd.tick) * clickMs(barAtTick(cmd.tick), api.playbackSpeed) : 0;
       const wait = localStart - clock();
-      if (wait > 0) {
-        // In time: count in and start exactly with the host.
+      const into = clock() - (localStart + countMs);
+      // The player settles on its own spot a moment after a pause, over a place set straight after: set it again at the start.
+      const startAt = (ms, count) => {
+        conductor.waiting = true;
         conductor.timers.push(setTimeout(() => {
-          api.countInVolume = cmd.countIn ? 1 : 0;
-          if (cmd.countIn) beginCountIn();
+          conductor.waiting = false;
+          api.tickPosition = cmd.tick;
+          api.countInVolume = count ? 1 : 0;
+          if (count) beginCountIn();
           api.play();
-        }, wait));
+        }, ms));
+      };
+      if (wait > 0 || into < 0) {
+        if (playing) api.pause();
+        api.tickPosition = cmd.tick; markTick = cmd.tick; drawStartMark();
+        glideToTick(cmd.tick, Math.max(0, Math.min(LOOP_GLIDE_MS, wait - 80))); revealSheet(true, true);
+        // In time: count in and start exactly with the host. Or in the middle of its count-in: start with its music.
+        if (wait > 0) startAt(wait, cmd.countIn); else startAt(-into, false);
       } else {
-        // Joined late: jump to where the host is now.
-        const into = clock() - (localStart + countMs);
+        // Joined late: go to where the host is now (already playing, as when it went round a loop by itself: just move).
         api.countInVolume = 0;
-        if (into < 0) conductor.timers.push(setTimeout(() => api.play(), -into));
-        else { api.tickPosition = cmd.tick + into * ticksPerMs(cmd.speed, cmd.tick); api.play(); }
+        if (counting) endCountIn();
+        api.tickPosition = cmd.tick + into * ticksPerMs(api.playbackSpeed, cmd.tick);
+        if (!playing) api.play();
+        revealSheet(true, true);
       }
     } else if (cmd.type === 'seek') {
       if (cmd.range) setLoop(cmd.range[0] - 1, cmd.range[1] - 1); else if (loop) setLoop(null);
@@ -2173,7 +2214,7 @@ body.following .host-only { display: none !important; }
     } else if (cmd.type === 'stop') {
       api.stop(); if (cmd.tick) api.tickPosition = cmd.tick; markTick = cmd.tick || 0;
       conductor.timers.push(setTimeout(() => centerOnTick(cmd.tick || 0, true), 120));
-    } else if (cmd.type === 'pos' && playing && !counting) {
+    } else if (cmd.type === 'pos' && cmd.st !== 'still' && playing && !counting) {
       // Where was I when the host was at cmd.tick? Nudge if we have drifted apart.
       const localAt = cmd.h - conductor.offset;
       const rate = ticksPerMs(api.playbackSpeed, cmd.tick);
@@ -2195,6 +2236,32 @@ body.following .host-only { display: none !important; }
           conductor.errs = []; conductor.lastFix = now;
         }
       }
+    }
+  }
+  // Follower: a report says the host has moved on from the last command this device got (one was lost on the way):
+  // match its tempo, bars and count-in, then play from where its speaker is, or stop where it stopped.
+  function catchUp(cmd) {
+    clearTimers(); conductor.errs = []; conductor.startedAt = clock(); conductor.lastFix = 0;
+    conductor.seenVer = cmd.ver;
+    if (loopGap) { clearTimeout(loopGap); loopGap = 0; setPlaying(playing); }
+    if (typeof cmd.speed === 'number' && Math.round(cmd.speed * SPEED_BASE) !== state.tempo) {
+      playSpeed(cmd.speed); state.tempo = Math.round(cmd.speed * SPEED_BASE); showTempo();
+    }
+    if ('range' in cmd && JSON.stringify(cmd.range || null) !== JSON.stringify(rangeBars())) {
+      if (cmd.range) setLoop(cmd.range[0] - 1, cmd.range[1] - 1); else setLoop(null);
+    }
+    if ('countIn' in cmd) conductor.countIn = !!cmd.countIn;
+    if (cmd.st === 'moving') {
+      if (counting) endCountIn();
+      // cmd.tick is what the host's speaker played at cmd.h; this device's music shows what it plays soundLag() later.
+      const rate = ticksPerMs(api.playbackSpeed, cmd.tick);
+      api.countInVolume = 0;
+      api.tickPosition = Math.max(0, cmd.tick + (clock() - (cmd.h - conductor.offset) + soundLag()) * rate);
+      if (!playing) api.play();
+    } else {
+      if (playing) api.pause();
+      api.tickPosition = cmd.tick; markTick = cmd.tick; drawStartMark();
+      conductor.timers.push(setTimeout(() => { if (!playing) { api.tickPosition = cmd.tick; centerOnTick(cmd.tick, true); } }, 250));
     }
   }
 
@@ -2248,7 +2315,7 @@ body.following .host-only { display: none !important; }
   function startFollowing(auto) {
     if (!conductor.room || !conductor.hostPeer) return;
     conductor.following = true;
-    conductor.offset = 0; conductor.bestRtt = Infinity; conductor.pongs = 0; conductor.synced = false; conductor.pings.clear();
+    conductor.offset = 0; conductor.bestRtt = Infinity; conductor.pongs = 0; conductor.synced = false; conductor.pings.clear(); conductor.seenVer = -1;
     // Sound stays on the conductor's device only.
     conductor.volume = api.masterVolume; api.masterVolume = 0;
     // Wake this device's audio while we have the tap, so a start later on isn't blocked.
@@ -2387,7 +2454,13 @@ body.following .host-only { display: none !important; }
       if (cmd.type === 'hello') return;
       // Remember the host's latest command so a follower can catch up once its clock is set.
       if (cmd.type === 'play' || cmd.type === 'pause' || cmd.type === 'stop') conductor.last = cmd;
-      if (conductor.following && conductor.synced && msg.peer === conductor.hostPeer) applyCommand(cmd);
+      if (!(conductor.following && conductor.synced && msg.peer === conductor.hostPeer)) return;
+      // Nothing arrives before it was sent: a report that seems to means this device's idea of the host's clock is
+      // behind (the pings that set it met a slow patch on the way back), which kept its music a little late. Move it up.
+      if (typeof cmd.h === 'number') { const lo = cmd.h - clock(); if (lo > conductor.offset + 10) conductor.offset = lo; }
+      // Had it already: the host sends its latest command again whenever someone starts following.
+      if (cmd.type !== 'pos' && typeof cmd.ver === 'number' && cmd.ver <= conductor.seenVer) return;
+      applyCommand(cmd);
     });
     room.on('pong', (msg) => {
       const d = msg.data || {};
@@ -5066,14 +5139,15 @@ body.following .host-only { display: none !important; }
       applyAudio();
       autoFollow();
     });
-    // The end of a pass of a loop: rest a beat and go round again (the conductor restarts everyone).
-    api.playerFinished.on(() => { if (loop && !conductor.following) setTimeout(restartLoop, 40); });
+    // The end of a pass of a loop: rest a beat and go round again (the conductor restarts everyone, and a follower
+    // goes round by itself in case the conductor's word comes late).
+    api.playerFinished.on(() => { if (loop) setTimeout(restartLoop, 40); });
     api.playerStateChanged.on((e) => {
       const was = playing;
       playing = e.state === 1;
       setPlaying(playing);
       // The first note reaches the speaker a moment after Play: until then the music waits (pos.at is that moment).
-      if (playing && !was) { clearStalePieces(); lastGrid = null; pos.at = heardAt = performance.now() + soundLag(); requestAnimationFrame(gridTick); lineState = null; revealSheet(true, true); if (state.layout === 'line' && !lineRaf) lineRaf = requestAnimationFrame(lineFollow); }
+      if (playing && !was) { conductor.startingUntil = 0; clearStalePieces(); lastGrid = null; pos.at = heardAt = performance.now() + soundLag(); requestAnimationFrame(gridTick); lineState = null; revealSheet(true, true); if (state.layout === 'line' && !lineRaf) lineRaf = requestAnimationFrame(lineFollow); }
       if (!playing) endCountIn();
       if (!playing && e.stopped) { activeBeats = []; trackNotes(); clearNow(); }
       // Stopped or paused: frame the note Play will start from (the player settles on its spot a moment later).
