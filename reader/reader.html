@@ -3398,19 +3398,6 @@ body.following .host-only { display: none !important; }
     pointLayer.replaceChildren(); pointRuns = [];
     if (!state.pointer || !api || !api.boundsLookup || !score || onPaper()) return;
     const lookup = api.boundsLookup, counts = countTicks();
-    if (!ink) ink = collectInk();
-    // Bow marks and articulations are font glyphs (SMuFL), not lines, so they aren't in the ink.
-    const marks = [], surf = $('sheet').querySelector('.at-surface'), base = surf && surf.getBoundingClientRect();
-    if (surf) surf.querySelectorAll('svg text').forEach((t) => {
-      const c = (t.textContent || '').codePointAt(0);
-      if (!((c >= 0xE4A0 && c <= 0xE4BF) || (c >= 0xE610 && c <= 0xE62F))) return;
-      // Their text box is far taller than the ink: measure the glyph from its baseline (as for the dynamics).
-      try {
-        const m = t.getScreenCTM(), p = t.getStartPositionOfChar(0), px = parseFloat(getComputedStyle(t).fontSize) * (m ? m.d : 1);
-        const r = t.getBoundingClientRect(), y = m.b * p.x + m.d * p.y + m.f - base.top, ext = dynExtent(t, px);
-        if (r.width) marks.push({ x: r.left - base.left, r: r.right - base.left, y: y - ext.up, b: y + ext.down });
-      } catch {}
-    });
     for (const ti of shownIndexes()) {
       const stops = [];
       score.masterBars.forEach((mb, bi) => {
@@ -3426,14 +3413,12 @@ body.following .host-only { display: none !important; }
           if (last && Math.abs(last.end - tick) < 2 && ((tied && !last.rest) || (rest && last.rest))) { last.end = end; continue; }
           const hb = headBox(beat, bb), vb = bb.barBounds.visualBounds, space = vb.h / 4;
           const sys = bb.barBounds.masterBarBounds.staffSystemBounds, sv = sys ? sys.visualBounds : vb;
-          // Just above the staff, or above a high note; a little higher over a high-finger arrow drawn above the head.
+          // Right above the note head, so the ball follows the shape of the tune (Janelle, 2026-11-12: "follow the contour
+          // and bounce right above each note"; it used to clear the stem, beam and bow marks too, which kept it high).
+          // A little higher over a high-finger arrow drawn above the head. A rest: just above the rest.
           const arrow = !rest && beat.notes.some(n => (n.finger || '').includes('↑'));
-          let top = Math.min(vb.y, rest ? vb.y : hb.cy - hb.h / 2);
-          // Clear the note's stem and beam too (a short line, not a slur or the staff lines), no higher than 5 spaces.
-          if (!rest) for (const e of ink) if (e.x < hb.x + hb.w + space && e.r > hb.x - space * 0.2 && e.r - e.x < space * 6 && e.b > vb.y - space * 5 && e.y < vb.y + vb.h && e.y < top) top = Math.max(e.y, vb.y - space * 5);
-          // A bow mark (down-bow, up-bow) or other mark drawn above the note: the ball stays above it too.
-          for (const m of marks) if (m.x < hb.x + hb.w + space * 0.5 && m.r > hb.x - space * 0.5 && m.b <= vb.y + space && m.y > vb.y - space * 8 && m.y < top + space * 0.5) top = Math.min(top, m.y + space * 0.5);
-          top -= space * (arrow ? 1.4 : 0.4);
+          let top = rest ? bb.visualBounds.y : hb.cy - hb.h / 2;
+          top -= space * (arrow ? 1.1 : 0.15);
           // Never up into the counts (or notes) of the part above: the ball sits in the room between, and bounces no higher.
           const ceil = roomAbove(bb.barBounds) + 2;
           top = Math.max(top, ceil + ballD(space));

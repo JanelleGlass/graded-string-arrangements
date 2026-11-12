@@ -345,8 +345,10 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
 - Metronome is one button that cycles Off → On → On with count-in → Count-in only.
   A count-in before a pickup counts the missing beats of its bar ("1 2 3 1 2" before a one-beat pickup in 3/4). The player only counts whole beats and starts the music straight after, so a pickup shorter than a beat (the Wellerman's eighth in 4/4) came in on the beat, with an empty beat before it, and every click while playing fell on an "&" (Janelle heard the gap, 2026-11-03). The reader now puts an unseen half beat of silence in front of such a pickup (a MusicXML forward in each part's first bar, `padPickup`), laid out with no room, so it counts "1 2 3 4 1 2 3", the gap is 4 and the pickup lands on its "&". The counts and the start ring skip the gap. A count-in started anywhere in the first bar counts from the top of it, like any other bar.
 - Bouncing ball (Janelle, 2026-11-05/06: for young students who can't read rhythms yet and don't know when the next
-  note comes): a small teal ball above each part's staff (one per part on the page), clear of the stems, beams and bow
-  marks, and never up into the counts of the part above (its bounces stay below them too). It bounces once on every
+  note comes): a small teal ball for each part on the page that lands right above each note head, following the shape
+  of the tune (Janelle, 2026-11-12: "follow the contour and bounce right above each note"; until then it landed clear
+  of the stems, beams and bow marks, so mostly at one height above the staff), a little higher over a high-finger
+  arrow, just above a rest, and never up into the counts of the part above (its bounces stay below them too). It bounces once on every
   count, landing as the count is heard (a ball reads as the beat, so landing early would teach clapping off the beat;
   the eye sees where it's going while it flies), and on every note as it starts: on a held note it travels forward a bounce at
   a time (a half note two bounces, a whole note four), each landing a share of the way to the next note in proportion
