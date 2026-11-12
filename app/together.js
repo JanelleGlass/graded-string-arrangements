@@ -31,8 +31,12 @@
   const AUTH_KEY = 'gsa-teacher';
   const BEAT_MS = 2000;       // a conducting teacher says so this often, so a student who arrives late finds her
   const HOST_GONE_MS = 7000;  // a teacher not heard from for this long has stopped conducting
+  // ...except on a device following her: a phone's connection (a hotspot, Janelle, 2026-11-12) can freeze for several
+  // seconds, and the music keeps going on its own meanwhile, so it holds on longer. A teacher who stops says so.
+  const FOLLOWED_GONE_MS = 25000;
 
-  const SITE_GONE_MS = 10000; // a following device stops following when the teacher hasn't been heard for this long
+  const SITE_GONE_MS = 10000; // the home page's Follow goes when the teacher hasn't been heard for this long,
+  const SITE_FOLLOWED_GONE_MS = 30000; // and a following device stops following after this long
   const FOLLOW_KEY = 'gsa-follow', CONDUCT_KEY = 'gsa-conduct'; // in this tab only (sessionStorage)
   const tab = {
     get(k) { try { return sessionStorage.getItem(k) === '1'; } catch { return false; } },
@@ -144,18 +148,24 @@
       fire();
     });
     gcTimer = setInterval(() => {
-      const old = [...hosts].filter(([, t]) => Date.now() - t > HOST_GONE_MS).map(([p]) => p);
+      const gone = mine.following ? FOLLOWED_GONE_MS : HOST_GONE_MS;
+      const old = [...hosts].filter(([, t]) => Date.now() - t > gone).map(([p]) => p);
       if (old.length) { old.forEach((p) => hosts.delete(p)); fire(); }
     }, 1000);
 
+    let joined = false;
     const joinOk = (ch) => new Promise((resolve, reject) => {
       ch.subscribe((status) => {
+        // Joined again after the connection dropped: the server has forgotten who this device is (supabase-js doesn't
+        // say it again by itself), so say it again.
+        if (status === 'SUBSCRIBED' && ch === inn && joined && !closed) { tracked = null; track().catch(() => {}); }
         if (status === 'SUBSCRIBED') { resolve(); connected(); }
         else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') { reject(new Error(status)); connected(); }
         else if (status === 'CLOSED') connected();
       });
     });
     await Promise.all([joinOk(main), joinOk(inn)]);
+    joined = true;
 
     function track() {
       const want = JSON.stringify({ following: !!mine.following, lead: !!lead });
@@ -248,7 +258,7 @@
     clearInterval(siteTimer);
     siteTimer = setInterval(() => {
       sayHere();
-      if (siteHost && Date.now() - siteSeen > SITE_GONE_MS) {
+      if (siteHost && Date.now() - siteSeen > (tab.get(FOLLOW_KEY) ? SITE_FOLLOWED_GONE_MS : SITE_GONE_MS)) {
         siteHost = null;
         tab.set(FOLLOW_KEY, false);
         siteChanged();
