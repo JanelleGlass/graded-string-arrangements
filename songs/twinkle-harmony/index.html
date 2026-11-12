@@ -544,6 +544,15 @@ body.following .host-only { display: none !important; }
   .fab-row { gap: 5px 6px; }
   .fab-btn.cyc { gap: 4px; padding: 0 7px; }
   .cyc-badge.looks > span { gap: 4px; }
+  /* The long labels take two short lines ("Note names / and fingers"), so the strip stays one row on an iPhone SE, and on
+     a bigger iPhone with the teacher's Conduct button too (Janelle saw two rows, 2026-11-12; the ball's button had
+     tipped it over). Same words, every phone the same. */
+  .cyc-badge.stack { align-items: center; }
+  .cyc-badge.stack > span, #g-look .word, #togetherLbl { white-space: normal; line-height: 1.08; text-wrap: balance; }
+  #g-look .word { max-width: 6.6em; }
+  #g-metro .cyc-badge > span { max-width: 4.6em; text-wrap: wrap; text-align: left; } /* "Count-in / only", not "Count- / in only" */
+  #g-count .cyc-badge > span { max-width: 4.2em; text-align: center; }
+  #togetherLbl { max-width: 5.6em; text-align: center; }
   html.small #g-together:not(.on):not(.offer) .fab-lbl { display: none; }
   .fab-set { gap: 5px; }
   .fab-btn, .play { height: 38px; }
