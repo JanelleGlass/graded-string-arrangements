@@ -272,7 +272,9 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   the key signature; when the key changes, the pinned key changes as the new key reaches the edge.
   It is a copy of the start as drawn, so at the start it sits exactly on it. When it is wider than
   half the screen (big music), the playing note sits just past it instead (Janelle, 2026-10-17).
-- Pages: every line of music names its parts beside the staves, not just the first line (2026-10-17).
+- Pages: every line of music names its parts beside the staves, not just the first line (2026-10-17). While playing,
+  the page glides to each new line in about 1.8 seconds (up to 3 for a longer way), easing in and out with
+  smootherstep, so it starts and ends almost imperceptibly (`glidePage`; Janelle, 2026-11-12: the browser's own smooth scroll was fast and jumpy, then a second, and 1.3, were a little fast); a scroll of the reader's own stops it.
 - Every setting is always visible in a strip at the bottom, on phones too, never covering notes.
   Phone-landscape buttons are compact so the strip fits one row on regular iPhones. Sideways on a phone the long
   labels take two short lines ("Note names / and fingers", "Count-in / only", "Counting: / On"), so it fits on an
@@ -424,8 +426,11 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
 - Metronome is one button that cycles Off → On → On with count-in → Count-in only.
   A count-in before a pickup counts the missing beats of its bar ("1 2 3 1 2" before a one-beat pickup in 3/4). The player only counts whole beats and starts the music straight after, so a pickup shorter than a beat (the Wellerman's eighth in 4/4) came in on the beat, with an empty beat before it, and every click while playing fell on an "&" (Janelle heard the gap, 2026-11-03). The reader now puts an unseen half beat of silence in front of such a pickup (a MusicXML forward in each part's first bar, `padPickup`), laid out with no room, so it counts "1 2 3 4 1 2 3", the gap is 4 and the pickup lands on its "&". The counts and the start ring skip the gap. A count-in started anywhere in the first bar counts from the top of it, like any other bar.
 - Bouncing ball (Janelle, 2026-11-05/06: for young students who can't read rhythms yet and don't know when the next
-  note comes): a small teal ball above each part's staff (one per part on the page), clear of the stems, beams and bow
-  marks, and never up into the counts of the part above (its bounces stay below them too). It bounces once on every
+  note comes): a small teal ball for each part on the page that lands right above each note head, following the shape
+  of the tune (Janelle, 2026-11-12: "follow the contour and bounce right above each note"; until then it landed clear
+  of the stems, beams and bow marks, so mostly at one height above the staff), a little higher over a high-finger
+  arrow, just above a rest, with air between the note and the ball (0.8 of a staff space; Janelle asked for a little,
+  then twice that, 2026-11-12), and never up into the counts of the part above (its bounces stay below them too). It bounces once on every
   count, landing as the count is heard (a ball reads as the beat, so landing early would teach clapping off the beat;
   the eye sees where it's going while it flies), and on every note as it starts: on a held note it travels forward a bounce at
   a time (a half note two bounces, a whole note four), each landing a share of the way to the next note in proportion
@@ -436,7 +441,8 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   or late, and each one jolted the ball, which Janelle saw as flashes): it runs on at the tempo, eases toward the
   reported place and never moves backwards, except for a real jump (a loop going round, a tap on another note). Room
   for the bounces (Janelle, 2026-11-10: three bounces on a dotted quarter in 6/8 looked like the third went to the next
-  note): in one long line, after drawing, a note the ball bounces along gets at least about three ball widths per bounce;
+  note): in one long line, after drawing, a note the ball bounces along gets at least about 2.7 ball widths per bounce (three, 2026-11-10 to 12, was a little too
+  wide with the even spacing, 2.5 a tiny bit too narrow);
   a bar where one doesn't is drawn again just wide enough (alphaTab's `displayWidth`, which the horizontal layout
   honours; the extra goes most to the long notes), at most three times, and measured afresh whenever the layout changes
   (`bounceRoom`). That second drawing waits until alphaTab has put every piece of the first on the page
@@ -465,7 +471,10 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   about 1.85 quarters) and has no setting for it, so the reader replaces that one method on alphaTab's bar-spacing
   object (`evenSpacing`): found after the first drawing by searching from `api.renderer` for an object with a
   `layoutingInfo` whose prototype has a method (not the constructor) containing `.85*Math.log2`, since the .min.js
-  shortens the name; then drawn again. A quarter note keeps the room it had; alphaTab still keeps every note clear of
+  shortens the name; then drawn again. Every note gets more than that, the proportions unchanged (`evenRoom`): 1.35 times
+  with finger numbers beside the notes, so the next note's number clears a short note's flag, else 1.2 (Janelle,
+  2026-11-12: a number sat against an eighth note's flag in The Butterfly; 1.3 everywhere was then a little too wide,
+  1.25 / 1.1 a tiny bit too narrow); alphaTab still keeps every note clear of
   the next. If alphaTab changes and the method isn't found, the music is simply spaced as before.
   Big beats when fast (Janelle, 2026-11-10): when the counts come faster than 150 a minute at the speed being played
   (back below 130), the ball bounces only on the big beats, skimming over the notes between: a dotted quarter in 6/8,

@@ -3517,19 +3517,6 @@ body.following .host-only { display: none !important; }
     pointLayer.replaceChildren(); pointRuns = [];
     if (!state.pointer || !api || !api.boundsLookup || !score || onPaper()) return;
     const lookup = api.boundsLookup, counts = countTicks();
-    if (!ink) ink = collectInk();
-    // Bow marks and articulations are font glyphs (SMuFL), not lines, so they aren't in the ink.
-    const marks = [], surf = $('sheet').querySelector('.at-surface'), base = surf && surf.getBoundingClientRect();
-    if (surf) surf.querySelectorAll('svg text').forEach((t) => {
-      const c = (t.textContent || '').codePointAt(0);
-      if (!((c >= 0xE4A0 && c <= 0xE4BF) || (c >= 0xE610 && c <= 0xE62F))) return;
-      // Their text box is far taller than the ink: measure the glyph from its baseline (as for the dynamics).
-      try {
-        const m = t.getScreenCTM(), p = t.getStartPositionOfChar(0), px = parseFloat(getComputedStyle(t).fontSize) * (m ? m.d : 1);
-        const r = t.getBoundingClientRect(), y = m.b * p.x + m.d * p.y + m.f - base.top, ext = dynExtent(t, px);
-        if (r.width) marks.push({ x: r.left - base.left, r: r.right - base.left, y: y - ext.up, b: y + ext.down });
-      } catch {}
-    });
     for (const ti of shownIndexes()) {
       const stops = [];
       score.masterBars.forEach((mb, bi) => {
@@ -3545,14 +3532,12 @@ body.following .host-only { display: none !important; }
           if (last && Math.abs(last.end - tick) < 2 && ((tied && !last.rest) || (rest && last.rest))) { last.end = end; continue; }
           const hb = headBox(beat, bb), vb = bb.barBounds.visualBounds, space = vb.h / 4;
           const sys = bb.barBounds.masterBarBounds.staffSystemBounds, sv = sys ? sys.visualBounds : vb;
-          // Just above the staff, or above a high note; a little higher over a high-finger arrow drawn above the head.
+          // Right above the note head, so the ball follows the shape of the tune (Janelle, 2026-11-12: "follow the contour
+          // and bounce right above each note"; it used to clear the stem, beam and bow marks too, which kept it high).
+          // A little higher over a high-finger arrow drawn above the head. A rest: just above the rest.
           const arrow = !rest && beat.notes.some(n => (n.finger || '').includes('↑'));
-          let top = Math.min(vb.y, rest ? vb.y : hb.cy - hb.h / 2);
-          // Clear the note's stem and beam too (a short line, not a slur or the staff lines), no higher than 5 spaces.
-          if (!rest) for (const e of ink) if (e.x < hb.x + hb.w + space && e.r > hb.x - space * 0.2 && e.r - e.x < space * 6 && e.b > vb.y - space * 5 && e.y < vb.y + vb.h && e.y < top) top = Math.max(e.y, vb.y - space * 5);
-          // A bow mark (down-bow, up-bow) or other mark drawn above the note: the ball stays above it too.
-          for (const m of marks) if (m.x < hb.x + hb.w + space * 0.5 && m.r > hb.x - space * 0.5 && m.b <= vb.y + space && m.y > vb.y - space * 8 && m.y < top + space * 0.5) top = Math.min(top, m.y + space * 0.5);
-          top -= space * (arrow ? 1.4 : 0.4);
+          let top = rest ? bb.visualBounds.y : hb.cy - hb.h / 2;
+          top -= space * (arrow ? 1.7 : 0.8); // air between the note and the ball (Janelle, 2026-11-12: 0.4, then twice that)
           // Never up into the counts (or notes) of the part above: the ball sits in the room between, and bounces no higher.
           const ceil = roomAbove(bb.barBounds) + 2;
           top = Math.max(top, ceil + ballD(space));
@@ -3623,6 +3608,10 @@ body.following .host-only { display: none !important; }
   // method's name, so the method is found by its formula, on the bar-spacing object of the first drawing; the music
   // is then drawn again. Not on paper.
   let evenSpacing = null; // { proto, name, orig } once found
+  // How much wider than alphaTab's quarter: with finger numbers beside the notes, room for the next note's number after a
+  // short note's flag; otherwise a little (Janelle, 2026-11-12: 1.3 everywhere was a little too wide; at 1.15 a number
+  // beside the next note touched an eighth note's flag).
+  const evenRoom = () => (state.fingerMode !== 'off' && fingerSpot() === 'left' ? 1.35 : 1.2); // then a tiny bit wider (2026-11-12)
   const evenSpacingOn = () => state.pointer && !onPaper();
   function findSpringFormula(root) {
     const seen = new Set(), queue = [[root, 0]];
@@ -3660,7 +3649,9 @@ body.following .host-only { display: none !important; }
       const k = orig.call(this, spring, duration, minDuration);
       if (!evenSpacingOn() || !(duration > 0) || !(minDuration > 0)) return k;
       const give = 1 + 0.85 * Math.log2(duration / minDuration), quarter = 1 + 0.85 * Math.log2(960 / minDuration);
-      return k * give / Math.max(0.05, quarter * duration / 960);
+      // evenRoom(): every note a little wider than alphaTab's quarter, so a short note has room for the next note's
+      // finger number after its flag (Janelle, 2026-11-12: the eighths in The Butterfly were tight).
+      return k * give / Math.max(0.05, evenRoom() * quarter * duration / 960);
     };
     evenSpacing = found;
     return true;
@@ -3690,8 +3681,9 @@ body.following .host-only { display: none !important; }
     if (bounceRoom.tries >= 3) return false;
     const scale = api.settings.display.scale, need = new Map();
     for (const run of pointRuns) {
-      // About three ball widths for each bounce (Janelle, 2026-11-10: two weren't enough to see the bounces apart).
-      const s = run.stops, hop = ballD(s[0].space) * 3;
+      // About two and a half ball widths for each bounce (Janelle, 2026-11-10: two weren't enough to see the bounces
+      // apart; 2026-11-12: three, with the even spacing, a little too wide).
+      const s = run.stops, hop = ballD(s[0].space) * 2.7; // then a tiny bit wider (2026-11-12)
       for (let k = 0; k + 1 < s.length; k++) {
         const cur = s[k], nxt = s[k + 1], flights = cur.lands.length;
         if (flights < 2 || nxt.sys !== cur.sys) continue;
@@ -4497,6 +4489,25 @@ body.following .host-only { display: none !important; }
     sheet.scrollLeft = Math.max(0, surfLeft() + xAt(L.disp) - W + ease());
     lineRaf = requestAnimationFrame(lineFollow);
   }
+  // Pages, while playing: a slow, soft glide to the next line down (Janelle, 2026-11-12: the browser's own smooth scroll
+  // was fast and jumpy, and the eye got lost). About a second, longer for a longer way, easing in and out. A scroll of
+  // the reader's own (wheel, finger, keys) stops it.
+  let pageGlide = 0;
+  function glidePage(to) {
+    cancelAnimationFrame(pageGlide); pageGlide = 0;
+    const from = window.scrollY, d = to - from;
+    if (reduceMotion || Math.abs(d) < 2) { window.scrollTo(0, to); return; }
+    const ms = Math.min(3000, 1800 + Math.abs(d) * 1.4), t0 = performance.now(); // slower again, twice (2026-11-12)
+    const step = (now) => {
+      // Smootherstep: starts and ends with no speed and no push, so the first moment of movement is barely noticeable
+      // (Janelle, 2026-11-12: "start almost imperceptibly, gradually faster, then gradually slower").
+      const x = Math.min(1, (now - t0) / ms), e = x * x * x * (x * (x * 6 - 15) + 10);
+      window.scrollTo(0, from + d * e);
+      pageGlide = x < 1 ? requestAnimationFrame(step) : 0;
+    };
+    pageGlide = requestAnimationFrame(step);
+  }
+  for (const ev of ['wheel', 'touchstart', 'keydown']) window.addEventListener(ev, () => { if (pageGlide) { cancelAnimationFrame(pageGlide); pageGlide = 0; } }, { passive: true });
   const scroller = {
     forceScrollTo() {},
     onBeatCursorUpdating(bb, nextBb, mode, startX, endX, duration) {
@@ -4511,7 +4522,7 @@ body.following .host-only { display: none !important; }
       if (key === lastScrollKey) return;
       lastScrollKey = key;
       const top = sheet.getBoundingClientRect().top + window.scrollY + (sys ? sys.realBounds.y : mbb.realBounds.y) - 110;
-      window.scrollTo({ top: Math.max(0, top), behavior: reduceMotion ? 'auto' : 'smooth' });
+      glidePage(Math.max(0, top));
     },
     [Symbol.dispose]() {},
   };
