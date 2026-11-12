@@ -2070,7 +2070,7 @@ body.following .host-only { display: none !important; }
   const LOOP_GLIDE_MS = 450;       // how long the slide back to the loop's first note takes
   const conductor = { room: null, me: null, hosting: false, following: false, hostPeer: null, offset: 0, bestRtt: Infinity, pongs: 0, synced: false,
     pings: new Map(), last: null, seq: 0, timers: [], posTimer: 0, pingTimer: 0, followers: 0, volume: 1, errs: [], startedAt: 0, lastFix: 0,
-    sentVer: 0, seenVer: -1, startingUntil: 0, quiet: 0, waiting: false };
+    sentVer: 0, seenVer: -1, startingUntil: 0, quiet: 0, waiting: false, odd: 0 };
   const clock = () => performance.now();
   // The written tempo (quarter notes a minute) at a tick: the last tempo mark at or before it.
   function tempoAtTick(tick) {
@@ -2160,7 +2160,14 @@ body.following .host-only { display: none !important; }
       if (typeof cmd.ver === 'number') conductor.seenVer = cmd.ver;
       // Stopped by the conductor: not round the loop by itself either.
       if (loopGap && (cmd.type === 'pause' || cmd.type === 'stop' || (cmd.type === 'seek' && !cmd.playing))) { clearTimeout(loopGap); loopGap = 0; setPlaying(playing); }
-    } else if (cmd.st && typeof cmd.ver === 'number' && cmd.ver !== conductor.seenVer) { catchUp(cmd); return; }
+    } else if (cmd.st && typeof cmd.ver === 'number') {
+      if (cmd.ver !== conductor.seenVer) { catchUp(cmd); return; }
+      // No command missed, yet the host's music moves and this one doesn't, or the other way round (a start that
+      // never happened): two reports in a row like that, and it catches up all the same.
+      const odd = cmd.st === 'moving' ? !playing && !counting && !loopGap && !conductor.waiting : playing;
+      conductor.odd = odd ? conductor.odd + 1 : 0;
+      if (conductor.odd >= 2) { conductor.odd = 0; catchUp(cmd); return; }
+    }
     if (cmd.type === 'tempo' || cmd.type === 'play') {
       playSpeed(cmd.speed);
       state.tempo = Math.round(cmd.speed * SPEED_BASE);

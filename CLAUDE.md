@@ -58,7 +58,11 @@ In a Claude cloud session the network may block cdn.jsdelivr.net (2026-11-02): t
 loads (TimeoutError)", the reader never having got alphaTab. Fetch the same file from npm and point the test at it:
 `npm pack @coderline/alphatab@1.8.4` in the scratchpad, untar `package/dist/alphaTab.min.js`, and run the test with
 `ALPHATAB_JS=<that path>`. Python's Playwright there must match the browser already installed (`pip install
-playwright==` the version `node -e "console.log(require('playwright/package.json').version)"` prints).
+playwright==` the version `node -e "console.log(require('playwright/package.json').version)"` prints). The Play
+together library (supabase-js, also from jsdelivr) can't load there either, and the piano check counts the failed
+download as a script error ("silent-night: no script errors: ... ERR_TUNNEL_CONNECTION_FAILED", twice; 2026-11-12):
+that is the session's network, not the site. Play together on a slow or patchy connection: `node tests/together_sim.js`
+(see "Play together on the website").
 
 The test needs Playwright once per computer: `python -m pip install playwright` then
 `python -m playwright install chromium`. To look at a page yourself: `python -m http.server 8000`
