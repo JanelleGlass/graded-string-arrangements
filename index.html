@@ -85,6 +85,9 @@ footer p { margin: 0 0 6px; }
 @media (max-width: 560px) { .wrap { padding: 32px 18px 44px; gap: 32px; } .lede { font-size: 1.02rem; } 
   .tabs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; margin-bottom: -8px; }
   .tabs button { padding: 8px 6px; font-size: 0.9rem; } }
+/* Four tabs (All songs and three sections): two to a row where three to a row would leave the last one alone.
+   Four fit in one row from about 440 px. */
+@media (max-width: 459px) { .tabs:has(> button:nth-child(4):last-child) { grid-template-columns: 1fr 1fr; } }
 </style>
 </head>
 <body>
@@ -101,7 +104,6 @@ footer p { margin: 0 0 6px; }
     <button type="button" data-section="all" aria-pressed="true">All songs</button>
     <button type="button" data-section="christmas" aria-pressed="false">Christmas</button>
     <button type="button" data-section="hymns" aria-pressed="false">Hymns</button>
-    <button type="button" data-section="solos" aria-pressed="false">Solos</button>
     <button type="button" data-section="other" aria-pressed="false">Other</button>
   </div>
 
@@ -157,24 +159,6 @@ footer p { margin: 0 0 6px; }
       <a class="song" href="songs/morning-has-broken/">
         <h3>Morning Has Broken</h3>
         <p>Bunessan, traditional Gaelic melody · D major · 3/4</p>
-        <span class="go">Open and play along →</span>
-      </a>
-    </div>
-  </section>
-
-  <section data-section="solos" aria-labelledby="h-solos">
-    <h2 id="h-solos">Solos</h2>
-    <div class="songs">
-      <a class="song" href="songs/morning-has-broken-solo-viola/">
-        <span class="eyebrow">Hymn</span>
-        <h3>Morning Has Broken — Solo Viola Variations</h3>
-        <p>Bunessan, traditional Gaelic melody · D major · 3/4</p>
-        <span class="go">Open and play along →</span>
-      </a>
-      <a class="song" href="songs/morning-has-broken-solo-viola-modulating/">
-        <span class="eyebrow">Hymn</span>
-        <h3>Morning Has Broken — Modulating Solo Viola Variations</h3>
-        <p>Bunessan, traditional Gaelic melody · D major, C major · 3/4</p>
         <span class="go">Open and play along →</span>
       </a>
     </div>
