@@ -65,7 +65,7 @@ What it checks
      alto clef with the viola's strings, kept after a reload; another book page starting with its own look again.
      (The generator's music rules are checked by tests/sight_reading.py.)
      Look ahead (laptop in one long line and on pages, phone): turning it on brings a count-in and the page's tempo;
-     at ½ beat, 1 beat, 2 beats and 1 bar, at 60 and 120, while it plays, every note due within that time of what is
+     at its three levels (½ beat, 1 beat, 1 bar), at 60 and 120, while it plays, every note due within that time of what is
      heard is covered and no other is (checked against each note's place on the screen, during a count-in too), the
      staff lines and bar lines are drawn over the cover, and every note comes back when the music stops.
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
@@ -880,8 +880,9 @@ LOOK_JS = """() => { const l = reader.look(); if (!l || l.t == null) return null
   }
   return { H: l.H, t: l.t, at: reader.at(), beats: out, lines: document.querySelectorAll('.look-layer g > rect').length - l.bands.length,
            cuts: l.bands.map(b => b.cut - b.left), counting: !document.getElementById('count').hidden }; }"""
-AHEAD_TICKS = {'½ beat': 480, '1 beat': 960, '2 beats': 1920, '1 bar': 3840}  # in 4/4
-AHEAD_SAY = {'½ beat': 'half a beat', '1 beat': 'one beat', '2 beats': 'two beats', '1 bar': 'a bar'}  # its button's label
+AHEAD_TICKS = {'Level 1': 480, 'Level 2': 960, 'Level 3': 3840}  # half a beat, a beat and a bar, in 4/4
+AHEAD_SAY = {'Level 1': 'level 1: each note vanishes half a beat', 'Level 2': 'level 2: each note vanishes one beat',
+             'Level 3': 'level 3: each note vanishes a bar'}  # its button's label
 
 
 async def look_ahead_checks(browser, base):
@@ -903,11 +904,11 @@ async def look_ahead_checks(browser, base):
         await pg.evaluate("() => { const t = document.getElementById('tempo'); t.value = 90; t.dispatchEvent(new Event('input')); }")
         await pg.click('#g-ahead')
         got = await pg.evaluate("() => ({ label: document.getElementById('g-ahead').getAttribute('aria-label'), metro: document.querySelector('#g-metro .now').textContent, tempo: document.getElementById('tempoChip').textContent })")
-        ck('half a beat' in got['label'] and got['metro'] == 'Count-in only' and got['tempo'] == '60',
+        ck('level 1: each note vanishes half a beat' in got['label'] and got['metro'] == 'Count-in only' and got['tempo'] == '60',
            f"turning Look ahead on brings a count-in and the page's tempo ({got})")
         problems, samples = [], 0
-        for setting in ['½ beat', '1 beat', '2 beats', '1 bar']:
-            while f'vanishes {AHEAD_SAY[setting]} ' not in await pg.get_attribute('#g-ahead', 'aria-label'):
+        for setting in ['Level 1', 'Level 2', 'Level 3']:
+            while AHEAD_SAY[setting] + ' ' not in await pg.get_attribute('#g-ahead', 'aria-label'):
                 await pg.click('#g-ahead')
             for tempo in (60, 120):
                 await pg.evaluate("(v) => { const t = document.getElementById('tempo'); t.value = v; t.dispatchEvent(new Event('input')); }", tempo)
@@ -940,7 +941,7 @@ async def look_ahead_checks(browser, base):
                 back = await pg.evaluate('() => reader.look().bands.every(b => b.cut === b.left)')
                 if not back:
                     problems.append(f'{setting} at {tempo}: the notes did not come back when the music stopped')
-        ck(not problems and samples >= 24, f'at ½ beat, 1 beat, 2 beats and 1 bar, at 60 and 120, the right notes vanish while it plays, and come back when it stops ({samples} checks{": " + "; ".join(problems[:4]) if problems else ""})')
+        ck(not problems and samples >= 18, f'at levels 1, 2 and 3 (½ beat, 1 beat, 1 bar), at 60 and 120, the right notes vanish while it plays, and come back when it stops ({samples} checks{": " + "; ".join(problems[:4]) if problems else ""})')
         ck(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
         await ctx.close()
 

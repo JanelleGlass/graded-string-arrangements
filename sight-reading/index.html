@@ -848,13 +848,14 @@ body.following .host-only { display: none !important; }
     { id: 'first', label: 'First time only' },
     { id: 'off', label: 'Off' },
   ];
-  // Look ahead: how long before it sounds a note vanishes, in beats (a dotted quarter in 6/8), or a bar.
+  // Look ahead: three levels, by how long before it sounds a note vanishes, in beats (a dotted quarter in 6/8) or a bar
+  // (Janelle, 2026-11-12: three levels, named Level 1 to 3, of half a beat, a beat and a bar; it began with ½, 1 and 2
+  // beats and a bar, named by the amount).
   const AHEAD = [
     { id: 'off', badge: 'Off', short: 'Off' },
-    { id: 'half', badge: '½ beat', short: '½', beats: 0.5, say: 'half a beat' },
-    { id: 'beat', badge: '1 beat', short: '1', beats: 1, say: 'one beat' },
-    { id: 'two', badge: '2 beats', short: '2', beats: 2, say: 'two beats' },
-    { id: 'bar', badge: '1 bar', short: 'Bar', bar: true, say: 'a bar' },
+    { id: 'half', badge: 'Level 1', short: '1', beats: 0.5, say: 'half a beat', level: 1 },
+    { id: 'beat', badge: 'Level 2', short: '2', beats: 1, say: 'one beat', level: 2 },
+    { id: 'bar', badge: 'Level 3', short: '3', bar: true, say: 'a bar', level: 3 },
   ];
   const FOLLOW = [
     { id: 'pulse', label: 'Pulsing notes' },
@@ -950,7 +951,7 @@ body.following .host-only { display: none !important; }
     // Bigger or smaller music (the − and + in the corner): a step on ZOOMS.
     zoom: ZOOMS.includes(saved.zoom) ? saved.zoom : 1,
     // Look ahead (the sight-reading page only): off, or how far ahead of the music the notes vanish.
-    ahead: LOOK_AHEAD && AHEAD.some(a => a.id === saved.ahead) ? saved.ahead : 'off',
+    ahead: !LOOK_AHEAD ? 'off' : saved.ahead === 'two' ? 'beat' : AHEAD.some(a => a.id === saved.ahead) ? saved.ahead : 'off', // 2 beats is gone
   };
   // Phones (upright or on their side): one long line.
   const smallMQ = window.matchMedia('(max-width: 600px) and (orientation: portrait), (max-height: 500px) and (orientation: landscape)');
@@ -1118,11 +1119,11 @@ body.following .host-only { display: none !important; }
     $('g-point').setAttribute('aria-pressed', String(pOn));
     $('g-point').setAttribute('aria-label', 'Bouncing ball (it bounces on each count, from note to note): ' + (pOn ? 'on' : 'off') + '. Tap to change.');
     const ah = AHEAD.find(a => a.id === state.ahead);
-    // An eye looking ahead, then "Look ahead" over the amount; phones (no room on an iPhone SE turned sideways) show
-    // just the amount ("½", "1", "Bar"), and a tap says it in words.
+    // An eye looking ahead, then "Look ahead" over the level; phones (no room on an iPhone SE turned sideways) show
+    // just the level ("1", "2", "3"), and a tap says how far ahead in words.
     $('g-ahead').innerHTML = aheadIco(!!ah.say) + '<span class="ah-long">' + stackBadge(AHEAD.map(a => 'Look ahead<br>' + a.badge), 'Look ahead<br>' + ah.badge) + '</span>'
       + '<span class="ah-short">' + stackBadge(AHEAD.map(a => a.short), ah.short) + '</span>';
-    $('g-ahead').setAttribute('aria-label', (ah.say ? 'Look ahead: each note vanishes ' + ah.say + ' before it is played' : 'Look ahead: off') + '. Tap to change.');
+    $('g-ahead').setAttribute('aria-label', (ah.say ? 'Look ahead, level ' + ah.level + ': each note vanishes ' + ah.say + ' before it is played' : 'Look ahead: off') + '. Tap to change.');
     $('g-ahead').classList.toggle('on', !!ah.say);
     // Look ahead with the ball off: the cursor shows where the hands are, over the vanished notes.
     $('sheet').classList.toggle('look-cursor', !!ah.say && !state.pointer);
@@ -1185,7 +1186,7 @@ body.following .host-only { display: none !important; }
     }
     save(); renderCycles();
     if (!ah.say) clearLook();
-    toast(ah.say ? 'Look ahead: each note vanishes ' + ah.say + ' before you play it' + also : 'Look ahead off', ah.say ? 2800 : 1700);
+    toast(ah.say ? 'Look ahead, level ' + ah.level + ': each note vanishes ' + ah.say + ' before you play it' + also : 'Look ahead off', ah.say ? 2800 : 1700);
   });
   // ---- Parts: what is on the page, and what plays ----
   // A level (or a level and voice) on each row, with an eye and a speaker for each instrument: every part is on the

@@ -212,8 +212,9 @@ flash a bar, the mic listening, duets, book codes) is in Janelle's brief, which 
   outside the chord may now skip a third on the far side, and the chords are copied only with the notes.
 - Look ahead (round 2, 2026-11-12, on the same pull request as round 1 at Janelle's request; she will put both live
   together): "the eyes are the headlights; the hands are the car". A button in the strip, after the ball, steps Off →
-  ½ beat → 1 beat → 2 beats → 1 bar (a beat is a dotted quarter in 6/8). While the music plays, each note vanishes that
-  long before it sounds, with everything on it (head, stem, its part of a beam, finger number, note name, its counts);
+  Level 1 (½ beat) → Level 2 (1 beat) → Level 3 (1 bar); a beat is a dotted quarter in 6/8 (Janelle, 2026-11-12: "three
+  levels instead"; it began as Off, ½ beat, 1 beat, 2 beats, 1 bar, named by the amount, and a saved "2 beats" becomes
+  Level 2). While the music plays, each note vanishes that long before it sounds, with everything on it (head, stem, its part of a beam, finger number, note name, its counts);
   the staff lines, bar lines, clef and key stay, and the ball (or, with the ball off, the cursor) always shows where the
   hands are. Timed to what is heard (`heardTick`: the picture's clock that waits for the speaker, and during a count-in
   the clicks as they are heard). The notes come back when the music stops. Turning it on brings a count-in (Count-in
@@ -222,13 +223,14 @@ flash a bar, the mic listening, duets, book codes) is in Janelle's brief, which 
   number to its left) after a drawing, and `updateLook` grows a paper-coloured cover per line of music and part
   (`.look-layer`, between the counts and the ball) up to the first note not yet due, with copies of the staff lines and
   bar lines on top. Only the sight-reading page has it: `LOOK_AHEAD` in the reader is false, and the build turns it on
-  there. Its button: "Look ahead" over the amount in words on bigger screens; on phones an eye looking right and just the
-  amount ("½", "1", "2", "Bar"), since on an iPhone SE turned sideways the strip had no more room (it stays one row
-  there, and at 1024 wide); a tap's toast says it in words. Round 5's duets will cover only the student's own part.
+  there. Its button: "Look ahead" over "Level 1" on bigger screens; on phones an eye looking right and just the level
+  ("1", "2", "3"), since on an iPhone SE turned sideways the strip had no more room (it stays one row there, and at 1024
+  wide); a tap's toast says the level and how far ahead in words ("Look ahead, level 2: each note vanishes one beat before
+  you play it"). Round 5's duets will cover only the student's own part.
 - Tests: `tests/sight_reading.py` reads 1,000 exercises per page and instrument back from their MusicXML (plus a few
   made-up pages that try eighths, 2/4 and 3/4, longer exercises, low 2, few and free crossings, a viola page of its own)
   and checks them apart from the generator's own code. `tests/smoke.py` checks the page itself at laptop, phone and
-  iPhone SE sizes, and offline, and Look ahead at every setting at 60 and 120 (in one long line and on pages, laptop and
+  iPhone SE sizes, and offline, and Look ahead at every level at 60 and 120 (in one long line and on pages, laptop and
   phone): while it plays, every note due within that time of what is heard is covered on the screen and no other is.
 
 ## The app version (home screen, offline)
