@@ -376,12 +376,16 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   of the tune (Janelle, 2026-11-12: "follow the contour and bounce right above each note"; until then it landed clear
   of the stems, beams and bow marks, so mostly at one height above the staff), a little higher over a high-finger
   arrow, just above a rest, with air between the note and the ball (0.8 of a staff space; Janelle asked for a little,
-  then twice that, 2026-11-12), and never up into the counts of the part above (its bounces stay below them too). It bounces once on every
-  count, landing as the count is heard (a ball reads as the beat, so landing early would teach clapping off the beat;
-  the eye sees where it's going while it flies), and on every note as it starts: on a held note it travels forward a bounce at
-  a time (a half note two bounces, a whole note four), each landing a share of the way to the next note in proportion
-  to the time (Janelle, 2026-11-06: it bounced in place before), then lands on the next note, higher for a longer flight. Tied notes are one
-  note. Over a rest it is a hollow ring; rests in a row are one. Stopped, it sits on the note Play starts from; a loop's
+  then twice that, 2026-11-12), and never up into the counts of the part above (its bounces stay below them too). It
+  follows the beat or the rhythm (Janelle, 2026-11-12: "follow the beat or the rhythm or off? a toggle"; until then it
+  did both, landing on every count and on every note). The beat: it lands on every count as it is heard (a ball reads
+  as the beat, so landing early would teach clapping off the beat; the eye sees where it's going while it flies),
+  steady, skimming over the notes between counts (two eighths get one bounce); on a held note it travels forward a
+  bounce at a time (a half note two bounces, a whole note four), each landing a share of the way to the next note in
+  proportion to the time (Janelle, 2026-11-06: it bounced in place before), and a count that falls between two notes
+  lands a share of the way between them the same way. The rhythm: it lands on every note as it starts, and over a
+  held note it makes one long flight to the next, higher for a longer flight (a half note one bounce, two eighths two).
+  Both start on the first note (a pickup too). Tied notes are one note. Over a rest it is a hollow ring; rests in a row are one. Stopped, it sits on the note Play starts from; a loop's
   last flight goes back to its first note; to the next line on pages, it flies off the end of the line and drops onto
   the next. It keeps time with the speaker, on a smoothed clock (2026-11-10: the player's reports come a little early
   or late, and each one jolted the ball, which Janelle saw as flashes): it runs on at the tempo, eases toward the
@@ -406,9 +410,14 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   ball went back to its resting place on the first note (the "shadow") and the lit note went dark, for one frame. That
   check now uses its own time, set once on Play (`heardAt`); a frame-by-frame trace shows no jumps.
   The room per bounce was raised from about two ball widths to three (Janelle: the first bars got no more room). Switching the ball off or on draws the music again, so the bars go back to their own width without
-  it. Pages lay out bars by alphaTab's rules (no `displayWidth`), so there the spacing is as always. On by default, saved. Its switch is a round button in the strip, after
-  Counting (a ball with a dotted arc; teal when on, grey and crossed out when off; a tap shows a toast), on every
-  screen. It sat at the top right, left of Print, until Janelle moved it down (2026-11-10), where Follow now sits.
+  it. Pages lay out bars by alphaTab's rules (no `displayWidth`), so there the spacing is as always. The rhythm needs no
+  widened bars (one bounce per note), so switching between the beat and the rhythm draws the music again too (the
+  setting is part of the `bounceRoom` key). On by default, on the beat, saved (`pointer`: 'beat', 'rhythm' or 'off';
+  'on', saved before 2026-11-12, is the beat). Its switch is a round button in the strip, after Counting, stepping
+  Beat → Rhythm → Off → Beat (the ball after its dotted bounces: two even ones for the beat, a long one and two short
+  ones for the rhythm, teal; grey and crossed out when off; a tap shows a toast, "Bouncing ball on the beat (a bounce
+  on every count)"), on every screen, icon only so the strip keeps its width. It sat at the top right, left of Print,
+  until Janelle moved it down (2026-11-10), where Follow now sits.
   Never printed.
   Even spacing (Janelle, 2026-11-10: "make the space between the notes equal to how many beats there are ... only when
   the bouncing ball is turned on"): with the ball on, the room after each note is in proportion to its length (a
@@ -423,10 +432,10 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   1.25 / 1.1 a tiny bit too narrow); alphaTab still keeps every note clear of
   the next. If alphaTab changes and the method isn't found, the music is simply spaced as before.
   Big beats when fast (Janelle, 2026-11-10): when the counts come faster than 150 a minute at the speed being played
-  (back below 130), the ball bounces only on the big beats, skimming over the notes between: a dotted quarter in 6/8,
+  (back below 130), the ball on the beat bounces only on the big beats, skimming over the notes between: a dotted quarter in 6/8,
   9/8 and 12/8, the whole bar in 3/4 and 2/4, a half note in 4/4 (`bigBeat`); other time signatures keep their counts.
   So each song switches at its own speed (The Butterfly at its written ♩=120 bounces on dotted quarters; slowed to 60,
-  on every eighth). Line changes on pages: it hops off the end of the line, then drops straight down onto the next
+  on every eighth). On the rhythm it keeps to every note at any speed (The Butterfly at ♩=120: every eighth). Line changes on pages: it hops off the end of the line, then drops straight down onto the next
   line's first note, faster as it falls, landing on the beat (she saw it float down from above).
   History: it began as a pointing finger (an open palm over rests) that hopped once per count and landed half a count
   before each note; Janelle found the hops too much, a smooth glide was tried, and she chose the ball (2026-11-06).
