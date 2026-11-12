@@ -1,0 +1,101 @@
+/* Flash a bar: one card for the music, three big buttons that never move, the streak and the level. Bright and simple,
+   for young students; the site's colors and lettering. Works on a phone either way round. */
+:root { --stand: #E6EAE8; --paper: #FFFFFF; --ink: #17201C; --muted: #55615B; --line: #CDD5D1; --teal: #1D5B72; --teal-dark: #174A5D;
+  --sun: #F0B000; --sun-soft: #FFF4D1; --font-display: "EB Garamond", "Iowan Old Style", Georgia, serif; --font-body: "Figtree", "Segoe UI", system-ui, -apple-system, sans-serif; }
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--stand); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.4; }
+button, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.fl-back { position: fixed; z-index: 10; left: calc(8px + env(safe-area-inset-left, 0px)); top: calc(8px + env(safe-area-inset-top, 0px)); display: inline-flex; align-items: center;
+  height: 30px; padding: 0 12px 0 10px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.96); color: var(--teal);
+  font-size: 0.86rem; font-weight: 700; text-decoration: none; box-shadow: 0 1px 2px rgba(20, 30, 26, 0.10), 0 4px 14px -6px rgba(20, 30, 26, 0.38); }
+.fl { min-height: 100%; max-width: 980px; margin: 0 auto; padding: calc(48px + env(safe-area-inset-top, 0px)) 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+.fl-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 18px; }
+.fl-top h1 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: clamp(1.8rem, 5vw, 2.6rem); line-height: 1; }
+.fl-choose { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.fl-choose select, .fl-inst { height: 38px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.96); box-shadow: 0 1px 2px rgba(20, 30, 26, 0.08); }
+.fl-choose select { max-width: 17rem; padding: 0 32px 0 14px; font-weight: 700; -webkit-appearance: none; appearance: none; text-overflow: ellipsis;
+  background: rgba(255, 255, 255, 0.96) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z' fill='%231D5B72'/%3E%3C/svg%3E") no-repeat right 8px center / 20px 20px; }
+.fl-inst { display: inline-flex; overflow: hidden; }
+.fl-inst button { border: 0; background: none; padding: 0 14px; font-weight: 700; }
+.fl-inst button + button { border-left: 1px solid #E1E6E4; }
+.fl-inst button[aria-pressed="true"] { background: var(--teal); color: #FFFFFF; }
+
+/* The card: the music in the middle; a cover hides it between looks, with what to do in big words and the beat */
+.fl-card { position: relative; flex: 1 1 auto; min-height: 210px; border-radius: 22px; background: var(--paper); box-shadow: 0 1px 2px rgba(20, 30, 26, 0.06), 0 14px 34px -18px rgba(20, 30, 26, 0.45); overflow: hidden; }
+.fl-music { position: absolute; inset: 0; }
+#score { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.fl-cover { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 12px; padding: 16px; text-align: center; background: var(--paper);
+  opacity: 0; pointer-events: none; transition: opacity 0.12s; }
+.fl-card.covered .fl-cover { opacity: 1; }
+.fl-say { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: clamp(1.5rem, 4.5vw, 2.4rem); line-height: 1.1; color: var(--teal); }
+.fl-beat { display: grid; place-items: center; width: 1.6em; height: 1.6em; border-radius: 50%; font-family: var(--font-display); font-weight: 600; font-variant-numeric: lining-nums; font-size: clamp(3.4rem, 12vw, 6rem); line-height: 1; }
+.fl-beat[hidden] { display: none; }
+.fl-beat.count { color: var(--teal); background: #E3EEF2; }
+.fl-beat.play { color: #3A2A00; background: var(--sun); box-shadow: 0 0 0 10px var(--sun-soft); }
+/* While the pattern shows, a bar along the bottom runs down */
+.fl-timer { position: absolute; left: 0; right: 0; bottom: 0; height: 8px; background: transparent; }
+.fl-timer span { display: block; height: 100%; background: var(--sun); transform-origin: 0 50%; transform: scaleX(0); transition-property: transform; transition-timing-function: linear; }
+.fl-timer:not(.run) span { visibility: hidden; }
+/* Checking: the pattern is back, with a soft ring round the card */
+.fl-card.check { box-shadow: 0 0 0 4px var(--sun-soft), 0 14px 34px -18px rgba(20, 30, 26, 0.45); }
+
+/* Three big buttons, always in the same places; the ones that don't apply now are greyed out */
+.fl-actions { display: grid; grid-template-columns: 1fr 1.25fr 1fr; gap: 12px; }
+.fl-btn { height: 64px; border-radius: 999px; border: 0; font-weight: 800; font-size: 1.15rem; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  box-shadow: 0 1px 2px rgba(20, 30, 26, 0.10), 0 6px 16px -8px rgba(20, 30, 26, 0.45); transition: transform 0.08s; }
+.fl-btn:active:not([disabled]) { transform: scale(0.97); }
+.fl-btn[disabled] { opacity: 0.35; box-shadow: none; cursor: default; }
+.fl-btn svg { width: 24px; height: 24px; fill: currentColor; }
+.fl-go { background: var(--teal); color: #FFFFFF; font-size: 1.3rem; }
+.fl-go:hover:not([disabled]) { background: var(--teal-dark); }
+.fl-yes { background: var(--sun); color: #3A2A00; }
+.fl-no { background: #FFFFFF; color: var(--ink); border: 2px solid var(--line); }
+
+/* The streak (a star) and the level (− / +) */
+.fl-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.fl-streak { display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px 6px 10px; border-radius: 999px; background: var(--sun-soft); }
+.fl-streak svg { width: 30px; height: 30px; fill: var(--sun); }
+.fl-streak > b { font-size: 1.7rem; font-weight: 800; line-height: 1; font-variant-numeric: lining-nums tabular-nums; }
+.fl-streak > span { font-weight: 700; }
+.fl-streak small { margin-left: 8px; color: var(--muted); font-weight: 600; }
+.fl-level { display: inline-flex; align-items: center; gap: 10px; }
+.fl-level button { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: #FFFFFF; font-size: 1.4rem; font-weight: 700; line-height: 1; }
+.fl-level button[disabled] { opacity: 0.35; cursor: default; }
+.fl-level-txt { display: grid; text-align: center; min-width: 13.5em; }
+.fl-level-txt small { color: var(--muted); font-size: 0.82rem; }
+.fl-how { margin: 0; color: var(--muted); font-size: 0.88rem; max-width: 70ch; }
+.fl-toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 20; padding: 9px 18px; border-radius: 999px;
+  background: #17201C; color: #FFFFFF; font-weight: 700; box-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.5); white-space: nowrap; max-width: calc(100vw - 24px); overflow: hidden; text-overflow: ellipsis; }
+.fl-toast[hidden] { display: none; }
+
+/* Phones held upright: a little tighter */
+@media (max-width: 560px) {
+  .fl { padding-inline: 12px; gap: 12px; }
+  .fl-top h1 { font-size: 1.7rem; }
+  .fl-choose select { max-width: 13rem; }
+  .fl-btn { height: 56px; font-size: 1rem; }
+  .fl-go { font-size: 1.1rem; }
+  .fl-level-txt { min-width: 0; }
+  .fl-how { display: none; }
+}
+/* Phones turned sideways: the card gets the height; the title steps aside and the choices sit beside All songs */
+@media (max-height: 500px) and (orientation: landscape) {
+  .fl { padding-top: calc(6px + env(safe-area-inset-top, 0px)); gap: 8px; max-width: none; padding-left: calc(16px + env(safe-area-inset-left, 0px)); padding-right: calc(16px + env(safe-area-inset-right, 0px)); }
+  .fl-top { padding-left: 130px; min-height: 30px; }
+  .fl-top h1 { display: none; }
+  .fl-choose select, .fl-inst { height: 30px; font-size: 0.82rem; }
+  .fl-card { min-height: 130px; border-radius: 16px; }
+  .fl-actions { grid-template-columns: 1fr 1.2fr 1fr; gap: 8px; }
+  .fl-btn { height: 46px; font-size: 1rem; }
+  .fl-status { gap: 8px; }
+  .fl-streak { padding: 2px 12px 2px 8px; }
+  .fl-streak svg { width: 22px; height: 22px; }
+  .fl-streak > b { font-size: 1.3rem; }
+  .fl-level button { width: 34px; height: 34px; }
+  .fl-how { display: none; }
+  .fl-beat { font-size: 3rem; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

@@ -321,13 +321,16 @@ def song_page(reader, song, facts, app, revs):
 
 
 SIGHT = 'sight-reading'
-SIGHT_FILES = ['generator.js', 'practice.js', 'practice.css']  # served beside its page; pages.json goes into the page
+SIGHT_FILES = ['generator.js', 'practice.js', 'practice.css', 'flash.js', 'flash.css']  # served beside its pages; pages.json goes into them
+FLASH_TEMPLATE = ROOT / 'tools' / 'flash_template.html'  # Flash a bar (round 3): its page, from this template
+FLASH_ICON = ('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12z"/></svg>')
 NEW_ICON = ('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 '
             '1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>')
 SIGHT_BAR = f'''  <div class="sr-bar" id="srBar" role="group" aria-label="Sight-reading">
     <select id="srPage" aria-label="Book page"></select>
     <div class="sr-inst" role="group" aria-label="Instrument"><button type="button" id="srViolin" aria-pressed="true">Violin</button><button type="button" id="srViola" aria-pressed="false">Viola</button></div>
     <label class="sr-num">Exercise <input id="srNum" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" aria-label="Exercise number"></label>
+    <a class="sr-flash" id="srFlash" href="flash/">{FLASH_ICON}<span>Flash<span class="sr-long"> a bar</span></span></a>
     <button class="sr-new" id="srNew" type="button" disabled>{NEW_ICON}New exercise</button>
   </div>
 '''
@@ -353,6 +356,21 @@ def read_pages():
             if not p.get(k):
                 fail(f'{SIGHT}/pages.json: page {pid} has no {k}')
     return pages
+
+
+def flash_page(pages, app, revs):
+    """Flash a bar (sight-reading round 3): a lighter page than the reader, with the same music drawing (alphaTab), the
+    string colors and the fonts. A pattern flashes, hides, and the student plays it (sight-reading/flash.js)."""
+    page = FLASH_TEMPLATE.read_text(encoding='utf-8')
+    data = json.dumps(pages, ensure_ascii=False, separators=(',', ':')).replace('</', '<\\/')
+    for k, v in [('PAGES', data), ('FONT_URL', f"../../{FONT}?v={revs['font']}"), ('GENERATOR', revs['generator.js']),
+                 ('FLASH_CSS', revs['flash.css']), ('FLASH_JS', revs['flash.js'])]:
+        if page.count('{{' + k + '}}') != 1:
+            fail(f'tools/flash_template.html: expected one {{{{{k}}}}}')
+        page = page.replace('{{' + k + '}}', v)
+    if page.count(ALPHATAB) != 1:
+        fail(f'tools/flash_template.html no longer loads {ALPHATAB}')
+    return HEAD + app + page
 
 
 def sight_reading_page(reader, pages, app, revs):
@@ -505,6 +523,10 @@ def main():
     offline[f'{SIGHT}/'] = fingerprint(page)
     for f in SIGHT_FILES:
         offline[f'{SIGHT}/{f}?v={sight_revs[f]}'] = sight_revs[f]
+    flash = flash_page(pages, app_script('../../', app_rev), sight_revs)
+    (ROOT / SIGHT / 'flash').mkdir(exist_ok=True)
+    (ROOT / SIGHT / 'flash' / 'index.html').write_text(flash, encoding='utf-8', newline='\n')
+    offline[f'{SIGHT}/flash/'] = fingerprint(flash)
     print(f"  {SIGHT}: {len(pages)} book page(s) ({', '.join(p['id'] for p in pages)}), unlisted")
 
     home = (ROOT / 'index.html').read_text(encoding='utf-8')

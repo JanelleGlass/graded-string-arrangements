@@ -1,0 +1,48 @@
+<title>Flash a bar</title>
+<meta name="description" content="Flash a bar: a short pattern shows for a moment, then hides, and you play it from that glance.">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,500;0,600;1,500&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../flash.css?v={{FLASH_CSS}}">
+<script>window.SIGHT_READING_PAGES = {{PAGES}}; window.FLASH_FONT = '{{FONT_URL}}';</script>
+<script src="../generator.js?v={{GENERATOR}}"></script>
+</head>
+<body>
+<a class="fl-back" id="back" href="../">&larr; Sight-reading</a>
+<main class="fl">
+  <header class="fl-top">
+    <h1>Flash a bar</h1>
+    <div class="fl-choose">
+      <select id="flPage" aria-label="Book page"></select>
+      <div class="fl-inst" role="group" aria-label="Instrument"><button type="button" id="flViolin" aria-pressed="true">Violin</button><button type="button" id="flViola" aria-pressed="false">Viola</button></div>
+    </div>
+  </header>
+
+  <section class="fl-card" id="card" aria-live="polite">
+    <div class="fl-music" id="music"><div id="score"></div></div>
+    <div class="fl-cover" id="cover"><p class="fl-say" id="say">Setting out the music…</p><div class="fl-beat" id="beat" hidden><span id="beatNum"></span></div></div>
+    <div class="fl-timer" id="timer"><span id="timerBar"></span></div>
+  </section>
+
+  <div class="fl-actions">
+    <button type="button" class="fl-btn fl-no" id="notYet" disabled>Not yet</button>
+    <button type="button" class="fl-btn fl-go" id="start" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg><span id="startLbl">Start</span></button>
+    <button type="button" class="fl-btn fl-yes" id="gotIt" disabled>Got it</button>
+  </div>
+
+  <div class="fl-status">
+    <div class="fl-streak" id="streakBox" title="Got it, in a row"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.6 6.8-.8z"/></svg><b id="streak">0</b><span>in a row</span><small>Best <b id="best">0</b></small></div>
+    <div class="fl-level">
+      <button type="button" id="lvDown" aria-label="Easier">−</button>
+      <div class="fl-level-txt"><b id="level">Level 1</b><small id="levelSay"></small></div>
+      <button type="button" id="lvUp" aria-label="Harder">+</button>
+    </div>
+  </div>
+  <p class="fl-how">Tap <b>Start</b>. Look at the notes while they show. When they hide, listen to one bar of clicks, then play what you saw while the beat flashes. Then check: did you play it?</p>
+  <div class="fl-toast" id="toast" role="status" hidden></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/alphaTab.min.js"></script>
+<script src="../flash.js?v={{FLASH_JS}}"></script>
+</body>
+</html>

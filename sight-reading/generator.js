@@ -455,6 +455,105 @@
     }
     throw new Error('could not make exercise ' + n + ' of ' + page.id + ' for ' + inst + ': the rules may be too tight');
   }
+  // ---- Flash a bar (round 3): short patterns the eye takes in at once ----
+  // Half a bar to two bars from the page's notes and rhythms, no chord plan: a run of steps up or down, a scale fragment
+  // that turns once, mostly steps with one skip (and a step back after it), or a repeated rhythm. Each has one of the
+  // page's new notes when it can. noRepeats: never the same note twice in a row (a smooth bow change can sound like one
+  // long note, so round 4's listening will want it). Lengths: 'half' (2 beats, shown in 2/4; only in 4/4), 'bar', 'two'.
+  const flashLengths = (page) => ((page.time && page.time[0]) || '4/4') === '4/4' ? ['half', 'bar', 'two'] : ['bar', 'two'];
+  const SHAPES = ['run', 'turn', 'skip', 'cell'];
+  function pattern(page, inst, n, opts = {}) {
+    const R = rulesFor(page, inst);
+    const length = flashLengths(page).includes(opts.length) ? opts.length : 'bar';
+    const rng = seeded(page.id + '|flash|' + length + (opts.noRepeats ? '|norepeat' : '') + '|' + n);
+    const pageTime = R.times[0], half = length === 'half';
+    const time = half ? '2/4' : pageTime, len = BAR[time], bars = length === 'two' ? 2 : 1;
+    const tokens = R.rhythms.filter(t => t !== 'w' && (t !== 'h.' || len === 6));
+    const options = fillings(tokens, len).filter(seq => !TOKENS[seq[0]].rest);
+    if (!options.length) throw new Error('the rhythms cannot fill a bar of ' + time);
+    const least = { half: 2, bar: len >= 6 ? 3 : 2, two: 5 }[length];
+    const hasSteps = R.notes.some(a => R.notes.some(b => interval(a, b) === 2));
+    for (let tries = 0; tries < 120; tries++) {
+      const shape = SHAPES[Math.floor(rng() * SHAPES.length)];
+      // The rhythm: a repeated cell for 'cell' (a beat in a half bar, half a bar in 4/4, else a bar), else bar by bar.
+      let barSeqs;
+      if (shape === 'cell') {
+        const cellLen = half || len !== 8 ? (bars === 2 ? len : 2) : 4;
+        const cells = fillings(tokens, cellLen).filter(seq => !TOKENS[seq[0]].rest && seq.some(t => !TOKENS[t].rest));
+        if (!cells.length) continue;
+        const cell = cells[Math.floor(rng() * cells.length)];
+        barSeqs = Array.from({ length: bars }, () => Array.from({ length: len / cellLen }, () => cell).flat());
+      } else {
+        barSeqs = Array.from({ length: bars }, (_, b) => {
+          const list = b === 0 ? options : fillings(tokens, len);
+          return list[Math.floor(rng() * list.length)];
+        });
+      }
+      const events = [];
+      barSeqs.forEach((seq, b) => {
+        let pos = 0;
+        for (const t of seq) TOKENS[t].parts.forEach((L, k) => {
+          events.push({ bar: b, pos, len: L, rest: !!TOKENS[t].rest, token: t, fast: L === 1, beam: t === '8 8' ? (k ? 'end' : 'begin') : null });
+          pos += L;
+        });
+      });
+      const at = events.map((e, i) => (e.rest ? -1 : i)).filter(i => i >= 0), N = at.length;
+      if (N < least || (shape !== 'cell' && N < 2)) continue;
+      if (R.newRhythms.length && !barSeqs.flat().some(t => R.newRhythms.includes(t)) && tries < 60) continue;
+      const wantNew = R.newNotes.length && tries < 80;
+      // The notes, by the shape.
+      const d = rng() < 0.5 ? 1 : -1, pivot = 1 + Math.floor(rng() * Math.max(1, N - 2)), skipAt = 1 + Math.floor(rng() * Math.max(1, N - 1));
+      const picks = [], crossed = [];
+      let budget = 600;
+      const allowed = (i, c) => {
+        const p = picks[i - 1];
+        if (!p) return true;
+        const e = events[at[i]], before = events[at[i] - 1], touching = !!before && !before.rest;
+        const iv = interval(p, c), dir = direction(p, c);
+        if (iv > R.maxLeap) return false;
+        if (opts.noRepeats && iv === 1) return false;
+        if (touching && c.string !== p.string) {
+          if (R.crossings !== 'free' && (e.fast || before.fast)) return false;
+          if (R.crossings === 'few' && crossed.some(([k, bar]) => bar === e.bar && k < i)) return false;
+        }
+        if (shape === 'run') return iv === 2 && dir === d;
+        if (shape === 'turn') return iv === 2 && dir === (i <= pivot ? d : -d);
+        if (shape === 'skip') {
+          if (i === skipAt) return iv >= 3;
+          if (i === skipAt + 1) return iv === 2 && dir === -direction(picks[i - 2], p);
+          return iv === 2 || (iv === 1 && !opts.noRepeats && rng() < 0.2);
+        }
+        return hasSteps ? iv <= 3 : true; // cell: steps, skips and repeats (only leaps with no steps to take, as on open strings)
+      };
+      const walk = (i) => {
+        if (i === N) return !wantNew || picks.some(c => R.newNotes.includes(c.name));
+        if (--budget < 0) return false;
+        const can = R.notes.filter(c => allowed(i, c));
+        const w = can.map(c => (R.newNotes.includes(c.name) ? 2.5 : 1) * (picks[i - 1] && c.string === picks[i - 1].string ? 1.3 : 1));
+        for (const c of shuffle(can, w, rng)) {
+          const p = picks[i - 1], before = events[at[i] - 1];
+          picks[i] = c;
+          const crossing = p && before && !before.rest && c.string !== p.string;
+          if (crossing) crossed.push([i, events[at[i]].bar]);
+          if (walk(i + 1)) return true;
+          if (crossing) crossed.pop();
+        }
+        picks.length = i;
+        return false;
+      };
+      if (!walk(0)) continue;
+      const plan = { time, len, bars: barSeqs, events };
+      const tempo = startTempo(page), [beats, beatType] = pageTime.split('/').map(Number);
+      return {
+        xml: toXml(R, plan, picks, tempo), page: page.id, inst, n, shape, length, time, bars, tempo, key: R.key.name,
+        notes: picks.map(x => x.name), colors: picks.map(x => x.color), rhythm: barSeqs.map(b => b.join(' ')),
+        beats: bars * len / 2, // the pattern's length, in quarter notes
+        countIn: beats * 4 / beatType, // one bar of the page's time, in quarter notes
+      };
+    }
+    throw new Error('could not make a ' + length + ' pattern ' + n + ' of ' + page.id + ' for ' + inst);
+  }
+
   // What is wrong with a page's rules, in words ([] when nothing is).
   function problems(page) {
     const out = [];
@@ -463,5 +562,5 @@
     }
     return out;
   }
-  return { exercise, problems, startTempo, LOOKS, TOKENS, PATTERNS, COLORS };
+  return { exercise, pattern, flashLengths, problems, startTempo, LOOKS, TOKENS, PATTERNS, COLORS };
 });

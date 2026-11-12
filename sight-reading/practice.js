@@ -81,6 +81,7 @@
     }
     sel.value = page.id;
     sel.addEventListener('change', () => { location.assign('?page=' + encodeURIComponent(sel.value) + '&n=' + fresh()); });
+    $('srFlash').href = 'flash/?page=' + encodeURIComponent(page.id); // Flash a bar, on the same book page
     showInst();
     for (const [id, which] of [['srViolin', 'violin'], ['srViola', 'viola']]) {
       $(id).addEventListener('click', () => {

@@ -14,6 +14,11 @@ The exercises are read back from their MusicXML and checked here, apart from the
   - viola in alto clef, a fifth below the violin (or as the page says), violin in treble clef
   - alphaTab reads every one, with the same bars and notes
   - the same page and number always give the same music
+Flash a bar's patterns (pattern mode), every page, both instruments, every length (half a bar, a bar, two bars), with
+and without repeated notes, 300 numbers each: the page's notes (colors and finger numbers too) and rhythms but never a
+whole note, starting with a note, every bar adding up (half a bar in 2/4), no leap past the page's limit and no crossing
+on an eighth, the right length, no note twice in a row when asked, and the shape it says: a run all steps one way, a turn
+of steps that changes direction once, steps with one skip, or a repeated rhythm; alphaTab reads each one.
 Besides the book pages in sight-reading/pages.json, a few made-up pages here try what those don't use yet: eighth
 notes, dotted quarters, half rests, 2/4 and 3/4, 6 and 8 bars, low 2, few and free crossings, a viola page of its own.
 """
@@ -172,6 +177,99 @@ def check(page, inst, n, xml, at):
     return out
 
 
+def check_pattern(page, inst, length, no_repeats, ex):
+    """Problems with one Flash a bar pattern, in words."""
+    R, out = rules(page, inst), []
+    root = ET.fromstring(ex['xml'])
+    part = root.find('part')
+    first = part.find('measure/attributes')
+    div = int(first.findtext('divisions'))
+    beats, beat_type = int(first.findtext('time/beats')), int(first.findtext('time/beat-type'))
+    page_time = page.get('time', ['4/4'])[0]
+    want_time = '2/4' if length == 'half' else page_time
+    if f'{beats}/{beat_type}' != want_time:
+        out.append(f'time {beats}/{beat_type}, not {want_time}')
+    bar_len = beats * 4 * div // beat_type
+    measures = part.findall('measure')
+    if len(measures) != (2 if length == 'two' else 1):
+        out.append(f'{len(measures)} bars')
+    notes, kinds, prev_rest = [], [], None  # a rest at the end of a bar comes before the next bar's first note
+    for bi, m in enumerate(measures):
+        pos = 0
+        for el in m.findall('note'):
+            d = int(el.findtext('duration'))
+            rest = el.find('rest') is not None
+            kinds.append((el.findtext('type'), el.find('dot') is not None, rest))
+            if bi == 0 and pos == 0 and rest:
+                out.append('starts with a rest')
+            if not rest:
+                p = el.find('pitch')
+                k = (p.findtext('step'), int(p.findtext('alter') or 0), int(p.findtext('octave')))
+                a = R['allowed'].get(k)
+                if not a:
+                    out.append(f'{k} is not one of the page\'s notes')
+                elif el.get('color') != a['color'] or el.findtext('notations/technical/fingering') != a['label']:
+                    out.append(f"{a['name']} marked wrongly")
+                else:
+                    notes.append({'dia': k[2] * 7 + LETTERS.index(k[0]), 'name': a['name'], 'string': a['string'], 'len': d, 'after_rest': prev_rest, 'bar': bi})
+            prev_rest = rest
+            pos += d
+        if pos != bar_len:
+            out.append(f'bar {bi + 1} adds up to {pos}, not {bar_len}')
+    if any(t == 'whole' for t, _, r in kinds if not r):
+        out.append('a whole note')
+    allowed_types = {'w': ('whole', False), 'h.': ('half', True), 'h': ('half', False), 'q': ('quarter', False), 'qr': ('quarter', False), 'hr': ('half', False)}
+    for t, dot, rest in kinds:
+        ok = (t == 'eighth' and ('8 8' in page['rhythms'] or 'q. 8' in page['rhythms'])) or \
+             (t == 'quarter' and dot and 'q. 8' in page['rhythms']) or \
+             any(allowed_types.get(tok) == (t, dot) and (tok.endswith('r') == rest) for tok in page['rhythms'])
+        if not ok:
+            out.append(f"rhythm {t}{'.' if dot else ''}{' rest' if rest else ''} is not one of the page's")
+    steps = [(b['dia'] - a['dia']) for a, b in zip(notes, notes[1:])]
+    for a, b in zip(notes, notes[1:]):
+        if abs(a['dia'] - b['dia']) + 1 > page.get('maxLeap', 3):
+            out.append(f"a leap from {a['name']} to {b['name']}")
+        if no_repeats and a['dia'] == b['dia'] and a['name'] == b['name']:
+            out.append(f"{a['name']} twice in a row")
+        if a['string'] != b['string'] and not b['after_rest'] and page.get('crossings', 'some') != 'free' and (a['len'] == 1 or b['len'] == 1):
+            out.append(f"a crossing on an eighth ({a['name']} to {b['name']})")
+    shape = ex['shape']
+    if shape == 'run' and not (steps and all(x == steps[0] and abs(x) == 1 for x in steps)):
+        out.append(f'a run that is not all steps one way ({steps})')
+    if shape == 'turn' and not (steps and all(abs(x) == 1 for x in steps) and sum(1 for x, y in zip(steps, steps[1:]) if x != y) <= 1):
+        out.append(f'a turn that is not steps turning once ({steps})')
+    if shape == 'skip' and sum(1 for x in steps if abs(x) >= 2) != 1:
+        out.append(f'a skip pattern without exactly one skip ({steps})')
+    if shape == 'cell':
+        bars_rhythm = ex['rhythm']
+        if len(set(bars_rhythm)) != 1 and length == 'two':
+            out.append(f'a repeated rhythm whose bars differ ({bars_rhythm})')
+    beats_want = {'half': 2, 'bar': bar_len / div, 'two': 2 * bar_len / div}[length]
+    if abs(ex['beats'] - beats_want) > 1e-9:
+        out.append(f"length {ex['beats']} beats, not {beats_want}")
+    if ex['at'] != [len(measures), len(notes)]:
+        out.append(f"alphaTab read {ex['at']}, the file has {[len(measures), len(notes)]}")
+    return out
+
+
+PATTERN_JS = '''async ({ page, inst, length, noRepeats, from, to }) => {
+  const out = [];
+  for (let n = from; n <= to; n++) {
+    let ex = null, at = null, error = null, again = null;
+    try {
+      ex = SightReading.pattern(page, inst, n, { length, noRepeats });
+      again = SightReading.pattern(page, inst, n, { length, noRepeats }).xml === ex.xml;
+      const score = alphaTab.importer.ScoreLoader.loadScoreFromBytes(new TextEncoder().encode(ex.xml), new alphaTab.Settings());
+      const bars = score.tracks[0].staves[0].bars;
+      at = [bars.length, bars.reduce((k, b) => k + b.voices[0].beats.filter(x => !x.isRest).length, 0)];
+    } catch (e) { error = String(e && e.message || e); }
+    out.push(ex ? { xml: ex.xml, shape: ex.shape, rhythm: ex.rhythm, beats: ex.beats, at, again, error, n } : { error, n });
+  }
+  return out;
+}'''
+FLASH_COUNT = int(os.environ.get('FLASH_COUNT', '300'))
+
+
 # ---- Running the generator in the browser ----
 MAKE_JS = '''async ({ pages, from, to }) => {
   const out = [];
@@ -238,6 +336,32 @@ async def main():
                 print(f"  FAIL  {page['id']} {tag}: {sum(len(w) for w in bad.values())} problem(s)")
             else:
                 print(f"  ok    {page['id']} {tag}: {2 * COUNT} exercises (violin and viola) follow the rules")
+        # Flash a bar's patterns.
+        for page in pages:
+            bad, made, shapes = {}, 0, {}
+            lengths = await pg.evaluate('(p) => SightReading.flashLengths(p)', page)
+            for inst in ('violin', 'viola'):
+                for length in lengths:
+                    for no_rep in (False, True):
+                        got = await pg.evaluate(PATTERN_JS, {'page': page, 'inst': inst, 'length': length, 'noRepeats': no_rep, 'from': 1, 'to': FLASH_COUNT})
+                        for ex in got:
+                            where = f"{page['id']} {inst} {length}{' no repeats' if no_rep else ''} #{ex['n']}"
+                            if ex['error']:
+                                bad.setdefault('could not be made or read: ' + ex['error'], []).append(where); continue
+                            made += 1
+                            shapes[ex['shape']] = shapes.get(ex['shape'], 0) + 1
+                            if not ex['again']:
+                                bad.setdefault('the same number gave a different pattern', []).append(where)
+                            for problem in check_pattern(page, inst, length, no_rep, ex):
+                                bad.setdefault(problem, []).append(where)
+            tag = '[book page]' if page in PAGES else '[made-up page]'
+            if bad:
+                for what, where in list(bad.items())[:8]:
+                    failures.append(f"{page['id']} patterns: {what} ({len(where)}, e.g. {', '.join(where[:3])})")
+                print(f"  FAIL  {page['id']} {tag}: Flash a bar patterns, {sum(len(w) for w in bad.values())} problem(s)")
+            else:
+                print(f"  ok    {page['id']} {tag}: {made} Flash a bar patterns follow the rules ({', '.join(f'{k} {v}' for k, v in sorted(shapes.items()))})")
+            done += made
         # Violin and viola with one number: the same exercise, a fifth apart (when the page has no viola notes of its own).
         same = await pg.evaluate('''(page) => { const v = SightReading.exercise(page, 'violin', 42), a = SightReading.exercise(page, 'viola', 42);
           return v.rhythm.join() === a.rhythm.join() && v.notes.length === a.notes.length; }''', PAGES[0])

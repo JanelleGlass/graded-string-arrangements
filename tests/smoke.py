@@ -68,6 +68,11 @@ What it checks
      at its three levels (½ beat, 1 beat, 1 bar), at 60 and 120, while it plays, every note due within that time of what is
      heard is covered and no other is (checked against each note's place on the screen, during a count-in too), the
      staff lines and bar lines are drawn over the cover, and every note comes back when the music stops.
+     Flash a bar (laptop, iPad upright, phone both ways round): the pattern drawn inside its card; a round goes look,
+     hide, count in, play, check, with Start, Got it and Not yet each usable only when they apply; Got it counts the
+     streak and three in a row move up a level; the level, streak and best are still there after a reload; Not yet
+     starts the streak again; − and + change the level; Violin / Viola is kept with the sight-reading page's. The
+     sight-reading page's Flash a bar button opens it on the same book page.
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
      the teacher conducts, a student follows, and the student's music keeps up with the teacher's.
   4. The app layer: the browser can install the site, every file is saved after one visit, every song (and the
@@ -827,10 +832,12 @@ async def sight_reading_checks(browser, base):
         ck(wide <= 1, f'no sideways scrolling ({wide}px extra)')
         # The row: every control on the screen, above the music, clear of All songs.
         row = await pg.evaluate("""() => { const r = (id) => document.getElementById(id).getBoundingClientRect();
-          const ids = ['srPage', 'srViolin', 'srViola', 'srNum', 'srNew'], home = r('homeBtn'), surf = document.querySelector('#sheet .at-surface').getBoundingClientRect();
+          const ids = ['srPage', 'srViolin', 'srViola', 'srNum', 'srFlash', 'srNew'], home = r('homeBtn'), surf = document.querySelector('#sheet .at-surface').getBoundingClientRect();
           return { inside: ids.every(id => { const b = r(id); return b.width > 0 && b.left >= 0 && b.right <= innerWidth && b.top >= 0 && b.bottom <= innerHeight; }),
                    above: ids.every(id => r(id).bottom <= surf.top + 1), clear: ids.every(id => { const b = r(id); return b.left >= home.right || b.top >= home.bottom; }) }; }""")
-        ck(row['inside'] and row['above'] and row['clear'], f'the row (book page, Violin / Viola, number, New exercise) is on the screen over the music ({row})')
+        ck(row['inside'] and row['above'] and row['clear'], f'the row (book page, Violin / Viola, number, Flash a bar, New exercise) is on the screen over the music ({row})')
+        href = await pg.get_attribute('#srFlash', 'href')
+        ck(href == 'flash/?page=v1-02', f'Flash a bar opens on the same book page ({href})')
         await pg.click('#play'); await pg.wait_for_timeout(2500)
         tick = await pg.evaluate('() => reader.at()')
         ck(tick > 0, f'Play moves the music forward (tick {round(tick)})')
@@ -942,6 +949,83 @@ async def look_ahead_checks(browser, base):
                 if not back:
                     problems.append(f'{setting} at {tempo}: the notes did not come back when the music stopped')
         ck(not problems and samples >= 18, f'at levels 1, 2 and 3 (½ beat, 1 beat, 1 bar), at 60 and 120, the right notes vanish while it plays, and come back when it stops ({samples} checks{": " + "; ".join(problems[:4]) if problems else ""})')
+        ck(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
+        await ctx.close()
+
+
+async def flash_round(pg, answer):
+    """One round of Flash a bar, in the order it should go; returns the phases seen and whether each button was usable
+    only when it applies."""
+    seen, wrong = [], []
+    await pg.click('#start')
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 15:
+        st = await pg.evaluate("""() => ({ ...flash.state(), start: !document.getElementById('start').disabled,
+          got: !document.getElementById('gotIt').disabled, no: !document.getElementById('notYet').disabled })""")
+        tag = st['phase'] + ('/hidden' if st['covered'] else '/shown')
+        if not seen or seen[-1] != tag:
+            seen.append(tag)
+        if st['start'] or (st['got'] != (st['phase'] == 'check')) or (st['no'] != (st['phase'] == 'check')):
+            wrong.append(tag)
+        if st['phase'] == 'check':
+            break
+        await pg.wait_for_timeout(15)
+    await pg.click('#gotIt' if answer else '#notYet')
+    await pg.wait_for_function("() => flash.state().phase === 'ready' && flash.state().drawn", timeout=15000)
+    return seen, wrong
+
+
+async def flash_checks(browser, base):
+    """Flash a bar: a pattern shows, hides, and the student plays it from that glance."""
+    print('Sight-reading: Flash a bar')
+    for label, w, h in [('laptop', 1366, 860), ('iPad upright', 820, 1180), ('phone landscape', 844, 390), ('phone upright', 390, 844)]:
+        ctx = await browser.new_context(device_scale_factor=1, viewport={'width': w, 'height': h})
+        await setup(ctx)
+        await ctx.add_init_script("try { localStorage.setItem('gsa-flash-fast', '1'); } catch (e) {}")  # every wait ten times shorter
+        errors = []
+        pg = await ctx.new_page()
+        pg.on('pageerror', lambda e: errors.append(str(e)))
+        ck = lambda ok, what: check(ok, f'Flash a bar, {label}: {what}')
+        try:
+            await pg.goto(f'{base}/sight-reading/flash/?page=v1-02')
+            await pg.wait_for_function("() => window.flash && flash.state().phase === 'ready' && flash.state().drawn", timeout=60000)
+        except Exception as e:
+            ck(False, f'page loads ({e.__class__.__name__})')
+            await ctx.close()
+            continue
+        fit = await pg.evaluate("""() => { const m = document.getElementById('music').getBoundingClientRect(), s = document.querySelector('#score .at-surface svg');
+          const r = document.getElementById('score').getBoundingClientRect();
+          return { svg: !!s, inside: r.left >= m.left - 1 && r.right <= m.right + 1 && r.top >= m.top - 1 && r.bottom <= m.bottom + 1, wide: document.documentElement.scrollWidth - innerWidth,
+                   buttons: ['notYet', 'start', 'gotIt'].map(id => { const b = document.getElementById(id).getBoundingClientRect(); return b.bottom <= innerHeight + 1 && b.width > 60; }) }; }""")
+        ck(fit['svg'] and fit['inside'] and fit['wide'] <= 1 and all(fit['buttons']), f'the pattern is drawn inside its card, and the three buttons are on the screen ({fit})')
+        seen, wrong = await flash_round(pg, True)
+        order = ['flash/shown', 'flash/hidden', 'count/hidden', 'play/hidden', 'check/shown']
+        ck([x for x in seen if x in order] == order or [x for x in seen if x in order] == order[:2] + order[:2] + order[2:], f'a round goes look, hide, count in, play, check ({seen})')
+        ck(not wrong, f'Start, Got it and Not yet are usable only when they apply ({wrong[:3]})')
+        st = await pg.evaluate('() => flash.state()')
+        ck(st['streak'] == 1 and st['best'] == 1, f"Got it counts the streak ({st['streak']}, best {st['best']})")
+        if label == 'laptop':
+            for _ in range(2):
+                await flash_round(pg, True)
+            st = await pg.evaluate("() => ({ ...flash.state(), toast: document.getElementById('toast').textContent, lv: document.getElementById('level').textContent })")
+            ck(st['level'] == 1 and st['streak'] == 3 and 'Level up' in st['toast'] and st['lv'].startswith('Level 2'), f"three in a row move up a level ({st['lv']}, {st['toast']})")
+            await pg.reload()
+            await pg.wait_for_function("() => window.flash && flash.state().phase === 'ready' && flash.state().drawn", timeout=60000)
+            st = await pg.evaluate('() => flash.state()')
+            ck(st['level'] == 1 and st['streak'] == 3 and st['best'] == 3, f"the level, streak and best stay after a reload ({st['level']}, {st['streak']}, {st['best']})")
+            await flash_round(pg, False)
+            st = await pg.evaluate('() => flash.state()')
+            ck(st['streak'] == 0 and st['best'] == 3, f"Not yet starts the streak again, the best stays ({st['streak']}, {st['best']})")
+            await pg.click('#lvDown'); await pg.wait_for_timeout(300)
+            down = await pg.evaluate('() => flash.state().level')
+            await pg.click('#lvUp'); await pg.wait_for_timeout(300)
+            up = await pg.evaluate('() => flash.state().level')
+            ck(down == 0 and up == 1, f'− and + change the level ({down}, {up})')
+            await pg.click('#flViola')
+            await pg.wait_for_function("() => flash.state().phase === 'ready' && flash.state().drawn", timeout=15000)
+            inst = await pg.evaluate("() => JSON.parse(localStorage.getItem('sight-reading') || '{}').inst")
+            clef = await pg.evaluate("() => [...document.querySelectorAll('#score text')].some(t => t.textContent.codePointAt(0) === 0xE05C)")
+            ck(inst == 'viola' and clef, f'Viola: kept with the sight-reading page, in alto clef ({inst}, alto clef {clef})')
         ck(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
         await ctx.close()
 
@@ -1292,6 +1376,14 @@ async def app_checks(browser):
         await sp.close()
     except Exception as e:
         check(False, f'offline: the sight-reading page opens ({e.__class__.__name__})')
+    try:
+        fp = await ctx.new_page()
+        await fp.goto(f'{base}/sight-reading/flash/?page=v1-03')
+        await fp.wait_for_function("() => window.flash && flash.state().phase === 'ready' && flash.state().drawn", timeout=60000)
+        check(True, 'offline: Flash a bar opens and draws its pattern')
+        await fp.close()
+    except Exception as e:
+        check(False, f'offline: Flash a bar opens ({e.__class__.__name__})')
     stray = await ctx.new_page()
     try:
         await stray.goto(base + '/songs/not-saved/')
@@ -1585,6 +1677,7 @@ async def main():
         await one_line_checks(browser, base)
         await sight_reading_checks(browser, base)
         await look_ahead_checks(browser, base)
+        await flash_checks(browser, base)
         await print_checks(browser, base)
         await extras_checks(browser, base)
         await piano_checks(browser, base)
