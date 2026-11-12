@@ -3509,6 +3509,7 @@ body.following .host-only { display: none !important; }
   // method's name, so the method is found by its formula, on the bar-spacing object of the first drawing; the music
   // is then drawn again. Not on paper.
   let evenSpacing = null; // { proto, name, orig } once found
+  const EVEN_ROOM = 1.3;
   const evenSpacingOn = () => state.pointer && !onPaper();
   function findSpringFormula(root) {
     const seen = new Set(), queue = [[root, 0]];
@@ -3546,7 +3547,9 @@ body.following .host-only { display: none !important; }
       const k = orig.call(this, spring, duration, minDuration);
       if (!evenSpacingOn() || !(duration > 0) || !(minDuration > 0)) return k;
       const give = 1 + 0.85 * Math.log2(duration / minDuration), quarter = 1 + 0.85 * Math.log2(960 / minDuration);
-      return k * give / Math.max(0.05, quarter * duration / 960);
+      // EVEN_ROOM: every note a little wider than alphaTab's quarter, so a short note has room for the next note's
+      // finger number after its flag (Janelle, 2026-11-12: the eighths in The Butterfly were tight).
+      return k * give / Math.max(0.05, EVEN_ROOM * quarter * duration / 960);
     };
     evenSpacing = found;
     return true;

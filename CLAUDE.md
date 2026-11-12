@@ -388,7 +388,8 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   about 1.85 quarters) and has no setting for it, so the reader replaces that one method on alphaTab's bar-spacing
   object (`evenSpacing`): found after the first drawing by searching from `api.renderer` for an object with a
   `layoutingInfo` whose prototype has a method (not the constructor) containing `.85*Math.log2`, since the .min.js
-  shortens the name; then drawn again. A quarter note keeps the room it had; alphaTab still keeps every note clear of
+  shortens the name; then drawn again. Every note gets 1.3 times that (`EVEN_ROOM`; Janelle, 2026-11-12: in The Butterfly the
+  next note's finger number sat against an eighth note's flag), the proportions unchanged; alphaTab still keeps every note clear of
   the next. If alphaTab changes and the method isn't found, the music is simply spaced as before.
   Big beats when fast (Janelle, 2026-11-10): when the counts come faster than 150 a minute at the speed being played
   (back below 130), the ball bounces only on the big beats, skimming over the notes between: a dotted quarter in 6/8,
