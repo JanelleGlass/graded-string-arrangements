@@ -156,9 +156,8 @@ h1 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: c
 .sheet-wrap.tight .top-tools .zoom-pill button { width: 32px; font-size: 18px; }
 .sheet-wrap.tight .top-tools .fab-btn.cyc { gap: 4px; padding: 0 8px; }
 .sheet-wrap.tight .top-tools .cyc-badge { font-size: 0.7rem; }
-/* Still too little room (an iPad mini upright): the key drops its word and keeps its coloured letters. Then the house
-   (back to All songs) steps aside, and with no room at all (a small phone with the Hear speakers out), the key too,
-   until the panel closes. */
+/* Still too little room (an iPad mini upright): the key drops its word and keeps its coloured letters. With none at all
+   (a small phone with the Hear speakers out), the key steps aside until the panel closes. */
 .sheet-wrap.bare .key-lbl { display: none; }
 .sheet-wrap.bare .key { padding-left: 8px; }
 .sheet-wrap.nokey .key { visibility: hidden; }
@@ -262,11 +261,17 @@ hr.div { border: 0; border-top: 1px solid var(--line); margin: 0; }
 /* Follow: a small quiet word at the top, there only while a teacher conducts this piece (Janelle, 2026-11-10). */
 .top-tools .follow-btn { min-width: 0; padding: 0 12px; font-size: 0.86rem; font-weight: 600; color: var(--muted); }
 .top-tools .follow-btn.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
-/* Back to the song list: a house first in the buttons at the top right, in teal so it stands out from Print and
-   Download. It stays at the top of the window however big the music is, and on a phone turned sideways, where the
-   title and its "All songs" link aren't shown (Janelle, 2026-11-11). Song pages only: the build shows it. */
-.top-tools .home-btn { color: #1D5B72; border: 1.5px solid #1D5B72; text-decoration: none; }
-.top-tools .home-btn[hidden], .sheet-wrap.nohome .top-tools .home-btn { display: none; }
+/* Back to the song list: a small "All songs" button floating at the top left of the screen, whatever the scroll, the
+   way the phone is held, or the page zoom (Janelle, 2026-11-11/12). Pinch-zoomed, it keeps to the corner of what is on
+   the screen at its own size (the script after it). Song pages only: the build shows it. The title sits below it;
+   on a phone turned sideways (no title) the Strings key moves over beside it (--home-room). */
+.home-float { position: fixed; z-index: 1100; left: calc(8px + env(safe-area-inset-left, 0px)); top: calc(8px + env(safe-area-inset-top, 0px));
+  transform-origin: 0 0; display: inline-flex; align-items: center; height: 30px; padding: 0 12px 0 10px; border-radius: 999px;
+  border: 1px solid #CDD5D1; background: rgba(255, 255, 255, 0.96); color: #1D5B72; font-family: var(--font-body);
+  font-size: 0.86rem; font-weight: 700; text-decoration: none; white-space: nowrap; box-shadow: 0 1px 2px rgba(20, 30, 26, 0.10), 0 4px 14px -6px rgba(20, 30, 26, 0.38); }
+.home-float:hover { border-color: #1D5B72; }
+.home-float[hidden] { display: none; }
+.home-float:not([hidden]) ~ .page .top { padding-top: 34px; }
 .info-teach { margin: 2px 0 0; font-size: 0.86rem; }
 /* Counts switched off: the row goes blank (the music is drawn again without its room, so the lines close up) */
 #sheet.counts-off .count-layer { visibility: hidden; }
@@ -488,7 +493,7 @@ body.following .host-only { display: none !important; }
 @media print {
   @page { margin: 12mm; }
   /* Printed from the browser's own menu with no copy for paper (one long line): the page as it is, without the buttons */
-  .fab, .fab-bar, .parts-tab, .drawer, .tools-dock, .count, .buy, .foot, .print-cover { display: none !important; }
+  .fab, .fab-bar, .parts-tab, .drawer, .tools-dock, .count, .buy, .foot, .print-cover, .home-float { display: none !important; }
   .sheet { box-shadow: none; }
   html.print-ready, html.print-ready body { background: #FFFFFF; }
   html.print-ready body { margin: 0; padding: 0; }
@@ -558,6 +563,8 @@ body.following .host-only { display: none !important; }
   #pop-parts .tier-note { font-size: 0.82rem; line-height: 1.3; }
   .toggle { padding: 5px 10px; font-size: 0.82rem; }
   .key { left: 6px; top: 4px; gap: 5px; padding: 3px 8px 3px 10px; }
+  .home-float:not([hidden]) ~ .page .key { left: var(--home-room, 6px); }
+  .home-float { height: 27px; font-size: 0.8rem; }
   .sheet.keyed { padding-top: 32px; }
   .top-tools { --tools-pad: 6px; top: 2px; gap: 6px; }
   .top-tools .zoom-pill, .top-tools .fab-btn { height: 27px; }
@@ -568,15 +575,35 @@ body.following .host-only { display: none !important; }
 }
 }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
-.home-link { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 10px; padding: 6px 15px 6px 12px; border: 1.5px solid var(--accent); border-radius: 999px; background: var(--paper); color: #1D5B72; font-size: 0.95rem; font-weight: 700; text-decoration: none; }
-.home-link:hover { background: var(--accent); color: var(--accent-ink); }
 </style>
 </head>
 <body>
+<a class="home-float" id="homeBtn" href="../../">← All songs</a>
+<script>
+// Keep "All songs" in the top left corner of what is on the screen. A pinch-zoomed page shows only part of itself and
+// enlarges what's fixed with it, so the button follows the visible part (visualViewport) and is scaled back down.
+(() => {
+  const b = document.getElementById('homeBtn'), vv = window.visualViewport;
+  if (b.hidden) return;
+  const place = () => {
+    const z = vv ? vv.scale : 1;
+    // Its gap from the corner (left, top) is zoomed too, so it is taken back to its size on the screen.
+    const cs = getComputedStyle(b), x = parseFloat(cs.left) || 0, y = parseFloat(cs.top) || 0;
+    b.style.transform = vv && (Math.abs(z - 1) > 0.01 || vv.offsetLeft || vv.offsetTop)
+      ? `translate(${vv.offsetLeft - x * (1 - 1 / z)}px, ${vv.offsetTop - y * (1 - 1 / z)}px) scale(${1 / z})` : '';
+    // A phone turned sideways shows no title, so the Strings key at the top of the music moves over beside the button.
+    const sheet = document.querySelector('.sheet-wrap');
+    if (sheet && Math.abs(z - 1) <= 0.01) document.documentElement.style.setProperty('--home-room', Math.max(6, Math.ceil(b.getBoundingClientRect().right + 6 - sheet.getBoundingClientRect().left)) + 'px');
+  };
+  if (vv) { vv.addEventListener('resize', place); vv.addEventListener('scroll', place); }
+  window.addEventListener('resize', place);
+  addEventListener('DOMContentLoaded', place);
+  addEventListener('load', place);
+})();
+</script>
 <div class="page">
   <header class="top">
     <div class="title-wrap">
-      <a class="home-link" href="../../">← All songs</a>
       <h1><button class="title-btn" id="infoBtn" type="button" aria-expanded="false" aria-controls="infoPop">The Wellerman<span class="info-i" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg></span><span class="sr"> — about this song</span></button></h1>
       <div class="info-pop" id="infoPop" role="dialog" aria-label="About this song" hidden>
         <button class="info-x" id="infoX" type="button" aria-label="Close">×</button>
@@ -612,7 +639,7 @@ body.following .host-only { display: none !important; }
   <p class="err" id="err" role="alert"></p>
 
   <div class="sheet-wrap">
-    <div class="tools-dock"><div class="top-tools" id="topTools"><a class="fab-btn round home-btn" id="homeBtn" href="../../" aria-label="All songs" title="All songs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></a><button class="fab-btn follow-btn" id="g-follow" type="button" aria-pressed="false" hidden>Follow</button><button class="fab-btn round host-only" id="printBtn" type="button" aria-label="Print the music" title="Print the music"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg></button><button class="fab-btn round host-only" id="pdfBtn" type="button" aria-label="Download the music as a PDF" title="Download a PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/></svg></button><div class="zoom-pill" role="group" aria-label="Size of the music"><button type="button" id="zoomOut" aria-label="Smaller music" title="Smaller">−</button><button type="button" id="zoomIn" aria-label="Bigger music" title="Bigger">+</button></div><button class="fab-btn big-only cyc" id="g-layout" type="button"></button></div></div>
+    <div class="tools-dock"><div class="top-tools" id="topTools"><button class="fab-btn follow-btn" id="g-follow" type="button" aria-pressed="false" hidden>Follow</button><button class="fab-btn round host-only" id="printBtn" type="button" aria-label="Print the music" title="Print the music"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg></button><button class="fab-btn round host-only" id="pdfBtn" type="button" aria-label="Download the music as a PDF" title="Download a PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/></svg></button><div class="zoom-pill" role="group" aria-label="Size of the music"><button type="button" id="zoomOut" aria-label="Smaller music" title="Smaller">−</button><button type="button" id="zoomIn" aria-label="Bigger music" title="Bigger">+</button></div><button class="fab-btn big-only cyc" id="g-layout" type="button"></button></div></div>
     <div class="key-dock"><div class="key" id="legend" role="note" aria-label="String colors"></div></div>
     <div class="sheet" id="sheet"></div>
     <div class="loading" id="loading">Setting out the music…</div>
@@ -1335,15 +1362,14 @@ body.following .host-only { display: none !important; }
   // phone size, then the key drops its word, then it steps aside until the panel closes.
   function placeTools() {
     const dock = document.querySelector('.sheet-wrap'), tools = $('topTools'), key = $('legend');
-    dock.classList.remove('tight', 'bare', 'nohome', 'nokey');
+    dock.classList.remove('tight', 'bare', 'nokey');
     let shift = 0;
     if (partsOpen) {
       const panelLeft = document.documentElement.clientWidth - $('pop-parts').offsetWidth;
       const right = document.querySelector('.sheet-wrap').getBoundingClientRect().right;
       shift = Math.max(0, Math.round(right - panelLeft));
       const fits = () => key.hidden || right - parseFloat(getComputedStyle(tools).getPropertyValue('--tools-pad')) - shift - tools.offsetWidth >= key.getBoundingClientRect().right + 8;
-      // Before the key goes, the house (back to All songs) steps aside: the key changes with the parts being chosen.
-      const steps = document.documentElement.classList.contains('small') ? ['bare', 'nohome', 'nokey'] : ['tight', 'bare', 'nohome', 'nokey'];
+      const steps = document.documentElement.classList.contains('small') ? ['bare', 'nokey'] : ['tight', 'bare', 'nokey'];
       for (const s of steps) { if (fits()) break; dock.classList.add(s); }
     }
     document.documentElement.style.setProperty('--tools-shift', shift + 'px');
