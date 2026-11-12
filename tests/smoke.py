@@ -11,9 +11,10 @@ Needs Playwright for Python and its Chromium, once per computer:
     python3 -m playwright install chromium
 
 What it checks
-  1. Home page: a card for every song in songs.json, each under its section's heading (Christmas, Hymns, Solos,
-     Other, in that order); the tabs over them (All songs, then one per section) each show only their section, a
-     link with #hymns opens on that tab; the home-screen app file and icons load, no script errors.
+  1. Home page: a card for every song in songs.json, each under its section's heading (Christmas, Hymns, Other, in
+     that order: SECTIONS in tools/build_site.py); the tabs over them (All songs, then one per section) each show only
+     their section, a link with #hymns opens on that tab, and on phones no tab sits alone on its row; the home-screen
+     app file and icons load, no script errors.
   2. Every song page, at laptop and phone-landscape size: the score loads with all parts,
      notes are drawn, Play moves the music forward, nothing scrolls sideways, no script errors.
      The page settings are separate buttons in the strip; On the note steps through its five looks,
@@ -1419,7 +1420,7 @@ async def home_checks(browser, base):
     for s in SONGS:
         check(f"songs/{s['slug']}/" in links, f"card for {s['title']}")
     check(len(links) == len(SONGS), f'{len(links)} cards for {len(SONGS)} songs')
-    # The cards sit in sections (Christmas, Hymns, Solos, Other), each under its heading, in the build's order.
+    # The cards sit in sections (Christmas, Hymns, Other), each under its heading, in the build's order.
     under = await pg.evaluate("""() => Object.fromEntries([...document.querySelectorAll('a.song')].map(a =>
       [a.getAttribute('href'), a.closest('section')?.querySelector('h2')?.textContent || '']))""")
     wrong = [s['title'] for s in SONGS if under.get(f"songs/{s['slug']}/") != s.get('section')]
@@ -1450,6 +1451,14 @@ async def home_checks(browser, base):
         check(got['on'] == [want[1]] and len(got['shown']) == sum(s.get('section') == want[1] for s in SONGS),
               f"a link to #{section_id(want[1])} opens on the {want[1]} tab ({got['on']}, {len(got['shown'])} shown)")
         await linked.close()
+    # On phones the tabs sit in a grid, and none is left alone on a row (Janelle, 2026-11-02).
+    for w in (360, 375, 390, 430, 460, 540):
+        await pg.set_viewport_size({'width': w, 'height': 800})
+        rows = await pg.evaluate("""() => { const n = {};
+          for (const b of document.querySelectorAll('.tabs button')) { const y = Math.round(b.getBoundingClientRect().top); n[y] = (n[y] || 0) + 1; }
+          return Object.values(n); }""")
+        check(len(rows) == 1 or min(rows) >= 2, f'phone {w} px: no tab alone on its row ({rows})')
+    await pg.set_viewport_size({'width': 1280, 'height': 720})  # Playwright's own size, as the page opened
     # Added to a phone's home screen, the site opens like an app (no address bar): the app file and its icons load.
     app = await pg.evaluate("""async () => {
       const link = document.querySelector('link[rel=manifest]'), touch = document.querySelector('link[rel=apple-touch-icon]');
