@@ -4295,6 +4295,23 @@ body.following .host-only { display: none !important; }
     sheet.scrollLeft = Math.max(0, surfLeft() + xAt(L.disp) - W + ease());
     lineRaf = requestAnimationFrame(lineFollow);
   }
+  // Pages, while playing: a slow, soft glide to the next line down (Janelle, 2026-11-12: the browser's own smooth scroll
+  // was fast and jumpy, and the eye got lost). About a second, longer for a longer way, easing in and out. A scroll of
+  // the reader's own (wheel, finger, keys) stops it.
+  let pageGlide = 0;
+  function glidePage(to) {
+    cancelAnimationFrame(pageGlide); pageGlide = 0;
+    const from = window.scrollY, d = to - from;
+    if (reduceMotion || Math.abs(d) < 2) { window.scrollTo(0, to); return; }
+    const ms = Math.min(1800, 900 + Math.abs(d) * 0.9), t0 = performance.now();
+    const step = (now) => {
+      const x = Math.min(1, (now - t0) / ms), e = 0.5 - Math.cos(Math.PI * x) / 2;
+      window.scrollTo(0, from + d * e);
+      pageGlide = x < 1 ? requestAnimationFrame(step) : 0;
+    };
+    pageGlide = requestAnimationFrame(step);
+  }
+  for (const ev of ['wheel', 'touchstart', 'keydown']) window.addEventListener(ev, () => { if (pageGlide) { cancelAnimationFrame(pageGlide); pageGlide = 0; } }, { passive: true });
   const scroller = {
     forceScrollTo() {},
     onBeatCursorUpdating(bb, nextBb, mode, startX, endX, duration) {
@@ -4309,7 +4326,7 @@ body.following .host-only { display: none !important; }
       if (key === lastScrollKey) return;
       lastScrollKey = key;
       const top = sheet.getBoundingClientRect().top + window.scrollY + (sys ? sys.realBounds.y : mbb.realBounds.y) - 110;
-      window.scrollTo({ top: Math.max(0, top), behavior: reduceMotion ? 'auto' : 'smooth' });
+      glidePage(Math.max(0, top));
     },
     [Symbol.dispose]() {},
   };
