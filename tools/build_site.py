@@ -378,6 +378,7 @@ def sight_reading_page(reader, pages, app, revs):
     # Each exercise is written at the book page's slowest tempo (practice.js says which page, before the reader starts).
     b = replace(b, t['tempo'], "const BASE_TEMPO = window.sightReading.tempo; // the book page's slowest tempo (practice.js)")
     b = replace(b, t['tempo_percent'], 'const TEMPO_PERCENT = false;')
+    b = replace(b, 'const LOOK_AHEAD = false;', 'const LOOK_AHEAD = true;')  # its button in the strip
     b = replace(b, f"const SCORE_URL = '{t['score']}';", "const SCORE_URL = ''; // the music is made on the page (window.readerScore)")
     b = replace(b, "const FONT_URL = 'font/Bravura.woff2';", f"const FONT_URL = '../{FONT}?v={revs['font']}';")
     b = replace(b, "const SOUNDFONT_URL = 'soundfont/strings-generaluser-sf2.b64.txt';",

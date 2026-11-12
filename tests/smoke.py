@@ -64,6 +64,10 @@ What it checks
      music and the number in the address; a typed number bringing an exercise back, the same after a reload; Viola in
      alto clef with the viola's strings, kept after a reload; another book page starting with its own look again.
      (The generator's music rules are checked by tests/sight_reading.py.)
+     Look ahead (laptop in one long line and on pages, phone): turning it on brings a count-in and the page's tempo;
+     at ½ beat, 1 beat, 2 beats and 1 bar, at 60 and 120, while it plays, every note due within that time of what is
+     heard is covered and no other is (checked against each note's place on the screen, during a count-in too), the
+     staff lines and bar lines are drawn over the cover, and every note comes back when the music stops.
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
      the teacher conducts, a student follows, and the student's music keeps up with the teacher's.
   4. The app layer: the browser can install the site, every file is saved after one visit, every song (and the
@@ -866,6 +870,81 @@ async def sight_reading_checks(browser, base):
         await ctx.close()
 
 
+LOOK_JS = """() => { const l = reader.look(); if (!l || l.t == null) return null;
+  const surf = document.querySelector('#sheet .at-surface').getBoundingClientRect(), sc = reader.score, out = [];
+  for (const bar of sc.tracks[0].staves[0].bars) for (const b of bar.voices[0].beats) {
+    const g = document.querySelector('g.b' + b.id); if (!g) continue;
+    const r = g.getBoundingClientRect(), x = (r.left + r.right) / 2 - surf.left, y = (r.top + r.bottom) / 2 - surf.top;
+    const band = l.bands.find(d => y >= d.top && y <= d.bottom);
+    out.push({ tick: sc.masterBars[bar.index].start + b.playbackStart, covered: !!band && x < band.cut });
+  }
+  return { H: l.H, t: l.t, at: reader.at(), beats: out, lines: document.querySelectorAll('.look-layer g > rect').length - l.bands.length,
+           cuts: l.bands.map(b => b.cut - b.left), counting: !document.getElementById('count').hidden }; }"""
+AHEAD_TICKS = {'½ beat': 480, '1 beat': 960, '2 beats': 1920, '1 bar': 3840}  # in 4/4
+AHEAD_SAY = {'½ beat': 'half a beat', '1 beat': 'one beat', '2 beats': 'two beats', '1 bar': 'a bar'}  # its button's label
+
+
+async def look_ahead_checks(browser, base):
+    """Look ahead on the sight-reading page: notes vanish the chosen time before they are heard."""
+    print('Sight-reading: Look ahead')
+    for label, w, h, pages in [('laptop, one long line', 1366, 860, False), ('laptop, pages', 1366, 860, True), ('phone landscape', 844, 390, False)]:
+        ctx = await browser.new_context(device_scale_factor=1)
+        await setup(ctx)
+        errors = []
+        try:
+            pg = await open_reader(ctx, f'{base}/sight-reading/?page=v1-03&n=40', errors, 'look ahead', w, h)
+        except Exception as e:
+            check(False, f'{label}: Look ahead page loads ({e.__class__.__name__})')
+            await ctx.close()
+            continue
+        ck = lambda ok, what: check(ok, f'{label}: {what}')
+        if pages:
+            await pg.click('#g-layout'); await pg.wait_for_timeout(2000)
+        await pg.evaluate("() => { const t = document.getElementById('tempo'); t.value = 90; t.dispatchEvent(new Event('input')); }")
+        await pg.click('#g-ahead')
+        got = await pg.evaluate("() => ({ label: document.getElementById('g-ahead').getAttribute('aria-label'), metro: document.querySelector('#g-metro .now').textContent, tempo: document.getElementById('tempoChip').textContent })")
+        ck('half a beat' in got['label'] and got['metro'] == 'Count-in only' and got['tempo'] == '60',
+           f"turning Look ahead on brings a count-in and the page's tempo ({got})")
+        problems, samples = [], 0
+        for setting in ['½ beat', '1 beat', '2 beats', '1 bar']:
+            while f'vanishes {AHEAD_SAY[setting]} ' not in await pg.get_attribute('#g-ahead', 'aria-label'):
+                await pg.click('#g-ahead')
+            for tempo in (60, 120):
+                await pg.evaluate("(v) => { const t = document.getElementById('tempo'); t.value = v; t.dispatchEvent(new Event('input')); }", tempo)
+                # The first run of each setting counts in (and is checked during the count-in); the others start at once.
+                count_in = tempo == 60
+                while (await pg.text_content('#g-metro .now')) != ('Count-in only' if count_in else 'Off'):
+                    await pg.click('#g-metro')
+                await pg.click('#restart')
+                await pg.click('#play')
+                beat_ms = 60000 / tempo
+                waits = ([beat_ms * 2.6] if count_in else []) + [beat_ms * (5.3 if count_in else 1.3), beat_ms * 1.1, beat_ms * 1.7]
+                for ms in waits:
+                    await pg.wait_for_timeout(ms)
+                    st = await pg.evaluate(LOOK_JS)
+                    if not st:
+                        problems.append(f'{setting} at {tempo}: no cover'); continue
+                    samples += 1
+                    want = AHEAD_TICKS[setting]
+                    if abs(st['H'] - st['t'] - want) > 40:
+                        problems.append(f"{setting} at {tempo}: notes vanish {round(st['H'] - st['t'])} ticks ahead, not {want}")
+                    if not st['counting'] and abs(st['t'] - st['at']) > 0.06 * tempo * 16:
+                        problems.append(f"{setting} at {tempo}: the cover's clock {round(st['t'])} is not the heard one {round(st['at'])}")
+                    wrong = [b for b in st['beats'] if abs(b['tick'] - st['H']) > 40 and b['covered'] != (b['tick'] <= st['H'])]
+                    if wrong:
+                        problems.append(f"{setting} at {tempo}: {len(wrong)} note(s) covered wrongly at heard {round(st['t'])} (e.g. {wrong[0]})")
+                    if any(st['cuts']) and st['lines'] < 5:
+                        problems.append(f"{setting} at {tempo}: staff lines not drawn over the cover ({st['lines']})")
+                await pg.click('#play')
+                await pg.wait_for_timeout(400)
+                back = await pg.evaluate('() => reader.look().bands.every(b => b.cut === b.left)')
+                if not back:
+                    problems.append(f'{setting} at {tempo}: the notes did not come back when the music stopped')
+        ck(not problems and samples >= 24, f'at ½ beat, 1 beat, 2 beats and 1 bar, at 60 and 120, the right notes vanish while it plays, and come back when it stops ({samples} checks{": " + "; ".join(problems[:4]) if problems else ""})')
+        ck(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
+        await ctx.close()
+
+
 async def sheets_printed(pg):
     pdf = await pg.pdf(format='Letter', prefer_css_page_size=True, print_background=True)
     return len(re.findall(rb'/Type\s*/Page(?![a-zA-Z])', pdf))
@@ -1504,6 +1583,7 @@ async def main():
         await voices_checks(browser, base)
         await one_line_checks(browser, base)
         await sight_reading_checks(browser, base)
+        await look_ahead_checks(browser, base)
         await print_checks(browser, base)
         await extras_checks(browser, base)
         await piano_checks(browser, base)
