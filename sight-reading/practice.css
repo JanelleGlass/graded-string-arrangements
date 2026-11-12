@@ -1,0 +1,49 @@
+/* The sight-reading page: a row over the music with the book page, the instrument, the exercise number and New
+   exercise. On every screen, phones turned sideways too (where the title is hidden), so it is always in reach. Light
+   buttons on the stand, like the reader's own. */
+.sr-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; font-family: var(--font-body); }
+.sr-bar > * { flex: none; }
+.sr-bar select, .sr-inst, .sr-num, .sr-new { height: 42px; border-radius: 999px; box-shadow: 0 1px 2px rgba(20, 30, 26, 0.10), 0 4px 14px -6px rgba(20, 30, 26, 0.38); }
+.sr-bar select { max-width: min(24rem, 100%); padding: 0 34px 0 16px; border: 1px solid #CDD5D1; color: #17201C; font-weight: 700; cursor: pointer;
+  -webkit-appearance: none; appearance: none; text-overflow: ellipsis;
+  background: rgba(255, 255, 255, 0.96) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z' fill='%231D5B72'/%3E%3C/svg%3E") no-repeat right 10px center / 20px 20px; }
+.sr-bar select:hover, .sr-num:hover { border-color: #1D5B72; }
+.sr-inst { display: inline-flex; overflow: hidden; border: 1px solid #CDD5D1; background: rgba(255, 255, 255, 0.96); }
+.sr-inst button { border: 0; background: none; padding: 0 15px; color: #17201C; font-weight: 700; }
+.sr-inst button + button { border-left: 1px solid #E1E6E4; }
+.sr-inst button[aria-pressed="true"] { background: #1D5B72; color: #FFFFFF; }
+.sr-inst button:focus-visible { outline: 2px solid #1D5B72; outline-offset: -3px; }
+.sr-num { display: inline-flex; align-items: center; gap: 6px; padding: 0 6px 0 14px; border: 1px solid #CDD5D1; background: rgba(255, 255, 255, 0.96); color: #55615B; font-weight: 600; font-size: 0.9rem; cursor: text; }
+.sr-num input { width: 3.4em; height: 30px; border: 1px solid transparent; border-radius: 8px; background: #EEF2F0; color: #17201C; font: 700 1.05rem/1 var(--font-body); font-variant-numeric: tabular-nums; text-align: center; padding: 0 2px; }
+.sr-num input:focus { outline: none; border-color: #1D5B72; background: #FFFFFF; }
+.sr-new { display: inline-flex; align-items: center; gap: 8px; border: 0; background: #1D5B72; color: #FFFFFF; padding: 0 22px 0 16px; font-weight: 800; font-size: 1.02rem; }
+.sr-new svg { width: 20px; height: 20px; fill: currentColor; flex: none; }
+.sr-new:hover { background: #174A5D; }
+.sr-new[disabled] { opacity: 0.6; cursor: progress; }
+/* No PDFs to buy here */
+.buy { display: none !important; }
+@media (min-width: 721px) { .sr-new { margin-left: auto; } }
+@media (max-width: 560px) {
+  .sr-bar { gap: 8px; }
+  .sr-bar select, .sr-inst, .sr-num, .sr-new { height: 38px; }
+  .sr-bar select { max-width: 100%; }
+}
+/* Phones held upright see "Turn your phone sideways": the row waits with the music */
+@media (max-width: 600px) and (orientation: portrait) { .sr-bar { display: none; } }
+/* Phones turned sideways (no title, and the line of music fills the height): one thin row pinned along the top of the
+   screen beside "All songs", always in reach. The reader keeps the music below it: the room it leaves at the top of the
+   screen (#topInset, the notch's room) grows by the row's height. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .sr-bar { position: fixed; z-index: 1050; left: 0; right: 0; top: 0; flex-wrap: nowrap; gap: 6px; background: var(--stand);
+    padding: calc(5px + env(safe-area-inset-top, 0px)) calc(10px + env(safe-area-inset-right, 0px)) 5px var(--sr-home, 100px); }
+  #topInset { height: calc(env(safe-area-inset-top, 0px) + 40px) !important; }
+  html .page { padding-top: calc(46px + env(safe-area-inset-top, 0px)); }
+  html .home-float:not([hidden]) ~ .page .key { left: 6px; } /* All songs is in the row now, not over the music */
+  .sr-bar select, .sr-inst, .sr-num, .sr-new { height: 30px; font-size: 0.8rem; }
+  .sr-bar select { flex: 0 1 auto; min-width: 0; max-width: 15em; padding: 0 26px 0 11px; background-position: right 5px center; background-size: 18px 18px; }
+  .sr-inst button { padding: 0 10px; }
+  .sr-num { padding: 0 4px 0 10px; font-size: 0.78rem; }
+  .sr-num input { height: 24px; font-size: 0.9rem; width: 3.1em; }
+  .sr-new { padding: 0 14px 0 10px; font-size: 0.86rem; gap: 5px; margin-left: auto; }
+  .sr-new svg { width: 17px; height: 17px; }
+}

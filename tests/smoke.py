@@ -58,10 +58,16 @@ What it checks
      not a stale copy in one long line; and where the print window doesn't open by itself, a card offers a Print button.
      Joy to the World's violin melody, which used to leave one line on a second sheet, prints on one sheet.
      Download PDF saves the same sheet as a PDF file, named for the song and its parts, without a print window.
+  2b. The sight-reading page (unlisted), at laptop and phone-landscape sizes: an exercise from the book page and number
+     in the address, its row (book page, Violin / Viola, exercise number, New exercise) in sight over the music,
+     the page's starting look (string colors, plain notes) and tempo, Play moving the music; New exercise changing the
+     music and the number in the address; a typed number bringing an exercise back, the same after a reload; Viola in
+     alto clef with the viola's strings, kept after a reload; another book page starting with its own look again.
+     (The generator's music rules are checked by tests/sight_reading.py.)
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
      the teacher conducts, a student follows, and the student's music keeps up with the teacher's.
-  4. The app layer: the browser can install the site, every file is saved after one visit, every song
-     opens and plays with the server stopped and the network off, and an update reaches the saved
+  4. The app layer: the browser can install the site, every file is saved after one visit, every song (and the
+     sight-reading page, New exercise too) opens and plays with the server stopped and the network off, and an update reaches the saved
      copy without downloading the unchanged files (the string sounds) again.
 
 Offline options (only needed where the internet is filtered):
@@ -782,6 +788,84 @@ FINGERS_CLEAR_JS = '''() => { const touching = []; let checked = 0;
     } }
   return { checked, touching }; }'''
 # How many sheets of Letter paper the print takes (Chromium's own PDF of the print).
+MUSIC_JS = """() => reader.score.tracks[0].staves[0].bars.map(b => b.voices[0].beats.map(x => x.isRest ? 'r' : x.notes.map(n => n.realValue).join('+') + ':' + x.duration).join(',')).join('|')"""
+
+
+async def sight_reading_checks(browser, base):
+    """The sight-reading page: the reader with music made on the page for a book page and an exercise number."""
+    print('Sight-reading page')
+    for label, w, h in [('laptop', 1366, 860), ('phone landscape', 844, 390), ('iPhone SE landscape', 667, 375)]:
+        ctx = await browser.new_context(device_scale_factor=1)
+        await setup(ctx)
+        errors = []
+        try:
+            pg = await open_reader(ctx, f'{base}/sight-reading/?page=v1-02&n=7', errors, 'sight-reading', w, h)
+        except Exception as e:
+            check(False, f'{label}: sight-reading page loads ({e.__class__.__name__})')
+            await ctx.close()
+            continue
+        ck = lambda ok, what: check(ok, f'{label}: {what}')
+        title = (await pg.evaluate("() => document.getElementById('infoBtn').firstChild.textContent")).strip()
+        ck(title == 'Sight-reading', f'title reads "Sight-reading" ("{title}")')
+        got = await pg.evaluate("""() => ({ page: document.getElementById('srPage').value, n: document.getElementById('srNum').value,
+          tracks: reader.score.tracks.length, bars: reader.score.masterBars.length, clef: reader.score.tracks[0].staves[0].bars[0].clef,
+          look: document.querySelector('#g-look .now .word').textContent, colors: document.querySelector('#g-colors .now').textContent,
+          tempo: document.getElementById('tempoChip').textContent, key: document.getElementById('srKey').textContent,
+          strings: [...document.querySelectorAll('#legend .key-head')].map(e => e.textContent).join('') })""")
+        ck(got['page'] == 'v1-02' and got['n'] == '7', f"book page and number from the address ({got['page']}, {got['n']})")
+        ck(got['tracks'] == 1 and got['bars'] == 4, f"one part, four bars ({got['tracks']}, {got['bars']})")
+        ck(got['look'] == 'Plain notes' and got['colors'] == 'All', f"starts with string colors and plain notes, as the page says ({got['colors']}, {got['look']})")
+        ck(got['tempo'] == '60', f"starts at the page's slowest tempo ({got['tempo']})")
+        ck(got['key'] == 'A major' and got['strings'] == 'EADG', f"violin in A major with its strings ({got['key']}, {got['strings']})")
+        drawn = await pg.evaluate("() => document.querySelectorAll('#sheet .at-surface > *').length")
+        ck(drawn > 0, 'notes are drawn')
+        wide = await pg.evaluate('() => document.documentElement.scrollWidth - window.innerWidth')
+        ck(wide <= 1, f'no sideways scrolling ({wide}px extra)')
+        # The row: every control on the screen, above the music, clear of All songs.
+        row = await pg.evaluate("""() => { const r = (id) => document.getElementById(id).getBoundingClientRect();
+          const ids = ['srPage', 'srViolin', 'srViola', 'srNum', 'srNew'], home = r('homeBtn'), surf = document.querySelector('#sheet .at-surface').getBoundingClientRect();
+          return { inside: ids.every(id => { const b = r(id); return b.width > 0 && b.left >= 0 && b.right <= innerWidth && b.top >= 0 && b.bottom <= innerHeight; }),
+                   above: ids.every(id => r(id).bottom <= surf.top + 1), clear: ids.every(id => { const b = r(id); return b.left >= home.right || b.top >= home.bottom; }) }; }""")
+        ck(row['inside'] and row['above'] and row['clear'], f'the row (book page, Violin / Viola, number, New exercise) is on the screen over the music ({row})')
+        await pg.click('#play'); await pg.wait_for_timeout(2500)
+        tick = await pg.evaluate('() => reader.at()')
+        ck(tick > 0, f'Play moves the music forward (tick {round(tick)})')
+        await pg.click('#play')
+        first = await pg.evaluate(MUSIC_JS)
+        await pg.click('#srNew'); await pg.wait_for_timeout(1500)
+        n2 = await pg.input_value('#srNum')
+        second = await pg.evaluate(MUSIC_JS)
+        ck(n2 != '7' and f'n={n2}' in pg.url and second != first, f'New exercise brings new music and its number, in the address too (#{n2}, {pg.url})')
+        await pg.click('#play'); await pg.wait_for_timeout(2000)
+        tick = await pg.evaluate('() => reader.at()')
+        ck(tick > 0, f'the new exercise plays (tick {round(tick)})')
+        await pg.click('#play')
+        await pg.fill('#srNum', '7'); await pg.press('#srNum', 'Enter'); await pg.wait_for_timeout(1500)
+        ck(await pg.evaluate(MUSIC_JS) == first and 'n=7' in pg.url, 'typing a number brings that exercise back')
+        await pg.click('#srViola'); await pg.wait_for_timeout(1500)
+        got = await pg.evaluate("""() => ({ clef: reader.score.tracks[0].staves[0].bars[0].clef, key: document.getElementById('srKey').textContent,
+          strings: [...document.querySelectorAll('#legend .key-head')].map(e => e.textContent).join(''), pressed: document.getElementById('srViola').getAttribute('aria-pressed') })""")
+        ck(got['clef'] == 1 and got['key'] == 'D major' and got['strings'] == 'ADGC' and got['pressed'] == 'true',
+           f"Viola: alto clef, D major, the viola's strings ({got})")
+        viola = await pg.evaluate(MUSIC_JS)
+        await pg.reload()
+        await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
+        await pg.wait_for_timeout(1000)
+        again = await pg.evaluate(MUSIC_JS)
+        pressed = await pg.get_attribute('#srViola', 'aria-pressed')
+        ck(again == viola and pressed == 'true', 'after a reload: still viola, and the same number gives the same music')
+        # Another book page starts with its own look again, after the student changed it.
+        await pg.click('#g-look'); await pg.wait_for_timeout(1200)
+        async with pg.expect_navigation():
+            await pg.select_option('#srPage', 'v1-04')
+        await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
+        await pg.wait_for_timeout(1000)
+        look = await pg.evaluate("() => document.querySelector('#g-look .now .word').textContent")
+        ck('page=v1-04' in pg.url and look == 'Plain notes', f'another book page opens with its own look ({pg.url}, {look})')
+        ck(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
+        await ctx.close()
+
+
 async def sheets_printed(pg):
     pdf = await pg.pdf(format='Letter', prefer_css_page_size=True, print_background=True)
     return len(re.findall(rb'/Type\s*/Page(?![a-zA-Z])', pdf))
@@ -1116,6 +1200,18 @@ async def app_checks(browser):
         if not os.environ.get('NO_WEBFONTS'):
             check(await sp.evaluate(LETTERING_JS), f'offline: {slug} has its lettering')
         await sp.close()
+    try:
+        sp = await open_reader(ctx, f'{base}/sight-reading/?page=v1-03&n=12', errors, 'sight-reading', 844, 390)
+        drawn = await sp.evaluate("() => document.querySelectorAll('#sheet .at-surface > *').length")
+        before = await sp.evaluate(MUSIC_JS)
+        await sp.click('#srNew'); await sp.wait_for_timeout(1500)
+        after = await sp.evaluate(MUSIC_JS)
+        await sp.click('#play'); await sp.wait_for_timeout(2500)
+        tick = await sp.evaluate('() => reader.at()')
+        check(drawn > 0 and after != before and tick > 0, f'offline: the sight-reading page opens, New exercise works, and it plays (tick {round(tick)})')
+        await sp.close()
+    except Exception as e:
+        check(False, f'offline: the sight-reading page opens ({e.__class__.__name__})')
     stray = await ctx.new_page()
     try:
         await stray.goto(base + '/songs/not-saved/')
@@ -1407,6 +1503,7 @@ async def main():
         await voices40_checks(browser, base)
         await voices_checks(browser, base)
         await one_line_checks(browser, base)
+        await sight_reading_checks(browser, base)
         await print_checks(browser, base)
         await extras_checks(browser, base)
         await piano_checks(browser, base)

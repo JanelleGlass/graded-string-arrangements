@@ -14,6 +14,8 @@ Writes
                                <!-- app:start --> and <!-- app:end -->
   sw.js                        the offline copy (from tools/sw_template.js): every page and file the site
                                needs, each with a fingerprint, so a change reaches copies already on phones
+  sight-reading/index.html     the sight-reading page (unlisted): the reader with music made by
+                               sight-reading/generator.js for the book pages in sight-reading/pages.json
 
 The app layer (offline copy, install button, iPhone sound) lives in app/app.js and sw.js, apart from
 the reader. The home-screen app file is manifest.webmanifest, with its icons in assets/.
@@ -318,6 +320,83 @@ def song_page(reader, song, facts, app, revs):
     return HEAD + app + head + '\n</head>\n<body>\n' + b.lstrip('\n') + '\n</body>\n</html>\n'
 
 
+SIGHT = 'sight-reading'
+SIGHT_FILES = ['generator.js', 'practice.js', 'practice.css']  # served beside its page; pages.json goes into the page
+NEW_ICON = ('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 '
+            '1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>')
+SIGHT_BAR = f'''  <div class="sr-bar" id="srBar" role="group" aria-label="Sight-reading">
+    <select id="srPage" aria-label="Book page"></select>
+    <div class="sr-inst" role="group" aria-label="Instrument"><button type="button" id="srViolin" aria-pressed="true">Violin</button><button type="button" id="srViola" aria-pressed="false">Viola</button></div>
+    <label class="sr-num">Exercise <input id="srNum" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" aria-label="Exercise number"></label>
+    <button class="sr-new" id="srNew" type="button" disabled>{NEW_ICON}New exercise</button>
+  </div>
+'''
+
+
+def read_pages():
+    """The sight-reading book pages (sight-reading/pages.json): checked here for what a typo would break; the music
+    rules themselves are checked by tests/sight_reading.py."""
+    path = ROOT / SIGHT / 'pages.json'
+    try:
+        pages = json.loads(path.read_text(encoding='utf-8'))
+    except ValueError as e:
+        fail(f'{SIGHT}/pages.json is not valid JSON: {e}')
+    if not isinstance(pages, list) or not pages:
+        fail(f'{SIGHT}/pages.json: expected a list of pages')
+    seen = set()
+    for p in pages:
+        pid = p.get('id', '')
+        if not re.fullmatch(r'[a-z0-9-]+', pid or '') or pid in seen:
+            fail(f'{SIGHT}/pages.json: bad or repeated id {pid!r}')
+        seen.add(pid)
+        for k in ('title', 'notes', 'key', 'rhythms'):
+            if not p.get(k):
+                fail(f'{SIGHT}/pages.json: page {pid} has no {k}')
+    return pages
+
+
+def sight_reading_page(reader, pages, app, revs):
+    """The sight-reading page: the reader, with music made by the generator (sight-reading/generator.js) for the book
+    page and exercise number in the address, and a row over the music to choose them. Unlisted: no home-page card."""
+    e = html.escape
+    cut = reader.index('</style>') + len('</style>')
+    head, body = reader[:cut], reader[cut:]
+    t = TEMPLATE
+    head = replace(head, f"<title>{t['title']}</title>", '<title>Sight-reading</title>')
+    head = replace(head, f"Read and play along with {t['title']} in six levels for violin, viola, cello and bass.",
+                   'New music to read for each page of the sight-reading book, for violin and viola.')
+    b = body
+    b = replace(b, t['lede'], 'New music to read for each page of the book, as much as you like: tap New exercise for '
+                'another. The exercise number brings the same music back on any device, so a class can read the same one.')
+    b = replace(b, f">{t['title']}<span class=\"info-i\"", '>Sight-reading<span class="info-i"')
+    b = replace(b, f"<p class=\"info-title\">{t['title']}</p>", '<p class="info-title">Sight-reading</p>')
+    b = replace(b, f"<p class=\"eyebrow\">{t['collection']}</p>", '<p class="eyebrow">Sight-reading</p>')
+    b = replace(b, f"<p class=\"info-src\">{t['source']}</p>", '<p class="info-src" id="srSource"></p>')
+    b = replace(b, f"<dt>Key</dt><dd>{t['key']}</dd>", '<dt>Key</dt><dd id="srKey"></dd>')
+    b = replace(b, f"<dt>Time</dt><dd>{t['time']}</dd>", '<dt>Time</dt><dd id="srTime"></dd>')
+    b = replace(b, f"<dt>Length</dt><dd>{t['bars']}</dd>", '<dt>Length</dt><dd id="srLength"></dd>')
+    # Each exercise is written at the book page's slowest tempo (practice.js says which page, before the reader starts).
+    b = replace(b, t['tempo'], "const BASE_TEMPO = window.sightReading.tempo; // the book page's slowest tempo (practice.js)")
+    b = replace(b, t['tempo_percent'], 'const TEMPO_PERCENT = false;')
+    b = replace(b, f"const SCORE_URL = '{t['score']}';", "const SCORE_URL = ''; // the music is made on the page (window.readerScore)")
+    b = replace(b, "const FONT_URL = 'font/Bravura.woff2';", f"const FONT_URL = '../{FONT}?v={revs['font']}';")
+    b = replace(b, "const SOUNDFONT_URL = 'soundfont/strings-generaluser-sf2.b64.txt';",
+                f"const SOUNDFONT_URL = '../{SOUNDFONT}?v={revs['soundfont']}';")
+    b = replace(b, f"'{t['storage']}'", f"'{SIGHT}-reader'", count=2)
+    b = replace(b, "  else { $('buyNote').textContent = 'PDF store link coming soon. Free to read and play along here.'; }",
+                "  else { $('buyPending').hidden = true; $('buyNote').textContent = 'Free to read and play along.'; }")
+    b = replace(b, '<a class="home-float" id="homeBtn" href="../../" hidden>', '<a class="home-float" id="homeBtn" href="../">')
+    b = replace(b, '  </header>\n', '  </header>\n\n' + SIGHT_BAR)
+    b = replace(b, ' The bass sounds an octave below where it is written, as on a real double bass.', '')
+    data = json.dumps(pages, ensure_ascii=False, separators=(',', ':')).replace('</', '<\\/')
+    own = ('<meta name="robots" content="noindex">\n'  # unlisted until Janelle says it's ready
+           f'<link rel="stylesheet" href="practice.css?v={revs["practice.css"]}">\n'
+           f'<script>window.SIGHT_READING_PAGES = {data};</script>\n'
+           f'<script src="generator.js?v={revs["generator.js"]}"></script>\n'
+           f'<script src="practice.js?v={revs["practice.js"]}"></script>\n')
+    return HEAD.replace('../../', '../') + app + own + head + '\n</head>\n<body>\n' + b.lstrip('\n') + '\n</body>\n</html>\n'
+
+
 def section_id(name):
     """A section's short name for the page address ("Hymns" -> "hymns", as in .../#hymns)."""
     return re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
@@ -413,6 +492,19 @@ def main():
             print(f'  note: {slug} has no tempo mark in the score, so it plays at quarter = 120')
         if len(set(got['tempos'])) > 1:
             print(f"  tempo changes: {' -> '.join(map(str, got['tempos']))} (tempo control shows a percentage)")
+
+    # Sight-reading (unlisted): its page and files, offline too.
+    for f in SIGHT_FILES:
+        if not (ROOT / SIGHT / f).exists():
+            fail(f'missing {SIGHT}/{f}')
+    pages = read_pages()
+    sight_revs = {**shared, **{f: fingerprint(ROOT / SIGHT / f) for f in SIGHT_FILES}}
+    page = sight_reading_page(reader, pages, app_script('../', app_rev), sight_revs)
+    (ROOT / SIGHT / 'index.html').write_text(page, encoding='utf-8', newline='\n')
+    offline[f'{SIGHT}/'] = fingerprint(page)
+    for f in SIGHT_FILES:
+        offline[f'{SIGHT}/{f}?v={sight_revs[f]}'] = sight_revs[f]
+    print(f"  {SIGHT}: {len(pages)} book page(s) ({', '.join(p['id'] for p in pages)}), unlisted")
 
     home = (ROOT / 'index.html').read_text(encoding='utf-8')
     a, z = '<!-- songs:start', '  <!-- songs:end -->'

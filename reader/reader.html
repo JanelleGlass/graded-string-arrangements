@@ -4913,24 +4913,61 @@ body.following .host-only { display: none !important; }
     return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
   }
 
-  async function boot() {
-    buildControls();
-    if (typeof alphaTab === 'undefined') return fail('The music reader could not load. Check your connection and reload the page.');
-    let xmlBuf, fontUrl;
-    try {
-      const [xr, fr] = await Promise.all([fetch(SCORE_URL), fetch(FONT_URL)]);
-      if (!xr.ok || !fr.ok) throw new Error('missing');
-      xmlBuf = await xr.arrayBuffer();
-      fontUrl = await toDataUrl(new Blob([await fr.arrayBuffer()], { type: 'font/woff2' }));
-    } catch { return fail('The score did not load. Reload the page to try again.'); }
-
+  // A score (MusicXML) read into the reader: the string colors, finger numbers and words from the file, the layout of
+  // its parts (the Parts table follows), then alphaTab's own reading of it.
+  function readScore(xmlBuf, settings) {
     const xmlDoc = new DOMParser().parseFromString(new TextDecoder().decode(xmlBuf), 'application/xml');
     if (padPickup(xmlDoc)) xmlBuf = new TextEncoder().encode(new XMLSerializer().serializeToString(xmlDoc)).buffer;
     marks = readMarks(xmlDoc);
     words = readWords(xmlDoc);
     // The six levels, levels and voices, or one line, from the part names; the Parts table follows.
     const found = layoutOf([...xmlDoc.querySelectorAll('part-list > score-part')].map(p => p.querySelector('part-name')?.textContent.trim() || ''));
-    if (found !== layout) { switchLayout(found); buildControls(); }
+    if (found !== layout) {
+      switchLayout(found);
+      if (state.heard && !state.heard.length) state.heard = [...state.seen]; // nothing left to hear: hear what's seen
+      buildControls();
+    }
+    const next = alphaTab.importer.ScoreLoader.loadScoreFromBytes(new Uint8Array(xmlBuf), settings);
+    score = next; pickupExtra = 0;
+    prepareScore();
+    markSame();
+  }
+  // New music in place of the music on the page, with the same settings, sounds and size (the sight-reading page's New
+  // exercise, and its Violin / Viola): playing stops, and Play starts again from the beginning.
+  function newScore(xmlBuf) {
+    if (!api || printing) return false;
+    cancelLoopGap(); clearTimers();
+    if (playing || counting) api.stop();
+    endCountIn();
+    loop = null; markTick = 0; markBeat = null;
+    try { api.playbackRange = null; } catch {}
+    try { readScore(xmlBuf, api.settings); } catch { fail('The music could not be read.'); return false; }
+    // The tempo marks are halved again for very slow playing (playSpeed), from this score's own marks.
+    tempoScale = 1; writtenTempos = null;
+    bounceRoom = { key: '', widths: new Map(), tries: 0 }; nameRoom = { part: 0, line: 0 }; fitTries = 0;
+    xmap = null; lineState = null; lastScrollKey = null;
+    $('sheet').scrollLeft = 0;
+    applySize();
+    labelStaves(shownIndexes());
+    api.renderScore(score, shownIndexes());
+    playSpeed(state.tempo / SPEED_BASE);
+    applyAudio();
+    return true;
+  }
+
+  async function boot() {
+    buildControls();
+    if (typeof alphaTab === 'undefined') return fail('The music reader could not load. Check your connection and reload the page.');
+    let xmlBuf, fontUrl;
+    // A page that makes its own music (the sight-reading page, sight-reading/practice.js) hands it over as MusicXML
+    // instead of a score file.
+    const made = window.readerScore;
+    try {
+      const [xr, fr] = await Promise.all([made ? null : fetch(SCORE_URL), fetch(FONT_URL)]);
+      if ((xr && !xr.ok) || !fr.ok) throw new Error('missing');
+      xmlBuf = made ? await made() : await xr.arrayBuffer();
+      fontUrl = await toDataUrl(new Blob([await fr.arrayBuffer()], { type: 'font/woff2' }));
+    } catch { return fail(made ? 'The music could not be made. Reload the page to try again.' : 'The score did not load. Reload the page to try again.'); }
 
     const s = new alphaTab.Settings();
     s.core.useWorkers = false;
@@ -4959,15 +4996,13 @@ body.following .host-only { display: none !important; }
     s.player.scrollMode = alphaTab.ScrollMode.Continuous; // the page's own scroller below does the moving
 
     try {
-      score = alphaTab.importer.ScoreLoader.loadScoreFromBytes(new Uint8Array(xmlBuf), s);
+      readScore(xmlBuf, s);
     } catch (e) { return fail('The score file could not be read.'); }
-    prepareScore();
-    markSame();
 
     api = new alphaTab.AlphaTabApi($('sheet'), s);
     api.customScrollHandler = scroller;
     holdPictureForSound();
-    window.reader = { api, score, conductor, xmap: () => xmap, line: () => lineState, at: () => playedTick(performance.now()), lag: reportLag };
+    window.reader = { api, get score() { return score; }, conductor, xmap: () => xmap, line: () => lineState, at: () => playedTick(performance.now()), lag: reportLag, newScore };
     api.error.on(() => fail('Something went wrong drawing the music. Reload the page to try again.'));
     api.renderStarted.on(() => { if (!fitPending) fitTries = 0; if (!namePending) nameTries = 0; head = null; lineHead.classList.remove('on'); clearTimeout(printTimer); });
     api.renderFinished.on(() => { namePending = false; if (fitNames()) return; // drawn again with room for the part names
