@@ -456,10 +456,15 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   with the Payhip PDFs still to come).
 - Back to the song list (Janelle, 2026-11-11: the small grey "← All songs" over the title was hard to see, and gone
   once bigger music scrolled the page; on a phone turned sideways the title isn't shown at all, so there was no way
-  back): "← All songs" over the title is a teal outlined button (`HOME_LINK_CSS` in the build), and a round teal house
-  (`homeBtn`) is the first of the buttons at the top right of the music, so it stays at the top of the window on every
-  screen. It is `hidden` in the master reader (the Claude preview has no song list); the build shows it. With Parts open
-  and too little room beside the Strings key, the house steps aside before the key does (`nohome` in `placeTools`).
+  back). A first fix (a teal house at the top right and a bigger header button, live 2026-11-11) was replaced the next
+  day: Janelle wanted one button floating at the top of the screen whatever the phone's way round or the page's zoom,
+  and no bigger. Now "← All songs" is a small pill fixed at the top left of the screen (`homeBtn`, `.home-float`, the
+  same size as the top-right buttons), on every screen, the turn-your-phone screen too, over the music once scrolled.
+  Pinch-zoomed, a small script before `.page` keeps it in the top left corner of what is showing, at its own size
+  (`visualViewport`: moved by its offset, scaled by 1 / its scale). The title sits below it; on a phone turned sideways
+  (no title) the Strings key moves over beside it (`--home-room`), so on an iPhone SE turned sideways with Parts open
+  the key steps aside until the panel closes. It is `hidden` in the master reader (the Claude preview has no song list);
+  the build shows it. Never printed.
 - Pinch to zoom on touch screens: two fingers on the music make it bigger or smaller, over a clef, key or time signature too (their explain buttons pass two-finger touches on to the music; they swallowed them until 2026-11-10). The music grows
   and shrinks under the fingers, then settles on the nearest − / + size. A second finger cancels a tap
   or a press-and-hold; the browser's own page zoom is kept off the music.

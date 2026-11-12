@@ -99,13 +99,6 @@ HEAD = '''<!doctype html>
 <meta name="apple-mobile-web-app-title" content="Graded Strings">
 <style>body{margin:0;padding:0}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 '''
-# The "All songs" link over the title: a teal outlined button, easy to see and to tap (Janelle, 2026-11-11: the small
-# grey words were hard to find). The house at the top right of the music (the reader's homeBtn) is the way back once
-# the title has scrolled away.
-HOME_LINK_CSS = ('.home-link { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 10px; padding: 6px 15px 6px 12px; '
-                 'border: 1.5px solid var(--accent); border-radius: 999px; background: var(--paper); color: #1D5B72; '
-                 'font-size: 0.95rem; font-weight: 700; text-decoration: none; }\n'
-                 '.home-link:hover { background: var(--accent); color: var(--accent-ink); }\n')
 
 
 def fail(msg):
@@ -280,7 +273,6 @@ def song_page(reader, song, facts, app, revs):
     levels = one or ('in six levels' if facts['layout'] == 'six tiers' else 'in four levels') + ' for violin, viola, cello and bass'
     head = replace(head, f"play along with {t['title']} in six levels for violin, viola, cello and bass",
                    f"play along with {e(song['title'])} {levels}")
-    head = replace(head, '</style>', HOME_LINK_CSS + '</style>')
 
     b = body
     piano = facts['layout'].endswith(PIANO)
@@ -320,8 +312,9 @@ def song_page(reader, song, facts, app, revs):
     b = replace(b, "  else { $('buyNote').textContent = 'PDF store link coming soon. Free to read and play along here.'; }",
                 "  else { $('buyPending').hidden = true; $('buyNote').textContent = 'Free to read and play along.'; }")
     # A way back to the song list.
-    b = replace(b, '    <div class="title-wrap">\n', '    <div class="title-wrap">\n      <a class="home-link" href="../../">← All songs</a>\n')
-    b = replace(b, 'aria-label="All songs" title="All songs" hidden>', 'aria-label="All songs" title="All songs">')
+    # A way back to the song list: the reader's "All songs" button, floating at the top left (hidden in the reader,
+    # since the Claude preview has no song list).
+    b = replace(b, '<a class="home-float" id="homeBtn" href="../../" hidden>', '<a class="home-float" id="homeBtn" href="../../">')
     return HEAD + app + head + '\n</head>\n<body>\n' + b.lstrip('\n') + '\n</body>\n</html>\n'
 
 
