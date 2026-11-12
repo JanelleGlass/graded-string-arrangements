@@ -199,7 +199,11 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   half the screen (big music), the playing note sits just past it instead (Janelle, 2026-10-17).
 - Pages: every line of music names its parts beside the staves, not just the first line (2026-10-17).
 - Every setting is always visible in a strip at the bottom, on phones too, never covering notes.
-  Phone-landscape buttons are compact so the strip fits one row on regular iPhones.
+  Phone-landscape buttons are compact so the strip fits one row on regular iPhones. Sideways on a phone the long
+  labels take two short lines ("Note names / and fingers", "Count-in / only", "Counting: / On"), so it fits on an
+  iPhone SE (651 px) and on a notched iPhone, whose page is only about 734 to 750 px wide in landscape, with the
+  teacher's Conduct button too (Janelle saw two rows, 2026-11-12: the ball's button had tipped it over). Only an
+  iPhone SE while conducting ("Conducting · 12") still takes two rows.
 - Everything stays in the same place so people can orient themselves: a choice that doesn't apply
   right now is greyed out in its place (a tap says why), never hidden, and a tap-to-change button
   keeps one width (its longest label) so nothing beside it shifts (Janelle, 2026-10-16).
