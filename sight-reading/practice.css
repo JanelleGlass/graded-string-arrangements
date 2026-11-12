@@ -1,7 +1,7 @@
 /* The sight-reading page: a row over the music with the book page, the instrument, the exercise number and New
    exercise. On every screen, phones turned sideways too (where the title is hidden), so it is always in reach. Light
    buttons on the stand, like the reader's own. */
-.sr-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; font-family: var(--font-body); }
+.sr-bar { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; font-family: var(--font-body); }
 .sr-bar > * { flex: none; }
 .sr-bar select, .sr-inst, .sr-num, .sr-new { height: 42px; border-radius: 999px; box-shadow: 0 1px 2px rgba(20, 30, 26, 0.10), 0 4px 14px -6px rgba(20, 30, 26, 0.38); }
 .sr-bar select { max-width: min(24rem, 100%); padding: 0 34px 0 16px; border: 1px solid #CDD5D1; color: #17201C; font-weight: 700; cursor: pointer;
@@ -24,12 +24,45 @@
 .sr-new svg { width: 20px; height: 20px; fill: currentColor; flex: none; }
 .sr-new:hover { background: #174A5D; }
 .sr-new[disabled] { opacity: 0.6; cursor: progress; }
+/* In a duet the Violin / Viola choice is each part's, in the Duet card: greyed out in its place */
+.sr-inst.off { opacity: 0.45; }
+.sr-inst.off button[aria-pressed] { background: none; color: #17201C; }
+/* Duet: a light pill like Flash a bar's, teal while a duet is on */
+.sr-duet { display: inline-flex; align-items: center; gap: 6px; height: 42px; padding: 0 16px 0 12px; border-radius: 999px; border: 1px solid #CDD5D1;
+  background: rgba(255, 255, 255, 0.96); color: #17201C; font-weight: 800; box-shadow: 0 1px 2px rgba(20, 30, 26, 0.10), 0 4px 14px -6px rgba(20, 30, 26, 0.38); }
+.sr-duet svg { width: 19px; height: 19px; fill: #1D5B72; flex: none; }
+.sr-duet:hover { border-color: #1D5B72; }
+.sr-duet[aria-pressed="true"] { background: #1D5B72; border-color: #1D5B72; color: #FFFFFF; }
+.sr-duet[aria-pressed="true"] svg { fill: #FFFFFF; }
+/* The Duet card, under its button */
+.sr-pop { position: absolute; z-index: 1100; top: calc(100% + 8px); left: 0; width: min(25rem, calc(100vw - 16px)); max-height: calc(100vh - 120px); overflow: auto;
+  padding: 12px 16px 16px; border-radius: 18px; background: #FFFFFF; color: #17201C; box-shadow: 0 2px 4px rgba(20, 30, 26, 0.08), 0 18px 40px -14px rgba(20, 30, 26, 0.5); }
+.sr-pop[hidden] { display: none; }
+.sr-pop-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.sr-pop-head b { font-family: var(--font-display); font-size: 1.45rem; font-weight: 600; line-height: 1; }
+.sr-pop-x { width: 34px; height: 34px; border: 0; border-radius: 50%; background: #EEF2F0; color: #17201C; font-size: 1.3rem; line-height: 1; }
+.sr-pop .sr-inst { height: 38px; box-shadow: none; }
+.sr-solo { margin-bottom: 12px; }
+.sr-solo button { padding: 0 22px; }
+.sr-pop-rows { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 10px 14px; }
+.sr-pop-rows > span { color: #55615B; font-weight: 700; font-size: 0.9rem; }
+.sr-pop-rows .sr-inst { justify-self: start; }
+.sr-pop-rows select { height: 38px; max-width: 100%; padding: 0 30px 0 12px; border-radius: 999px; border: 1px solid #CDD5D1; font-weight: 700; color: #17201C;
+  -webkit-appearance: none; appearance: none; text-overflow: ellipsis;
+  background: #FFFFFF url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z' fill='%231D5B72'/%3E%3C/svg%3E") no-repeat right 8px center / 20px 20px; }
+.sr-pop-rows.off { opacity: 0.4; }
+.sr-pop-rows.off .sr-inst button[aria-pressed="true"] { background: none; color: #17201C; }
+.sr-pop-note { margin: 12px 0 10px; color: #55615B; font-size: 0.84rem; line-height: 1.4; }
+.sr-copy { height: 38px; padding: 0 18px; border-radius: 999px; border: 1px solid #1D5B72; background: #FFFFFF; color: #1D5B72; font-weight: 800; }
+.sr-copy:hover { background: #E3EEF2; }
+/* "Exercise" on bigger screens, "No." on a phone turned sideways */
+.sr-short { display: none; }
 /* No PDFs to buy here */
 .buy { display: none !important; }
 @media (min-width: 721px) { .sr-new { margin-left: auto; } }
 @media (max-width: 560px) {
   .sr-bar { gap: 8px; }
-  .sr-bar select, .sr-inst, .sr-num, .sr-new, .sr-flash { height: 38px; }
+  .sr-bar select, .sr-inst, .sr-num, .sr-new, .sr-flash, .sr-duet { height: 38px; }
   .sr-bar select { max-width: 100%; }
 }
 /* Phones held upright see "Turn your phone sideways": the row waits with the music */
@@ -43,11 +76,19 @@
   #topInset { height: calc(env(safe-area-inset-top, 0px) + 40px) !important; }
   html .page { padding-top: calc(46px + env(safe-area-inset-top, 0px)); }
   html .home-float:not([hidden]) ~ .page .key { left: 6px; } /* All songs is in the row now, not over the music */
-  .sr-bar select, .sr-inst, .sr-num, .sr-new, .sr-flash { height: 30px; font-size: 0.8rem; }
-  .sr-flash { padding: 0 10px 0 8px; gap: 4px; }
-  .sr-flash svg { width: 15px; height: 15px; }
-  .sr-long { display: none; }
-  .sr-bar select { flex: 0 1 auto; min-width: 0; max-width: 15em; padding: 0 26px 0 11px; background-position: right 5px center; background-size: 18px 18px; }
+  .sr-bar select, .sr-inst, .sr-num, .sr-new, .sr-flash, .sr-duet { height: 30px; font-size: 0.8rem; }
+  .sr-flash, .sr-duet { padding: 0 10px 0 8px; gap: 4px; }
+  .sr-flash svg, .sr-duet svg { width: 15px; height: 15px; }
+  .sr-pop { top: calc(100% + 4px); width: min(37rem, calc(100vw - 16px)); max-height: calc(100vh - 52px - env(safe-area-inset-top, 0px)); padding: 10px 14px 12px; }
+  .sr-pop-rows { grid-template-columns: auto auto auto 1fr; }
+  .sr-pop .sr-inst, .sr-pop-rows select, .sr-copy { height: 32px; font-size: 0.82rem; }
+  .sr-pop-head { margin-bottom: 6px; }
+  .sr-solo { margin-bottom: 8px; }
+  .sr-pop-rows { gap: 6px 12px; }
+  .sr-pop-note { margin: 8px 0; font-size: 0.78rem; }
+  .sr-long, .sr-word { display: none; }
+  .sr-short { display: inline; }
+  .sr-bar select { flex: 0 1 auto; min-width: 7.5em; max-width: 15em; padding: 0 26px 0 11px; background-position: right 5px center; background-size: 18px 18px; }
   .sr-inst button { padding: 0 10px; }
   .sr-num { padding: 0 4px 0 10px; font-size: 0.78rem; }
   .sr-num input { height: 24px; font-size: 0.9rem; width: 3.1em; }

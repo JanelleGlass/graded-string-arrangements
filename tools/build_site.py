@@ -33,6 +33,8 @@ layouts the reader knows, in BUILD-SPEC order, and says which one it read:
   six tiers, 24 parts (songs built before 2026-10-16): level by level, violin-viola-cello-bass in each
   one line, 1 to 4 parts (a piece with no levels, such as Twinkle Harmony): the same line's name on each of its
     instruments, in violin-viola-cello-bass order ("Viola — Harmony", "Cello — Harmony")
+  a duet, 2 parts: "<instrument> — Part 1" then "<instrument> — Part 2" ("Violin — Part 1", "Viola — Part 2"), the
+    layout of the sight-reading page's duets (made in the browser, sight-reading/generator.js), for a song too
 
 songs.json fields
   slug        folder and file name, lowercase-with-dashes ("holy-holy-holy")
@@ -214,6 +216,16 @@ def one_line(names):
     return 'one line for ' + and_list([INSTRUMENTS[i].lower() for i in insts])
 
 
+def duet(names):
+    """A duet: "<instrument> — Part 1" then "<instrument> — Part 2" (the sight-reading page's duets). The layout's name
+    says who plays it ("a duet for violin and viola"); None if the parts aren't like that."""
+    found = [PART_NAME.match(n.strip()) for n in names]
+    if len(found) != 2 or not all(found) or [m.group(2) for m in found] != ['Part 1', 'Part 2']:
+        return None
+    insts = [m.group(1).lower() for m in found]
+    return 'a duet for ' + (f'two {insts[0]}s' if insts[0] == insts[1] else and_list(insts))
+
+
 PIANO = ', and piano'
 
 
@@ -235,11 +247,14 @@ def part_layout(slug, names):
     if not same_size:
         if one_line(names):
             return one_line(names)
+        if duet(names):
+            return duet(names)
         fail(f'{slug}: {len(names)} parts; the reader needs 44 (levels and voices with a countermelody and a concert '
              'part), 42 (with a countermelody, or with a concert part), 40 (levels and voices), 34 (levels and voices '
              'with no cello or bass Inner, built 2026-10-16), 24 (six tiers, built before 2026-10-16), or one line on '
              'up to four instruments, each part named "<instrument> — <the line\'s name>" in violin-viola-cello-bass '
-             f'order (found: {", ".join(repr(n) for n in names)})')
+             'order, or a duet ("<instrument> — Part 1", "<instrument> — Part 2") '
+             f'(found: {", ".join(repr(n) for n in names)})')
     for layout, want in same_size:
         if not wrong(want):
             return layout
@@ -272,7 +287,8 @@ def song_page(reader, song, facts, app, revs):
     head = replace(head, f"<title>{t['title']}</title>", f"<title>{e(song['title'])}</title>")
     # A piece with no levels says who plays it instead ("one line for viola and cello").
     one = facts['layout'].removeprefix('one line ') if facts['layout'].startswith('one line ') else None
-    levels = one or ('in six levels' if facts['layout'] == 'six tiers' else 'in four levels') + ' for violin, viola, cello and bass'
+    pair = facts['layout'] if facts['layout'].startswith('a duet ') else None
+    levels = ('as ' + pair) if pair else one or ('in six levels' if facts['layout'] == 'six tiers' else 'in four levels') + ' for violin, viola, cello and bass'
     head = replace(head, f"play along with {t['title']} in six levels for violin, viola, cello and bass",
                    f"play along with {e(song['title'])} {levels}")
 
@@ -282,6 +298,7 @@ def song_page(reader, song, facts, app, revs):
     if piano:
         extras += ', and a piano part' if extras else ', plus a piano part'
     b = replace(b, t['lede'], t['lede'] if facts['layout'] == 'six tiers' else f'One line, {one}.' if one else
+                f'{pair[0].upper()}{pair[1:]}, in two parts.' if pair else
                 'Four levels for violin, viola, cello and bass, each with a melody, an inner part and a bass line'
                 + extras + '.')
     b = replace(b, f">{t['title']}<span class=\"info-i\"", f">{e(song['title'])}<span class=\"info-i\"")
@@ -326,12 +343,30 @@ FLASH_TEMPLATE = ROOT / 'tools' / 'flash_template.html'  # Flash a bar (round 3)
 FLASH_ICON = ('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12z"/></svg>')
 NEW_ICON = ('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 '
             '1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>')
+DUET_ICON = ('<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="6.6" cy="17.6" rx="3.5" ry="2.6" transform="rotate(-22 6.6 17.6)"/>'
+             '<rect x="8.9" y="4.5" width="1.7" height="13"/><ellipse cx="15.9" cy="14.6" rx="3.5" ry="2.6" transform="rotate(-22 15.9 14.6)"/>'
+             '<rect x="18.2" y="1.5" width="1.7" height="13"/></svg>')
+# The row over the music, and the Duet card it opens (round 5). Part 1 and Part 2 each choose an instrument; Part 2's
+# level is a list (practice.js adds the earlier book pages to it); "I play" says which part Look ahead hides.
 SIGHT_BAR = f'''  <div class="sr-bar" id="srBar" role="group" aria-label="Sight-reading">
     <select id="srPage" aria-label="Book page"></select>
-    <div class="sr-inst" role="group" aria-label="Instrument"><button type="button" id="srViolin" aria-pressed="true">Violin</button><button type="button" id="srViola" aria-pressed="false">Viola</button></div>
-    <label class="sr-num">Exercise <input id="srNum" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" aria-label="Exercise number"></label>
+    <div class="sr-inst" id="srInst" role="group" aria-label="Instrument"><button type="button" id="srViolin" aria-pressed="true">Violin</button><button type="button" id="srViola" aria-pressed="false">Viola</button></div>
+    <label class="sr-num"><span class="sr-word">Exercise</span><span class="sr-short" aria-hidden="true">No.</span> <input id="srNum" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" aria-label="Exercise number"></label>
+    <button class="sr-duet" id="srDuet" type="button" aria-expanded="false" aria-controls="srDuetPop" aria-pressed="false">{DUET_ICON}<span>Duet</span></button>
     <a class="sr-flash" id="srFlash" href="flash/">{FLASH_ICON}<span>Flash<span class="sr-long"> a bar</span></span></a>
-    <button class="sr-new" id="srNew" type="button" disabled>{NEW_ICON}New exercise</button>
+    <button class="sr-new" id="srNew" type="button" disabled>{NEW_ICON}<span>New<span class="sr-long"> exercise</span></span></button>
+    <div class="sr-pop" id="srDuetPop" role="dialog" aria-label="Duet" hidden>
+      <div class="sr-pop-head"><b>Duet</b><button type="button" class="sr-pop-x" id="srDuetX" aria-label="Close">&times;</button></div>
+      <div class="sr-inst sr-solo" role="group" aria-label="Solo or duet"><button type="button" id="srSolo" aria-pressed="true">Solo</button><button type="button" id="srDuetOn" aria-pressed="false">Duet</button></div>
+      <div class="sr-pop-rows" id="srDuetRows">
+        <span>Part 1</span><div class="sr-inst" role="group" aria-label="Part 1"><button type="button" id="srP1violin" aria-pressed="true">Violin</button><button type="button" id="srP1viola" aria-pressed="false">Viola</button></div>
+        <span>Part 2</span><div class="sr-inst" role="group" aria-label="Part 2"><button type="button" id="srP2violin" aria-pressed="true">Violin</button><button type="button" id="srP2viola" aria-pressed="false">Viola</button></div>
+        <span>Part 2 is</span><select id="srLevel" aria-label="Part 2 is"><option value="same">On this page</option><option value="open">Open strings (a beginner or a parent)</option><option value="harder">Harder (a teacher part)</option></select>
+        <span>I play</span><div class="sr-inst" role="group" aria-label="I play"><button type="button" id="srMine1" aria-pressed="true">Part 1</button><button type="button" id="srMine2" aria-pressed="false">Part 2</button></div>
+      </div>
+      <p class="sr-pop-note">Part 1 is the exercise; Part 2 is built on its chords. The page shows the part you play, and both parts sound (Parts shows the other one too). For a partner on another device: the same page, exercise number and choices, or send the link.</p>
+      <button type="button" class="sr-copy" id="srCopy">Copy the link</button>
+    </div>
   </div>
 '''
 

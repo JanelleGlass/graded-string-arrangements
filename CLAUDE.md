@@ -90,7 +90,8 @@ Only after Janelle has checked the finished arrangement in the Music Arrangement
    bass), the same 40 then a Countermelody on violin and viola and/or a Concert part on each (42 or 44),
    34 in the same with no cello or bass Inner (built 2026-10-16), or 24 in the old six tiers
    (level by level; violin, viola, cello, bass), or one line (a piece with no levels: one to four
-   parts, violin to bass, each named "<instrument> — <the line's name>"). It says which one it read. Tell Janelle what it read so she can catch a mismatch. It also
+   parts, violin to bass, each named "<instrument> — <the line's name>"), or a duet (`<instrument> — Part 1`, then
+   `<instrument> — Part 2`: the sight-reading duets' layout). It says which one it read. Tell Janelle what it read so she can catch a mismatch. It also
    adds the song to the offline copy (`sw.js`), so installed copies get it on their next open.
 4. Run the test. Show her the page (local server, laptop and phone sizes) before pushing.
 5. Commit and push when she says go. Then check the live page loads.
@@ -269,6 +270,34 @@ flash a bar, the mic listening, duets, book codes) is in Janelle's brief, which 
   left out, silence, noise, quiet playing in a noisy room, the timing check at three delays) and Listen in
   `tests/smoke.py` with a made-up microphone (`window.flashMicStub`). Janelle's recorded takes, when they come, go in
   `tests/audio/` as 16-bit WAV (convert with ffmpeg) with `takes.json` saying what each one is.
+- Duets (round 5, 2026-11-12, same pull request; Janelle: "start round 5"): a "Duet" button in the sight-reading row
+  (two notes; teal while a duet is on) opens a card: Solo | Duet, Part 1 and Part 2 each Violin or Viola, "Part 2 is" (On
+  this page, Open strings, On each earlier book page, Harder: a teacher part), "I play" Part 1 | Part 2, and Copy the
+  link. The address carries the duet (`&duet=violin-viola&part2=same`), so one link, or the same page, number and
+  choices typed in, gives the same duet on every device; "I play" stays on the device (`localStorage` `sight-reading`:
+  `part`, and the last duet choices in `duet`). In a duet, Violin / Viola in the row is greyed out (a tap opens the card).
+  On a phone turned sideways the row says "No." for "Exercise" and "New" for "New exercise", to fit beside Duet.
+  - Part 1 is the solo exercise with that number, note for note, in its key; Part 2 is built on its chords
+    (`SightReading.duet`, its rules in the comment above it in `generator.js`): never crossing Part 1, never more than an
+    octave from it; a unison, third, fifth, sixth or octave on every strong beat and wherever both start a note; a second,
+    fourth or seventh only on a weak beat with one part passing by step against the other's chord note; no fifths or
+    octaves in a row with both moving; moving against Part 1 or holding while it moves (about 80%), its own rhythm (one
+    holding while the other moves; Part 1's rhythm in few bars). It leaps up to a fifth between chord notes (as a lower
+    part goes from V to I) even where the page's own leaps are smaller, may keep the home note or the fifth on through
+    another chord (a pedal), and ends on the home note or its third. Which part is on top: the viola under a violin, a
+    violin over a viola, two of the same on whichever side of Part 1 has more room.
+  - A viola with a violin's Part 1 plays the viola's notes for the page that are in the violin's key (the same fingers
+    it has learned), and the other way round. When Part 2's own notes can't make a part with that Part 1 (page 1 has only
+    open A and E; two violins on page 2 share five notes), it borrows open strings and first fingers, then any first-position
+    note and quarter and half rests, then a bar's rest now and then (`widened` 1, 4, 5); the details line says "(with a
+    few open strings and first fingers)" or "(with a few notes and rests from beyond the page)". If even that fails (none in
+    the tests' tens of thousands), the page plays the exercise alone and says so.
+  - The score names its parts `Violin — Part 1` / `Viola — Part 2`: the reader's duet layout (`duet:01`, Parts rows Part 1
+    and Part 2 headed "Part", the other instruments greyed out: "No Part 1 for cello: this duet is for violin and viola"),
+    and the build knows it ("a duet for violin and viola"). A duet opens showing only the part this device plays, one big
+    staff as on every song (two staves at the full size run off a laptop screen), labelled "Vln Part 1" (just "Part 1" for
+    two of the same instrument), with both parts playing (Hear's speakers out); Parts puts the other part on the page too.
+    Look ahead hides only the part this device plays (`window.sightReading.own`, `reader.parts()` for "I play").
 - Tests: `tests/sight_reading.py` reads 1,000 exercises per page and instrument back from their MusicXML (plus a few
   made-up pages that try eighths, 2/4 and 3/4, longer exercises, low 2, few and free crossings, a viola page of its own)
   and checks them apart from the generator's own code. `tests/smoke.py` checks the page itself at laptop, phone and
@@ -277,6 +306,10 @@ flash a bar, the mic listening, duets, book codes) is in Janelle's brief, which 
   `tests/sight_reading.py` also checks 300 Flash a bar patterns per page, instrument, length and repeat setting
   (notes, rhythms, bars, leaps, crossings, no repeats when asked, length, and the shape it says), and `tests/smoke.py` plays
   rounds of Flash a bar at laptop, iPad and phone sizes (the streak, levelling up, settings after a reload, offline).
+  `tests/sight_reading.py` also reads back duets for every page and pairing (1,000 numbers with Part 2 on the same page,
+  250 for each other level) and checks the brief's Part 2 rules apart from the generator; `tests/smoke.py` opens one duet
+  on two devices (the same music, each showing its own part, both playing), works the Duet card, and checks that Look
+  ahead hides only the part this device plays.
 
 ## The app version (home screen, offline)
 

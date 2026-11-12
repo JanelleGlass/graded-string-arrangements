@@ -58,13 +58,14 @@
     'w': { parts: [8] }, 'h.': { parts: [6] }, 'h': { parts: [4] }, 'q': { parts: [2] },
     '8 8': { parts: [1, 1] }, 'q. 8': { parts: [3, 1] },
     'qr': { parts: [2], rest: true }, 'hr': { parts: [4], rest: true },
+    'h.r': { parts: [6], rest: true }, 'wr': { parts: [8], rest: true }, // a bar's rest (a duet's Part 2, as a last resort)
   };
   for (const t of Object.values(TOKENS)) t.len = t.parts.reduce((a, b) => a + b, 0);
   const BAR = { '2/4': 4, '3/4': 6, '4/4': 8 }; // a bar's length in eighths
   // The last bar: the home note on beat 1, as long as the page's rhythms allow, then rests if it needs them.
   const ENDINGS = { 8: [['w'], ['h.', 'qr'], ['h', 'hr'], ['h', 'qr', 'qr']], 6: [['h.'], ['h', 'qr']], 4: [['h'], ['q', 'qr']] };
   // How often each token comes up, before the page's new ones are favoured.
-  const TOKEN_WEIGHT = { 'w': 0.5, 'h.': 1.1, 'h': 2, 'q': 3, '8 8': 1.6, 'q. 8': 1.1, 'qr': 1, 'hr': 0.6 };
+  const TOKEN_WEIGHT = { 'w': 0.5, 'h.': 1.1, 'h': 2, 'q': 3, '8 8': 1.6, 'q. 8': 1.1, 'qr': 1, 'hr': 0.6, 'h.r': 0.5, 'wr': 0.5 };
   // Chords by the scale degree of their root (0 is I, 3 is IV, 4 is V), and how likely each one is to follow another.
   // V never goes to IV.
   const NAMES = { 0: 'I', 3: 'IV', 4: 'V' };
@@ -141,7 +142,7 @@
     if (!m) throw new Error('note "' + name + '": write a string and a finger, like A3');
     const string = m[1], finger = Number(m[2]), open = OPEN[inst][string];
     if (open === undefined) throw new Error('note "' + name + '": the ' + inst + ' has no ' + string + ' string');
-    const pattern = PATTERNS[patterns[string] || 'high2'];
+    const pattern = Array.isArray(patterns[string]) ? patterns[string] : PATTERNS[patterns[string] || 'high2']; // or each finger's semitones
     if (!pattern) throw new Error('finger pattern "' + patterns[string] + '" on the ' + string + ' string: use ' + Object.keys(PATTERNS).join(', '));
     const semis = pattern[finger], midi = open + semis;
     // In first position each finger is the next letter up the string (A string: A, B, C, D, E).
@@ -250,7 +251,10 @@
       }
     }
     for (const t of R.newRhythms) if (bars.flat().filter(x => x === t).length < 2) return null;
-    // The notes and rests, in order.
+    return { time, len, bars, events: eventsOf(bars), phrases: ph, slots: len === 8 ? 2 : 1 };
+  }
+  // The notes and rests of a run of bars, in order.
+  function eventsOf(bars) {
     const events = [];
     bars.forEach((seq, b) => {
       let pos = 0;
@@ -260,7 +264,7 @@
         pos += L;
       });
     });
-    return { time, len, bars, events, phrases: ph, slots: len === 8 ? 2 : 1 };
+    return events;
   }
 
   // ---- Chords: one for each bar, or each half bar in 4/4 ----
@@ -380,55 +384,65 @@
   const TYPE = { 8: ['whole', false], 6: ['half', true], 4: ['half', false], 3: ['quarter', true], 2: ['quarter', false], 1: ['eighth', false] };
   const ACCIDENTAL = { '-1': 'flat', '0': 'natural', '1': 'sharp' };
   const PART = { violin: { name: 'Violin', abbr: 'Vln.', program: 41, clef: ['G', 2] }, viola: { name: 'Viola', abbr: 'Vla.', program: 42, clef: ['C', 3] } };
-  function toXml(R, plan, notes, tempo) {
-    const P = PART[R.inst], [beats, beatType] = plan.time.split('/'), out = [];
+  // parts: one or two of { inst, key, plan, notes, label }; the part is named "Violin \u2014 <label>". The tempo mark goes
+  // over the first part only.
+  const solo = (R, plan, notes) => [{ inst: R.inst, key: R.key, plan, notes, label: 'Sight-reading' }];
+  function toXml(parts, tempo) {
+    const [beats, beatType] = parts[0].plan.time.split('/'), out = [];
     out.push('<?xml version="1.0" encoding="UTF-8"?>',
       '<score-partwise version="4.0">',
       '  <work><work-title>Sight-reading</work-title></work>',
-      '  <part-list>',
-      '    <score-part id="P1">',
-      `      <part-name>${P.name} \u2014 Sight-reading</part-name>`,
-      `      <part-abbreviation>${P.abbr}</part-abbreviation>`,
-      `      <score-instrument id="P1-I1"><instrument-name>${P.name}</instrument-name></score-instrument>`,
-      `      <midi-instrument id="P1-I1"><midi-channel>1</midi-channel><midi-program>${P.program}</midi-program><volume>80</volume><pan>0</pan></midi-instrument>`,
-      '    </score-part>',
-      '  </part-list>',
-      '  <part id="P1">');
-    let k = 0;
-    plan.bars.forEach((_, b) => {
-      out.push(`    <measure number="${b + 1}">`);
-      if (b === 0) {
-        out.push('      <attributes>',
-          '        <divisions>2</divisions>',
-          `        <key><fifths>${R.key.fifths}</fifths><mode>${R.key.mode}</mode></key>`,
-          `        <time><beats>${beats}</beats><beat-type>${beatType}</beat-type></time>`,
-          `        <clef><sign>${P.clef[0]}</sign><line>${P.clef[1]}</line></clef>`,
-          '      </attributes>',
-          `      <direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${tempo}</per-minute></metronome></direction-type><sound tempo="${tempo}"/></direction>`);
-      }
-      const shown = new Map(); // sharps, flats and naturals already written in this bar
-      for (const e of plan.events.filter(x => x.bar === b)) {
-        const [type, dot] = TYPE[e.len];
-        if (e.rest) {
-          out.push(`      <note><rest/><duration>${e.len}</duration><voice>1</voice><type>${type}</type>${dot ? '<dot/>' : ''}</note>`);
-          continue;
-        }
-        const n = notes[k++], spot = n.letter + n.octave;
-        const now = shown.has(spot) ? shown.get(spot) : keyAlter(R.key.fifths, n.letter);
-        shown.set(spot, n.alter);
-        out.push(`      <note color="${n.color}">`,
-          `        <pitch><step>${n.letter}</step>${n.alter ? `<alter>${n.alter}</alter>` : ''}<octave>${n.octave}</octave></pitch>`,
-          `        <duration>${e.len}</duration>`,
-          '        <voice>1</voice>',
-          `        <type>${type}</type>${dot ? '<dot/>' : ''}${n.alter !== now ? `<accidental>${ACCIDENTAL[n.alter]}</accidental>` : ''}`,
-          `        <notehead color="${n.color}">normal</notehead>${e.beam ? `<beam number="1">${e.beam}</beam>` : ''}`,
-          `        <notations><technical><fingering>${n.label}</fingering></technical></notations>`,
-          '      </note>');
-      }
-      if (b === plan.bars.length - 1) out.push('      <barline location="right"><bar-style>light-heavy</bar-style></barline>');
-      out.push('    </measure>');
+      '  <part-list>');
+    parts.forEach((part, p) => {
+      const P = PART[part.inst], id = 'P' + (p + 1);
+      out.push(`    <score-part id="${id}">`,
+        `      <part-name>${P.name} \u2014 ${part.label}</part-name>`,
+        `      <part-abbreviation>${P.abbr}</part-abbreviation>`,
+        `      <score-instrument id="${id}-I1"><instrument-name>${P.name}</instrument-name></score-instrument>`,
+        `      <midi-instrument id="${id}-I1"><midi-channel>${p + 1}</midi-channel><midi-program>${P.program}</midi-program><volume>80</volume><pan>0</pan></midi-instrument>`,
+        '    </score-part>');
     });
-    out.push('  </part>', '</score-partwise>', '');
+    out.push('  </part-list>');
+    parts.forEach(({ inst, key, plan, notes }, p) => {
+      const P = PART[inst];
+      out.push(`  <part id="P${p + 1}">`);
+      let k = 0;
+      plan.bars.forEach((_, b) => {
+        out.push(`    <measure number="${b + 1}">`);
+        if (b === 0) {
+          out.push('      <attributes>',
+            '        <divisions>2</divisions>',
+            `        <key><fifths>${key.fifths}</fifths><mode>${key.mode}</mode></key>`,
+            `        <time><beats>${beats}</beats><beat-type>${beatType}</beat-type></time>`,
+            `        <clef><sign>${P.clef[0]}</sign><line>${P.clef[1]}</line></clef>`,
+            '      </attributes>');
+          if (!p) out.push(`      <direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${tempo}</per-minute></metronome></direction-type><sound tempo="${tempo}"/></direction>`);
+        }
+        const shown = new Map(); // sharps, flats and naturals already written in this bar
+        for (const e of plan.events.filter(x => x.bar === b)) {
+          const [type, dot] = TYPE[e.len];
+          if (e.rest) {
+            out.push(`      <note><rest/><duration>${e.len}</duration><voice>1</voice><type>${type}</type>${dot ? '<dot/>' : ''}</note>`);
+            continue;
+          }
+          const n = notes[k++], spot = n.letter + n.octave;
+          const now = shown.has(spot) ? shown.get(spot) : keyAlter(key.fifths, n.letter);
+          shown.set(spot, n.alter);
+          out.push(`      <note color="${n.color}">`,
+            `        <pitch><step>${n.letter}</step>${n.alter ? `<alter>${n.alter}</alter>` : ''}<octave>${n.octave}</octave></pitch>`,
+            `        <duration>${e.len}</duration>`,
+            '        <voice>1</voice>',
+            `        <type>${type}</type>${dot ? '<dot/>' : ''}${n.alter !== now ? `<accidental>${ACCIDENTAL[n.alter]}</accidental>` : ''}`,
+            `        <notehead color="${n.color}">normal</notehead>${e.beam ? `<beam number="1">${e.beam}</beam>` : ''}`,
+            `        <notations><technical><fingering>${n.label}</fingering></technical></notations>`,
+            '      </note>');
+        }
+        if (b === plan.bars.length - 1) out.push('      <barline location="right"><bar-style>light-heavy</bar-style></barline>');
+        out.push('    </measure>');
+      });
+      out.push('  </part>');
+    });
+    out.push('</score-partwise>', '');
     return out.join('\n');
   }
 
@@ -437,6 +451,14 @@
   // Page rules, instrument ("violin" or "viola"), exercise number: the exercise. Throws, saying why, on rules that
   // can't make music.
   function exercise(page, inst, n) {
+    const { R, plan, chords, notes, tempo, time } = compose(page, inst, n);
+    return {
+      xml: toXml(solo(R, plan, notes), tempo), page: page.id, inst, n, tempo, time, bars: R.bars, key: R.key.name,
+      chords: chords.map(c => NAMES[c]), rhythm: plan.bars.map(b => b.join(' ')), notes: notes.map(x => x.name),
+    };
+  }
+  // The exercise's makings: its rules, rhythm plan, chords and notes (a duet's Part 2 is built on them).
+  function compose(page, inst, n) {
     const R = rulesFor(page, inst);
     const rng = seeded(page.id + '|' + n); // not the instrument: violin and viola get the same exercise
     const time = R.times.length > 1 ? R.times[Math.floor(rng() * R.times.length)] : R.times[0];
@@ -447,13 +469,251 @@
       const chords = planChords(R, plan, echoing, rng);
       const notes = planMelody(R, plan, chords, echoing, rng);
       if (!notes) continue;
-      const tempo = startTempo(page);
-      return {
-        xml: toXml(R, plan, notes, tempo), page: page.id, inst, n, tempo, time, bars: R.bars, key: R.key.name,
-        chords: chords.map(c => NAMES[c]), rhythm: plan.bars.map(b => b.join(' ')), notes: notes.map(x => x.name),
-      };
+      return { R, plan, chords, notes, tempo: startTempo(page), time };
     }
     throw new Error('could not make exercise ' + n + ' of ' + page.id + ' for ' + inst + ': the rules may be too tight');
+  }
+
+  // ---- Duets (round 5): a second part to play with the exercise ----
+  // Part 1 is the exercise with that number, note for note. Part 2 is built on its chords, in its key, under it (over it
+  // when a violin plays with a viola's Part 1), as the brief asks: never crossing it and never more than an octave from
+  // it; a unison, third, fifth, sixth or octave on every strong beat and wherever the two start a note together; a second,
+  // fourth or seventh only on a weak beat, where one part passes by step against the other's chord note; no fifths or
+  // octaves in a row with both parts moving; moving against Part 1 more than with it; and often holding while Part 1
+  // moves, or moving while it holds. Its own line follows Part 1's rules (chord notes on strong beats, a note outside the
+  // chord reached and left by step, a turn back after a leap of a fourth or more) and ends on the home note or its third.
+  // Part 2's level (part2):
+  //   'same'    the page's notes and rhythms (a viola with a violin's Part 1: the viola's notes for the page, those in the
+  //             key, so the same fingers it has learned; the same the other way round)
+  //   'open'    open strings, in long notes (a first finger now and then, where a chord has no open string), for a parent
+  //             or a younger brother or sister
+  //   a page    an earlier book page's notes and rhythms (its rules object), for a student a few pages behind
+  //   'harder'  every note in first position in the key, with eighths and dotted rhythms: a part for the teacher
+  // The pairs: violin and violin, violin and viola, viola and violin, viola and viola.
+  const PART2 = ['same', 'open', 'harder'];
+  // Every note a hand reaches in first position in a key, fingers 0 to most: each finger one step of the scale up a
+  // string whose open note is in the key (a string whose open note isn't, like the C string in A major, is left out).
+  function firstPosition(inst, key, most) {
+    const out = [];
+    for (const string of Object.keys(OPEN[inst])) {
+      if (keyAlter(key.fifths, string)) continue;
+      const semis = [0];
+      for (let f = 1; f <= 4; f++) {
+        const letter = LETTERS[(LETTERS.indexOf(string) + f) % 7];
+        semis.push((NATURAL[letter] - NATURAL[string] + 12) % 12 + keyAlter(key.fifths, letter));
+      }
+      for (let f = 0; f <= most; f++) out.push(makeNote(string + f, inst, { [string]: semis }, key));
+    }
+    return out;
+  }
+  // Part 2's rules: its notes (in Part 1's key), rhythms, biggest leap and string crossings.
+  function partnerRules(page, R1, inst2, level, earlier) {
+    const key = R1.key;
+    // A page's notes for this instrument, in the duet's key: the ones its key signature has (in a minor key, not the
+    // seventh note, whose sharp depends on the chord).
+    const inKey = (list) => list.map(n => ({ ...n, degree: (LETTERS.indexOf(n.letter) - LETTERS.indexOf(key.tonic) + 7) % 7 }))
+      .filter(n => n.alter === keyAlter(key.fifths, n.letter) && !(key.mode === 'minor' && n.degree === 6));
+    let R;
+    if (level === 'open') R = { notes: inKey(firstPosition(inst2, key, 1)), rhythms: ['w', 'h.', 'h', 'q'], maxLeap: 8, crossings: 'free' };
+    else if (level === 'harder') {
+      R = { notes: inKey(firstPosition(inst2, key, 4)), maxLeap: 6, crossings: 'free',
+        rhythms: [...new Set(['w', 'h.', 'h', 'q', '8 8', 'q. 8', 'qr', ...R1.rhythms])] };
+    } else {
+      const P = level === 'page' ? rulesFor(earlier, inst2) : inst2 === R1.inst ? R1 : rulesFor(page, inst2);
+      // A leap of a fourth or fifth between chord notes, as a lower part goes from V to I, even where the page's own
+      // tunes move only by step and third.
+      R = { notes: P === R1 ? R1.notes : inKey(P.notes), rhythms: P.rhythms, maxLeap: Math.max(5, P.maxLeap), crossings: P.crossings };
+    }
+    // Too few notes for the chords (a viola's page notes in a violin's key, say): open strings and first fingers too.
+    if (R.notes.length < 3 || [0, 3, 4].some(c => R1.chords.includes(c) && !R.notes.some(n => chordTones(c).includes(n.degree)))) R = widen(R, inKey, inst2, key, 1);
+    return { ...R, inst: inst2, key, level, inKey };
+  }
+  // More for Part 2, when its own notes can't make a part with this Part 1: open strings and first fingers (step 1), then
+  // every note in first position and quarter and half rests, to rest while Part 1 runs further than an octave (step 4),
+  // then a whole bar's rest now and then (step 5: a viola low on its C string, say, that a violin can't stay within an
+  // octave of). Marked, so the page can say so.
+  function widen(R, inKey, inst2, key, step) {
+    if (step === 5) return { ...R, widened: 5 };
+    const have = new Set(R.notes.map(n => n.midi));
+    const more = inKey(firstPosition(inst2, key, step)).filter(n => !have.has(n.midi));
+    const rests = step === 4 ? ['qr', 'hr'].filter(t => !R.rhythms.includes(t)) : [];
+    return more.length || rests.length ? { ...R, notes: R.notes.concat(more), rhythms: R.rhythms.concat(rests), widened: step } : R;
+  }
+  // Part 2's rhythm, bar by bar: its own (the last bar Part 1's ending, a phrase that starts again starting with Part 2's
+  // own first bar), chosen so that one part often holds while the other moves; Part 1's own rhythm only now and then.
+  const OPEN_WEIGHT = { 'w': 2, 'h.': 1.6, 'h': 3, 'q': 0.6, 'qr': 0.8, 'hr': 0.6, 'h.r': 0.5, 'wr': 0.5 };
+  function partnerRhythm(R2, plan1, rng) {
+    const len = plan1.len, B = plan1.bars.length, ph = plan1.phrases, last = plan1.bars[B - 1];
+    const ending = last.every(t => R2.rhythms.includes(t)) ? last : ENDINGS[len].find(e => e.every(t => R2.rhythms.includes(t)));
+    const options = fillings(R2.rhythms.filter(t => t !== 'w' || len === 8), len);
+    if (!ending || !options.length) throw new Error('Part 2\u2019s rhythms cannot fill a bar of ' + plan1.time);
+    if (R2.widened === 5) options.push([{ 8: 'wr', 6: 'h.r', 4: 'hr' }[len]]); // a bar's rest, as a last resort
+    const attacks = (seq) => eventsOf([seq]).filter(e => !e.rest).map(e => e.pos);
+    const weight = (seq, b, role, before) => {
+      let w = 1;
+      for (const t of seq) w *= (R2.level === 'open' ? OPEN_WEIGHT : TOKEN_WEIGHT)[t];
+      w = Math.pow(w, 1 / seq.length);
+      if (role === 'first' && TOKENS[seq[0]].rest) return 0;
+      if (role === 'cadence') { const t = seq[seq.length - 1]; w *= TOKENS[t].len >= 4 ? 3 : TOKENS[t].rest ? 1.5 : 1; }
+      if (before && before.join() === seq.join()) w *= 0.6;
+      const one = attacks(plan1.bars[b]), two = attacks(seq), both = two.filter(x => one.includes(x)).length;
+      w *= 1 + 0.5 * (one.length + two.length - 2 * both); // a note in one part while the other holds
+      if (seq.join() === plan1.bars[b].join()) w *= 0.3;
+      return w;
+    };
+    const bars = [];
+    for (let b = 0; b < B; b++) {
+      const k = ph.findIndex(([s, e]) => b >= s && b < e), [start, end] = ph[k];
+      if (b === B - 1) bars.push(ending);
+      else if (k > 0 && b === start && R2.widened !== 5) bars.push(bars[ph[0][0]]); // (as a last resort, its own)
+      else bars.push(pick(options, options.map(o => weight(o, b, b === 0 ? 'first' : b === end - 1 ? 'cadence' : 'plain', bars[b - 1])), rng));
+    }
+    return { time: plan1.time, len, bars, events: eventsOf(bars), phrases: ph, slots: plan1.slots };
+  }
+  const CONSONANT = [0, 3, 4, 7, 8, 9]; // a unison or octave, a third, fifth or sixth (in semitones, within the octave)
+  const PASSING = [2, 5, 10]; // a second, fourth or seventh: on a weak beat, one part passing against the other's chord note
+  function planPartner(one, R2, plan2, upper, rng) {
+    const plan1 = one.plan, chords = one.chords, T = plan1.bars.length * plan1.len, slotLen = plan1.len / plan1.slots;
+    // Part 1, eighth by eighth: the note sounding and where it began.
+    const p1 = new Array(T).fill(null);
+    let k = 0;
+    for (const e of plan1.events) {
+      const start = e.bar * plan1.len + e.pos, note = e.rest ? null : one.notes[k++];
+      for (let t = start; t < start + e.len; t++) p1[t] = note && { note, start };
+    }
+    const strongAt = (t) => t % slotLen === 0;
+    const chordAt = (n, t) => chordTones(chords[Math.floor(t / slotLen)]).includes(n.degree);
+    const gap = (a, b) => upper === 1 ? a.midi - b.midi : b.midi - a.midi; // Part 1's note a, Part 2's b: the upper one's height over the lower
+    const ev = plan2.events, at = [];
+    ev.forEach((e, i) => { if (!e.rest) at.push(i); });
+    const N = at.length, startOf = at.map(i => ev[i].bar * plan2.len + ev[i].pos);
+    const joined = (i) => i > 0 && !!ev[at[i] - 1] && !ev[at[i] - 1].rest;
+    // The moments each Part 2 note sounds against Part 1: its start, and each Part 1 note that starts while it sounds.
+    const moments = at.map((ei, i) => {
+      const s = startOf[i], out = [];
+      for (let t = s; t < s + ev[ei].len; t++) if (p1[t] && (t === s || p1[t].start === t)) out.push(t);
+      return out;
+    });
+    const picks = [], pending = [], passing = [], crossed = [];
+    let budget = 3000;
+    const sweet = (i, c) => moments[i].length && moments[i][0] === startOf[i] && moments[i].every(t => { const d = gap(p1[t].note, c); return d >= 0 && d <= 12 && CONSONANT.includes(d % 12); });
+    // false, or what kind of note c is at i: a chord note, a pedal, a free note (outside the chord, but sweet with Part 1
+    // all through, on a weak beat), or a passing or neighbour note (which moves on by step).
+    function allowed(i, c) {
+      const s = startOf[i], e = ev[at[i]], before = ev[at[i] - 1], p = picks[i - 1], touching = joined(i);
+      // It ends on the home note or its third (or, over Part 1, its fifth).
+      if (i === N - 1 && c.degree !== 0 && c.degree !== 2 && !(upper === 2 && c.degree === 4)) return false;
+      let kind = 'chord';
+      if (!chordAt(c, s)) {
+        // The home note or the fifth may stay on (a pedal) through another chord: the same note again.
+        if (p && touching && p.midi === c.midi && (c.degree === 0 || c.degree === 4) && !passing[i - 1]) kind = 'pedal';
+        else if (strongAt(s)) return false;
+        else if (sweet(i, c)) kind = 'free';
+        else {
+          if (!p || !touching || interval(p, c) !== 2) return false; // a passing or neighbour note: reached by step,
+          const after = ev[at[i] + 1];
+          if (!after || after.rest) return false; // and left by step
+          kind = 'passing';
+        }
+      }
+      if (p) {
+        const iv = interval(p, c), dir = direction(p, c), pp = picks[i - 2];
+        if (iv > R2.maxLeap) return false;
+        if (passing[i - 1] && iv !== 2) return false;
+        if (pending[i - 1] && dir === pending[i - 1]) return false; // after a leap of a fourth or more, turn back
+        if (pp && iv >= 4 && interval(pp, p) >= 3 && direction(pp, p) === dir) return false;
+        if (iv >= 3 && pp && interval(pp, p) >= 4 && direction(pp, p) === dir) return false;
+        if (touching && c.string !== p.string) {
+          if (R2.crossings !== 'free' && (e.fast || before.fast)) return false;
+          if (R2.crossings === 'few' && crossed.some(([j, bar]) => bar === e.bar && j < i)) return false;
+        }
+      }
+      for (const t of moments[i]) {
+        const q = p1[t].note, d = gap(q, c);
+        if (d < 0 || d > 12) return false; // never crossing, never more than an octave apart
+        const m = d % 12;
+        if (CONSONANT.includes(m)) continue;
+        if (strongAt(t) || (t === s && p1[t].start === t) || !PASSING.includes(m)) return false;
+        const moved = t === s ? c : q, held = t === s ? q : c;
+        if (chordAt(moved, t) || !chordAt(held, t)) return false;
+      }
+      // No fifths or octaves in a row with both parts moving.
+      if (p && touching && p1[s] && p1[s].start === s && p1[s - 1] && c.midi !== p.midi && p1[s].note.midi !== p1[s - 1].note.midi) {
+        const was = gap(p1[s - 1].note, p) % 12, now = gap(p1[s].note, c) % 12;
+        if (was === now && (now === 0 || now === 7)) return false;
+      }
+      return kind;
+    }
+    function weight(i, c) {
+      const s = startOf[i], p = picks[i - 1], q = p1[s];
+      let w = 1;
+      if (p) {
+        const iv = interval(p, c);
+        w *= [0, 1, 3, 2, 1.2, 1, 0.5, 0.35, 0.4][Math.min(iv, 8)];
+        if (iv === 1) { let run = 1; for (let j = i - 1; j > 0 && picks[j - 1].midi === picks[j].midi; j--) run++; w *= run >= 3 ? 0.12 : run === 2 ? 0.45 : 1; }
+        const pp = picks[i - 2];
+        if (pp && interval(pp, p) >= 3 && direction(pp, p) === -direction(p, c) && iv === 2) w *= 2;
+        if (c.string === p.string) w *= 1.2;
+        // Against Part 1: moving the other way is best, moving while it holds next, moving the same way least.
+        if (q && joined(i) && p1[s - 1] && q.start === s && q.note.midi !== p1[s - 1].note.midi && c.midi !== p.midi) {
+          w *= Math.sign(q.note.midi - p1[s - 1].note.midi) === -Math.sign(c.midi - p.midi) ? 2.5 : 0.55;
+        } else if (q && q.start !== s && c.midi !== p.midi) w *= 1.4;
+      } else if (c.degree === 0) w *= 2;
+      if (q) { const d = gap(q.note, c), m = d % 12; w *= [3, 4, 8, 9].includes(m) ? 2 : d === 0 ? 0.35 : m === 0 ? 0.8 : 1; } // thirds and sixths sound fullest
+      if (R2.level === 'open' && c.finger) w *= 0.03;
+      if (c.finger === 4 && R2.notes.some(x => x.finger === 0 && x.midi === c.midi)) w *= 0.25; // the open string, where it is the same note
+      if (i === N - 1) w *= c.degree === 0 ? 3 : c.degree === 2 ? 2 : 0.3; // the home note or its third sounds finished
+      return w;
+    }
+    function walk(i) {
+      if (i === N) return true;
+      if (--budget < 0) return false;
+      const kinds = new Map(), can = R2.notes.filter(c => { const k = allowed(i, c); if (k) kinds.set(c, k); return !!k; });
+      for (const c of shuffle(can, can.map(c => weight(i, c)), rng)) {
+        const p = picks[i - 1], before = ev[at[i] - 1];
+        picks[i] = c;
+        const dir = p ? direction(p, c) : 0;
+        pending[i] = p && interval(p, c) >= 4 ? dir : pending[i - 1] && dir !== -pending[i - 1] ? pending[i - 1] : 0;
+        passing[i] = kinds.get(c) === 'passing';
+        const crossing = p && before && !before.rest && c.string !== p.string;
+        if (crossing) crossed.push([i, ev[at[i]].bar]);
+        if (walk(i + 1)) return true;
+        if (crossing) crossed.pop();
+      }
+      picks.length = i;
+      return false;
+    }
+    return walk(0) ? picks.slice() : null;
+  }
+  // Page rules, the two instruments, the exercise number and Part 2's level ('same', 'open', 'harder' or an earlier
+  // page's rules): the duet, as one score of two parts named "Violin — Part 1" and "Viola — Part 2".
+  function duet(page, inst1, inst2, n, part2) {
+    if (!OPEN[inst2]) throw new Error('instrument "' + inst2 + '": violin or viola');
+    const one = compose(page, inst1, n);
+    const earlier = part2 && typeof part2 === 'object' ? part2 : null, level = earlier ? 'page' : PART2.includes(part2) ? part2 : 'same';
+    const R2 = partnerRules(page, one.R, inst2, level, earlier);
+    // Which part is on top (upper: 1 or 2): the viola under a violin; with two of the same instrument, Part 2 goes where
+    // its notes have more room (over a Part 1 that sits low, under one that sits high), else the other side.
+    const mid = one.notes.reduce((a, x) => a + x.midi, 0) / one.notes.length;
+    const room = (up) => up === 2 ? Math.max(...R2.notes.map(x => x.midi)) - mid : mid - Math.min(...R2.notes.map(x => x.midi));
+    const sides = inst1 !== inst2 ? [inst1 === 'viola' ? 2 : 1] : room(2) > room(1) ? [2, 1] : [1, 2];
+    const rng = seeded(page.id + '|duet|' + inst1 + '|' + inst2 + '|' + (earlier ? earlier.id : level) + '|' + n);
+    let R = R2;
+    for (let tries = 0; tries < 200; tries++) {
+      if (tries === 40 || tries === 80 || tries === 160) R = widen(R, R2.inKey, inst2, R2.key, tries === 40 ? 1 : tries === 80 ? 4 : 5);
+      const upper = sides[Math.floor(tries / 20) % sides.length];
+      const plan2 = partnerRhythm(R, one.plan, rng);
+      const notes2 = planPartner(one, R, plan2, upper, rng);
+      if (!notes2) continue;
+      const parts = [{ inst: inst1, key: one.R.key, plan: one.plan, notes: one.notes, label: 'Part 1' },
+        { inst: inst2, key: one.R.key, plan: plan2, notes: notes2, label: 'Part 2' }];
+      return {
+        xml: toXml(parts, one.tempo), page: page.id, inst1, inst2, n, part2: earlier ? earlier.id : level, upper, widened: R.widened || 0,
+        tempo: one.tempo, time: one.time, bars: one.R.bars, key: one.R.key.name, chords: one.chords.map(c => NAMES[c]),
+        rhythm: [one.plan, plan2].map(pl => pl.bars.map(b => b.join(' '))), notes: [one.notes, notes2].map(l => l.map(x => x.name)),
+      };
+    }
+    throw new Error('could not make a Part 2 for exercise ' + n + ' of ' + page.id + ' (' + inst1 + ' with ' + inst2 + ', ' + (earlier ? earlier.id : level) + ')');
   }
   // ---- Flash a bar (round 3): short patterns the eye takes in at once ----
   // Half a bar to two bars from the page's notes and rhythms, no chord plan: a run of steps up or down, a scale fragment
@@ -545,7 +805,7 @@
       const plan = { time, len, bars: barSeqs, events };
       const tempo = startTempo(page), [beats, beatType] = pageTime.split('/').map(Number);
       return {
-        xml: toXml(R, plan, picks, tempo), page: page.id, inst, n, shape, length, time, bars, tempo, key: R.key.name,
+        xml: toXml(solo(R, plan, picks), tempo), page: page.id, inst, n, shape, length, time, bars, tempo, key: R.key.name,
         notes: picks.map(x => x.name), colors: picks.map(x => x.color), rhythm: barSeqs.map(b => b.join(' ')),
         midis: picks.map(x => x.midi), // what each note sounds, for listening (round 4)
         starts: at.map(i => (events[i].bar * len + events[i].pos) / 2), // when each note starts, in quarter notes
@@ -564,5 +824,5 @@
     }
     return out;
   }
-  return { exercise, pattern, flashLengths, problems, startTempo, LOOKS, TOKENS, PATTERNS, COLORS };
+  return { exercise, duet, pattern, flashLengths, problems, startTempo, LOOKS, TOKENS, PATTERNS, COLORS, PART2 };
 });

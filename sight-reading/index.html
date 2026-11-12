@@ -14,10 +14,10 @@
 <style>body{margin:0;padding:0}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <script src="../app/app.js?v=3a19f0d83d"></script>
 <meta name="robots" content="noindex">
-<link rel="stylesheet" href="practice.css?v=bcb7b883e7">
+<link rel="stylesheet" href="practice.css?v=070e1d18aa">
 <script>window.SIGHT_READING_PAGES = [{"id":"v1-01","title":"Page 1: Open A and E","placeholder":true,"free":true,"notes":["A0","E0"],"new":["A0","E0"],"key":"A major","time":["4/4"],"rhythms":["w","h","q"],"bars":4,"maxLeap":5,"crossings":"some","tempo":[60,92],"help":{"colors":true,"look":"plain"}},{"id":"v1-02","title":"Page 2: A string 1, 2, 3","placeholder":true,"free":true,"notes":["A0","A1","A2","A3","E0"],"new":["A1","A2","A3"],"pattern":{"A":"high2","E":"high2"},"key":"A major","time":["4/4"],"rhythms":["w","h","q"],"bars":4,"maxLeap":3,"crossings":"some","tempo":[60,92],"help":{"colors":true,"look":"plain"}},{"id":"v1-03","title":"Page 3: E string 1, 2, 3","placeholder":true,"free":true,"notes":["A0","A1","A2","A3","E0","E1","E2","E3"],"new":["E1","E2","E3"],"pattern":{"A":"high2","E":"high2"},"key":"A major","time":["4/4"],"rhythms":["w","h","q"],"bars":4,"maxLeap":3,"crossings":"some","tempo":[60,92],"help":{"colors":true,"look":"plain"}},{"id":"v1-04","title":"Page 4: Quarter rests","placeholder":true,"free":true,"notes":["A0","A1","A2","A3","E0","E1","E2","E3"],"new":["qr"],"pattern":{"A":"high2","E":"high2"},"key":"A major","time":["4/4"],"rhythms":["w","h","q","qr"],"bars":4,"maxLeap":3,"crossings":"some","tempo":[60,92],"help":{"colors":true,"look":"plain"}}];</script>
-<script src="generator.js?v=5ed9c152ef"></script>
-<script src="practice.js?v=e0e56cc534"></script>
+<script src="generator.js?v=8412f3675e"></script>
+<script src="practice.js?v=f9389e6bb6"></script>
 <title>Sight-reading</title>
 <meta name="description" content="New music to read for each page of the sight-reading book, for violin and viola.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -655,10 +655,23 @@ body.following .host-only { display: none !important; }
 
   <div class="sr-bar" id="srBar" role="group" aria-label="Sight-reading">
     <select id="srPage" aria-label="Book page"></select>
-    <div class="sr-inst" role="group" aria-label="Instrument"><button type="button" id="srViolin" aria-pressed="true">Violin</button><button type="button" id="srViola" aria-pressed="false">Viola</button></div>
-    <label class="sr-num">Exercise <input id="srNum" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" aria-label="Exercise number"></label>
+    <div class="sr-inst" id="srInst" role="group" aria-label="Instrument"><button type="button" id="srViolin" aria-pressed="true">Violin</button><button type="button" id="srViola" aria-pressed="false">Viola</button></div>
+    <label class="sr-num"><span class="sr-word">Exercise</span><span class="sr-short" aria-hidden="true">No.</span> <input id="srNum" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" aria-label="Exercise number"></label>
+    <button class="sr-duet" id="srDuet" type="button" aria-expanded="false" aria-controls="srDuetPop" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="6.6" cy="17.6" rx="3.5" ry="2.6" transform="rotate(-22 6.6 17.6)"/><rect x="8.9" y="4.5" width="1.7" height="13"/><ellipse cx="15.9" cy="14.6" rx="3.5" ry="2.6" transform="rotate(-22 15.9 14.6)"/><rect x="18.2" y="1.5" width="1.7" height="13"/></svg><span>Duet</span></button>
     <a class="sr-flash" id="srFlash" href="flash/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12z"/></svg><span>Flash<span class="sr-long"> a bar</span></span></a>
-    <button class="sr-new" id="srNew" type="button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>New exercise</button>
+    <button class="sr-new" id="srNew" type="button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg><span>New<span class="sr-long"> exercise</span></span></button>
+    <div class="sr-pop" id="srDuetPop" role="dialog" aria-label="Duet" hidden>
+      <div class="sr-pop-head"><b>Duet</b><button type="button" class="sr-pop-x" id="srDuetX" aria-label="Close">&times;</button></div>
+      <div class="sr-inst sr-solo" role="group" aria-label="Solo or duet"><button type="button" id="srSolo" aria-pressed="true">Solo</button><button type="button" id="srDuetOn" aria-pressed="false">Duet</button></div>
+      <div class="sr-pop-rows" id="srDuetRows">
+        <span>Part 1</span><div class="sr-inst" role="group" aria-label="Part 1"><button type="button" id="srP1violin" aria-pressed="true">Violin</button><button type="button" id="srP1viola" aria-pressed="false">Viola</button></div>
+        <span>Part 2</span><div class="sr-inst" role="group" aria-label="Part 2"><button type="button" id="srP2violin" aria-pressed="true">Violin</button><button type="button" id="srP2viola" aria-pressed="false">Viola</button></div>
+        <span>Part 2 is</span><select id="srLevel" aria-label="Part 2 is"><option value="same">On this page</option><option value="open">Open strings (a beginner or a parent)</option><option value="harder">Harder (a teacher part)</option></select>
+        <span>I play</span><div class="sr-inst" role="group" aria-label="I play"><button type="button" id="srMine1" aria-pressed="true">Part 1</button><button type="button" id="srMine2" aria-pressed="false">Part 2</button></div>
+      </div>
+      <p class="sr-pop-note">Part 1 is the exercise; Part 2 is built on its chords. The page shows the part you play, and both parts sound (Parts shows the other one too). For a partner on another device: the same page, exercise number and choices, or send the link.</p>
+      <button type="button" class="sr-copy" id="srCopy">Copy the link</button>
+    </div>
   </div>
 
   <div class="turn" id="turnCover" role="note">
@@ -822,7 +835,19 @@ body.following .host-only { display: none !important; }
     if (!LAYOUTS[id]) LAYOUTS[id] = [{ name: m[2], short: m[2], insts, one: true, who, note: 'This piece has one line, for ' + who + '.' }];
     return LAYOUTS[id];
   }
-  const layoutRows = (id) => LAYOUTS[id] || oneLine(id);
+  // A duet (the sight-reading page's duets): two parts, one instrument each, named "Violin — Part 1" and "Viola — Part
+  // 2" (the same instrument twice for two violins). Its id names the two instruments ("duet:01"), so saved choices find it
+  // before the score has loaded; the other instruments are greyed out.
+  function duetRows(id) {
+    const m = /^duet:([0-3])([0-3])$/.exec(id || '');
+    if (!m) return undefined;
+    const insts = [Number(m[1]), Number(m[2])];
+    const who = insts[0] === insts[1] ? 'two ' + INSTRUMENTS[insts[0]].toLowerCase() + 's' : andList(insts.map(i => INSTRUMENTS[i].toLowerCase()));
+    if (!LAYOUTS[id]) LAYOUTS[id] = insts.map((i, k) => ({ name: 'Part ' + (k + 1), short: 'Part ' + (k + 1), insts: [i], duet: true, who,
+      note: k ? 'A second part on the same chords, to play with Part 1.' : 'The exercise from the book page.' }));
+    return LAYOUTS[id];
+  }
+  const layoutRows = (id) => LAYOUTS[id] || oneLine(id) || duetRows(id);
   let layout, ROWS, PARTS; // the song's layout, its rows, and for each part (by number) its row and instrument
   function useLayout(id) {
     layout = id; ROWS = layoutRows(id); PARTS = [];
@@ -833,7 +858,12 @@ body.following .host-only { display: none !important; }
   const layoutOf = (names) => Object.keys(LAYOUTS).find(id => {
     const want = LAYOUTS[id].flatMap(row => row.piano ? ['Piano'] : (row.insts || [0, 1, 2, 3]).map(i => INSTRUMENTS[i] + ' — ' + row.name));
     return want.length === names.length && want.every((w, k) => names[k].replace(/\s*\(pizz\.\)\s*$/, '').replace(/\s*[—–-]\s*/, ' — ').trim() === w);
-  }) || oneLineOf(names) || 'tiers';
+  }) || oneLineOf(names) || duetOf(names) || 'tiers';
+  function duetOf(names) {
+    const parts = names.map(n => /^(Violin|Viola|Cello|Bass)\s*[—–-]\s*Part ([12])$/.exec(n.trim()));
+    if (parts.length !== 2 || parts.some((p, k) => !p || p[2] !== String(k + 1))) return undefined;
+    return 'duet:' + parts.map(p => INSTRUMENTS.indexOf(p[1])).join('');
+  }
   function oneLineOf(names) {
     const parts = names.map(n => /^(Violin|Viola|Cello|Bass)\s*[—–-]\s*(.+?)(?:\s*\(pizz\.\))?$/.exec(n.trim()));
     if (!parts.length || parts.some(p => !p || p[2] !== parts[0][2])) return undefined;
@@ -902,7 +932,9 @@ body.following .host-only { display: none !important; }
   const rowOf = (ti) => PARTS[ti]?.row ?? -1;
   const instOf = (ti) => PARTS[ti]?.inst ?? 0;
   // Violin, Melody; a piece with one line, its first instrument (one part, big enough to read, as on every song).
-  const firstVisit = () => [ROWS[0].one ? 0 : trackIndex(ROWS.findIndex(r => r.name === 'Melody'), 0)];
+  // A duet: the part this device plays (window.sightReading.own: 0 or 1; the sight-reading page's "I play").
+  const ownPart = () => { const k = window.sightReading?.own; return Number.isInteger(k) && k >= 0 && k < PARTS.length ? k : 0; };
+  const firstVisit = () => ROWS[0].duet ? [ownPart()] : [ROWS[0].one ? 0 : trackIndex(ROWS.findIndex(r => r.name === 'Melody'), 0)];
   const indexList = (v, n) => Array.isArray(v) ? [...new Set(v.filter(x => Number.isInteger(x) && x >= 0 && x < n))].sort((a, b) => a - b) : null;
   // Settings saved before every part had its own eye: an eye per instrument and per level (every instrument chosen
   // at every level chosen); before that, one instrument and level, maybe with the tune above or all four
@@ -1215,7 +1247,7 @@ body.following .host-only { display: none !important; }
   // A part the song doesn't have (no cello or bass Inner in a 34-part song, no cello or bass Countermelody or Concert
   // part, no violin or bass in a piece for viola and cello): greyed out in its place, and a tap says why.
   function mixNone(list, kind, r, i) {
-    const why = 'No ' + ROWS[r].name + ' part for ' + INSTRUMENTS[i].toLowerCase() + (ROWS[r].one ? ': this piece is for ' + ROWS[r].who
+    const why = 'No ' + ROWS[r].name + (ROWS[r].duet ? '' : ' part') + ' for ' + INSTRUMENTS[i].toLowerCase() + (ROWS[r].duet ? ': this duet is for ' + ROWS[r].who : ROWS[r].one ? ': this piece is for ' + ROWS[r].who
       : ROWS[r].extra ? ': it is written for violin and viola' : ' in this piece: cellos and basses play a Bass Line or a Melody');
     const b = mixTog(list, kind, kind + '-' + r + '-' + i, why, () => toast(why, 2600));
     b.classList.add('none'); b.setAttribute('aria-disabled', 'true');
@@ -1227,7 +1259,7 @@ body.following .host-only { display: none !important; }
     list.classList.toggle('voices', layout !== 'tiers');
     // Levels and voices: the group rule over the table. It scrolls away with the rows, so a short screen gets the room back.
     if (layout.startsWith('voices')) mixCell(list, 'group-rule', 'One player on Melody, the lowest player on Bass Line, everyone else on Inner');
-    mixCell(list, 'mix-h lvl', layout === 'tiers' ? 'Level' : ROWS[0].one ? 'Part' : 'Level & voice'); mixCell(list, 'mix-h grp', 'See');
+    mixCell(list, 'mix-h lvl', layout === 'tiers' ? 'Level' : ROWS[0].one || ROWS[0].duet ? 'Part' : 'Level & voice'); mixCell(list, 'mix-h grp', 'See');
     mixCell(list, 'mix-h hcol', '', true); mixCell(list, 'mix-h grp hcol', 'Hear', true);
     INST_ABBR.forEach((a) => mixCell(list, 'mix-h ab', a));
     mixCell(list, 'mix-h ab hcol', '', true);
@@ -1259,13 +1291,19 @@ body.following .host-only { display: none !important; }
   // the six levels, each part goes to the level it came from.
   const FROM_TIERS = (t, i) => ['Open Strings', 'Easy Melody', 'Melody', i < 2 ? 'Inner' : 'Bass Line', 'Advanced Melody', i < 2 ? 'Advanced Inner' : 'Advanced Bass Line'][t];
   function switchLayout(id) {
+    const wasDuet = !!ROWS[0]?.duet;
     const was = PARTS.map(p => ({ inst: p.inst, old: ROWS[p.row].old ?? p.row, name: layout === 'tiers' ? FROM_TIERS(p.row, p.inst) : ROWS[p.row].name }));
     useLayout(id);
-    const match = ({ inst, old, name }) => id === 'tiers' ? trackIndex(old, inst) : PARTS.findIndex(p => p.inst === inst && ROWS[p.row].name === name);
+    // A duet's parts keep their places when an instrument changes (Part 1 stays Part 1).
+    const match = ({ inst, old, name }) => id === 'tiers' ? trackIndex(old, inst) : PARTS.findIndex(p => (p.inst === inst || ROWS[p.row].duet) && ROWS[p.row].name === name);
     const move = (list) => list && [...new Set(list.map(ti => match(was[ti])))].filter(ti => ti >= 0).sort((a, b) => a - b);
     state.seen = move(state.seen);
     if (!state.seen.length) state.seen = firstVisit();
     state.heard = move(state.heard);
+    // Into a duet: the part this device plays on the page, one big staff as on every song, and both parts playing, so
+    // the other part plays along (Hear's speakers out). Out of one: the parts on the page play again.
+    if (ROWS[0].duet && !wasDuet) { state.seen = firstVisit(); state.heard = PARTS.map((_, k) => k); state.hearOpen = true; }
+    else if (!ROWS[0].duet && wasDuet) { state.heard = null; state.hearOpen = false; }
     noteTier = null;
     buildMix();
   }
@@ -1779,7 +1817,10 @@ body.following .host-only { display: none !important; }
     const insts = new Set(strings.map(instOf)), tiers = new Set(strings.map(rowOf));
     score.tracks.forEach((t, i) => {
       const inst = SHORT[INSTRUMENTS[instOf(i)]], tier = ROWS[rowOf(i)]?.short ?? '';
-      const name = ROWS[rowOf(i)]?.piano ? 'Pno' : tiers.size > 1 && insts.size > 1 ? inst + ' ' + tier : tiers.size > 1 ? tier : inst;
+      // A duet always names the part ("Part 2"), with the instrument too when the two parts' instruments differ.
+      const duetInsts = ROWS[rowOf(i)]?.duet && new Set(PARTS.map(p => p.inst));
+      const name = ROWS[rowOf(i)]?.piano ? 'Pno' : duetInsts ? (duetInsts.size > 1 ? inst + ' ' : '') + tier
+        : tiers.size > 1 && insts.size > 1 ? inst + ' ' + tier : tiers.size > 1 ? tier : inst;
       t.shortName = name; t.name = name;
     });
   }
@@ -3901,6 +3942,7 @@ body.following .host-only { display: none !important; }
           for (const be of bb.beats) {
             const beat = be.beat;
             if (!shown.has(beat.voice.bar.staff.track.index)) continue;
+            if (ROWS[0].duet && Number.isInteger(window.sightReading?.own) && beat.voice.bar.staff.track.index !== window.sightReading.own) continue; // a duet: only my part
             const g = surf.querySelector('g.b' + beat.id);
             const gb = g && box(g);
             let left = gb && gb.r > gb.l ? Math.min(gb.l, be.visualBounds.x) : be.visualBounds.x;
@@ -5236,7 +5278,16 @@ body.following .host-only { display: none !important; }
     api = new alphaTab.AlphaTabApi($('sheet'), s);
     api.customScrollHandler = scroller;
     holdPictureForSound();
-    window.reader = { api, get score() { return score; }, conductor, xmap: () => xmap, line: () => lineState, at: () => playedTick(performance.now()), lag: reportLag, newScore, look: () => look && { H: look.H, t: look.t, ahead: state.ahead, bands: look.bands.map(b => ({ left: b.left, right: b.right, top: b.top, bottom: b.bottom, cut: b.cut })) } };
+    window.reader = { api, get score() { return score; }, conductor, xmap: () => xmap, line: () => lineState, at: () => playedTick(performance.now()), lag: reportLag, newScore,
+      // The parts on the page and the parts that play, from outside (the sight-reading page's "I play" in a duet).
+      parts: ({ seen, heard, hearOpen } = {}) => {
+        const s = indexList(seen, PARTS.length), h = indexList(heard, PARTS.length);
+        if (s && s.length) state.seen = s;
+        if (h) state.heard = h;
+        if (typeof hearOpen === 'boolean') state.hearOpen = hearOpen && !!state.heard;
+        look = null;
+        changed({ parts: true, audio: true });
+      }, look: () => look && { H: look.H, t: look.t, ahead: state.ahead, bands: look.bands.map(b => ({ left: b.left, right: b.right, top: b.top, bottom: b.bottom, cut: b.cut })) } };
     api.error.on(() => fail('Something went wrong drawing the music. Reload the page to try again.'));
     api.renderStarted.on(() => { if (!fitPending) fitTries = 0; if (!namePending) nameTries = 0; head = null; lineHead.classList.remove('on'); clearTimeout(printTimer); });
     api.renderFinished.on(() => { namePending = false; if (fitNames()) return; // drawn again with room for the part names

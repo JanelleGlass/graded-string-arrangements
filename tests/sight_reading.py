@@ -19,10 +19,18 @@ and without repeated notes, 300 numbers each: the page's notes (colors and finge
 whole note, starting with a note, every bar adding up (half a bar in 2/4), no leap past the page's limit and no crossing
 on an eighth, the right length, no note twice in a row when asked, and the shape it says: a run all steps one way, a turn
 of steps that changes direction once, steps with one skip, or a repeated rhythm; alphaTab reads each one.
+Duets (round 5), every page and pairing (violin and violin, violin and viola, viola and violin, viola and viola), 1,000
+numbers with Part 2 on the same page and 250 for each other level (open strings, harder, each earlier book page), read back
+from the score apart from the generator's own code: Part 1 is the exercise with that number; Part 2 in Part 1's key and its
+own clef, only its level's notes (with their colors and finger numbers) and rhythms, no leap past its limit, starting
+with a note and ending on the home note or its third; the two parts never cross and are never more than an octave apart,
+a unison, third, fifth, sixth or octave on every strong beat and wherever both start a note, any other interval a second,
+fourth or seventh with the note that moves stepping on one side, and no fifths or octaves in a row with both moving; over
+each page, the parts move the same way under 30% of the time and share a bar's rhythm in under 20% of bars.
 Besides the book pages in sight-reading/pages.json, a few made-up pages here try what those don't use yet: eighth
 notes, dotted quarters, half rests, 2/4 and 3/4, 6 and 8 bars, low 2, few and free crossings, a viola page of its own.
 """
-import asyncio, json, os, sys, threading, time
+import asyncio, json, os, re, sys, threading, time
 import xml.etree.ElementTree as ET
 from functools import partial
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
@@ -252,6 +260,222 @@ def check_pattern(page, inst, length, no_repeats, ex):
     return out
 
 
+# ---- Duets (round 5) ----
+SCALE_STEP = {'violin': 'GDAE', 'viola': 'CGDA'}
+
+
+def key_alter(fifths, letter):
+    sharps, flats = 'FCGDAEB', 'BEADGCF'
+    return (1 if sharps.index(letter) < fifths else 0) if fifths > 0 else (-1 if flats.index(letter) < -fifths else 0) if fifths < 0 else 0
+
+
+def first_position(inst, fifths, most):
+    """Every note in first position in a key, fingers 0 to most, as {(letter, alter, octave): [(string, color, label)]}:
+    each finger one step of the scale up a string whose open note is in the key."""
+    out = {}
+    for s in SCALE_STEP[inst]:
+        if key_alter(fifths, s):
+            continue
+        for f in range(most + 1):
+            letter = LETTERS[(LETTERS.index(s) + f) % 7]
+            semis = (NATURAL[letter] - NATURAL[s]) % 12 + key_alter(fifths, letter)
+            midi = OPEN[inst][s] + semis
+            alter = key_alter(fifths, letter)
+            octave = (midi - alter - NATURAL[letter]) // 12 - 1
+            label = '0' if f == 0 else (('↓' if semis < USUAL[f] else '↑') + str(f) if semis != USUAL[f] else str(f))
+            out.setdefault((letter, alter, octave), []).append((s, COLOR[s], label))
+    return out
+
+
+def page_notes(page, inst, fifths, tonic):
+    """A page's notes for one instrument, in another key: the ones that key's signature has (not a minor key's 7th)."""
+    out = {}
+    for k, a in rules(page, inst)['allowed'].items():
+        if k[1] == key_alter(fifths, k[0]):
+            out.setdefault(k, []).append((a['string'], a['color'], a['label']))
+    return out
+
+
+def read_part(part, div):
+    """One part of a score: its bars' rhythm tokens and its notes and rests, with where each starts (in divisions)."""
+    events, bars, t = [], [], 0
+    for m in part.findall('measure'):
+        items, pos = [], 0
+        for el in m.findall('note'):
+            d = int(el.findtext('duration'))
+            typ, dot, rest = el.findtext('type'), el.find('dot') is not None, el.find('rest') is not None
+            items.append((typ + ('.' if dot else ''), rest, el.findtext('beam')))
+            ev = {'t': t, 'pos': pos, 'len': d, 'rest': rest, 'bar': len(bars)}
+            if not rest:
+                p = el.find('pitch')
+                k = (p.findtext('step'), int(p.findtext('alter') or 0), int(p.findtext('octave')))
+                ev.update(key=k, midi=12 * (k[2] + 1) + NATURAL[k[0]] + k[1], dia=k[2] * 7 + LETTERS.index(k[0]),
+                          color=el.get('color'), label=el.findtext('notations/technical/fingering'))
+            events.append(ev)
+            pos += d; t += d
+        toks, i = [], 0
+        while i < len(items):
+            typ, rest, beam = items[i]
+            nxt = items[i + 1] if i + 1 < len(items) else None
+            if rest:
+                tok = {'quarter': 'qr', 'half': 'hr', 'half.': 'h.r', 'whole': 'wr'}.get(typ, typ + 'r')
+            elif typ == 'eighth' and beam == 'begin' and nxt and nxt[0] == 'eighth' and nxt[2] == 'end':
+                tok, i = '8 8', i + 1
+            elif typ == 'quarter.' and nxt and nxt[0] == 'eighth' and not nxt[1]:
+                tok, i = 'q. 8', i + 1
+            else:
+                tok = {'whole': 'w', 'half.': 'h.', 'half': 'h', 'quarter': 'q'}.get(typ, typ)
+            toks.append(tok); i += 1
+        bars.append((toks, pos))
+    return events, bars
+
+
+CONSONANT, PASSING = {0, 3, 4, 7, 8, 9}, {2, 5, 10}
+
+
+def check_duet(page, inst1, inst2, level, ex, pages):
+    """Problems with one duet, in words; and its motion and rhythm counts for the totals."""
+    out, stats = [], {'contrary': 0, 'similar': 0, 'oblique': 0, 'same_rhythm': 0, 'bars': 0}
+    root = ET.fromstring(ex['xml'])
+    names = [e.text for e in root.findall('part-list/score-part/part-name')]
+    if names != [f'{inst1.capitalize()} — Part 1', f'{inst2.capitalize()} — Part 2']:
+        out.append(f'parts named {names}')
+    # Part 1 is the exercise with that number, note for note.
+    solo_part = ex['solo'].split('<part id="P1">')[1].split('</part>')[0]
+    if ex['xml'].split('<part id="P1">')[1].split('</part>')[0] != solo_part:
+        out.append('Part 1 is not the exercise with that number')
+    p1el, p2el = root.findall('part')
+    a1, a2 = p1el.find('measure/attributes'), p2el.find('measure/attributes')
+    div = int(a1.findtext('divisions'))
+    fifths = int(a1.findtext('key/fifths'))
+    if int(a2.findtext('key/fifths')) != fifths:
+        out.append("Part 2 is not in Part 1's key")
+    clef = (a2.findtext('clef/sign'), a2.findtext('clef/line'))
+    if clef != (('G', '2') if inst2 == 'violin' else ('C', '3')):
+        out.append(f'Part 2 in clef {clef}')
+    beats, beat_type = int(a1.findtext('time/beats')), int(a1.findtext('time/beat-type'))
+    bar_len = beats * 4 * div // beat_type
+    strong_every = bar_len // 2 if bar_len == 8 else bar_len  # beats 1 and 3 in 4/4; beat 1 in 2/4 and 3/4
+    e1, bars1 = read_part(p1el, div)
+    e2, bars2 = read_part(p2el, div)
+    if len(bars1) != len(bars2) or any(pos != bar_len for _, pos in bars2):
+        out.append(f'Part 2 has {len(bars2)} bars adding up to {[pos for _, pos in bars2]}')
+    # Part 2's notes and rhythms, by its level (a few open strings and first fingers, or more, where the page's own notes
+    # can't make a part with this Part 1: widened 1 or 4).
+    tonic = {'A': 'A', 'D': 'D', 'G': 'G', 'C': 'C', 'E': 'E', 'B': 'B', 'F': 'F'}[[k for k, v in MAJOR.items() if v == fifths][0][0]]
+    earlier = next((p for p in pages if p['id'] == level), None)
+    if level == 'open':
+        allowed, toks, leap = first_position(inst2, fifths, 1), {'w', 'h.', 'h', 'q'}, 8
+    elif level == 'harder':
+        allowed, toks, leap = first_position(inst2, fifths, 4), {'w', 'h.', 'h', 'q', '8 8', 'q. 8', 'qr'} | set(page['rhythms']), 6
+    else:
+        src = earlier or page
+        allowed, toks, leap = page_notes(src, inst2, fifths, tonic), set(src['rhythms']), max(5, src.get('maxLeap', 3))
+        if len(allowed) < 3:  # too few notes for a part: open strings and first fingers too
+            allowed = {**first_position(inst2, fifths, 1), **allowed}
+    if ex['widened']:
+        allowed = {**first_position(inst2, fifths, min(4, ex['widened'])), **allowed}
+    if ex['widened'] >= 4:  # and quarter and half rests, then (5) a bar's rest now and then
+        toks |= {'qr', 'hr'} | ({'wr', 'h.r'} if ex['widened'] == 5 else set())
+    notes2 = [e for e in e2 if not e['rest']]
+    for e in notes2:
+        ways = allowed.get(e['key'])
+        if not ways:
+            out.append(f"Part 2 plays {e['key']}, not one of its notes ({level})")
+        elif not any(c == e['color'] and lab == e['label'] for _, c, lab in ways):
+            out.append(f"Part 2's {e['key']} marked {e['color']}/{e['label']}, not {ways}")
+    for toks2, _ in bars2:
+        for t in toks2:
+            if t not in toks:
+                out.append(f'Part 2 has rhythm {t!r} ({level})')
+    for a, b in zip(notes2, notes2[1:]):
+        if abs(a['dia'] - b['dia']) + 1 > leap:
+            out.append(f"Part 2 leaps a {abs(a['dia'] - b['dia']) + 1} ({level})")
+    # It starts with a note on beat 1, and ends on the home note or its third (or its fifth, over Part 1), on beat 1 of
+    # the last bar.
+    deg = lambda e: (LETTERS.index(e['key'][0]) - LETTERS.index(tonic)) % 7
+    if not e2 or e2[0]['rest']:
+        out.append('Part 2 starts with a rest')
+    last = notes2[-1] if notes2 else None
+    upper2 = ex['upper'] == 2
+    if not last or last['bar'] != len(bars2) - 1 or last['pos'] != 0 or deg(last) not in ((0, 2, 4) if upper2 else (0, 2)):
+        out.append(f"Part 2 ends on {last and last['key']} (bar {last and last['bar'] + 1}, at {last and last['pos']})")
+    # The two parts together, at every moment either starts a note.
+    def at(evs, t):
+        for e in evs:
+            if e['t'] <= t < e['t'] + e['len']:
+                return e
+    def steps_one_side(evs, e):
+        notes = [x for x in evs if not x['rest']]
+        i = notes.index(e)
+        side = [abs(notes[j]['dia'] - e['dia']) == 1 for j in (i - 1, i + 1) if 0 <= j < len(notes)]
+        return any(side)
+    times = sorted({e['t'] for e in e1 + e2})
+    signs, prev = set(), None
+    for t in times:
+        x, y = at(e1, t), at(e2, t)
+        if not x or not y or x['rest'] or y['rest']:
+            prev = None
+            continue
+        d = x['midi'] - y['midi']
+        signs.add((d > 0) - (d < 0))
+        gap = abs(d)
+        if gap > 12:
+            out.append(f'the parts are {gap} semitones apart at {t}')
+        m = gap % 12
+        both = x['t'] == t and y['t'] == t
+        if (t % strong_every == 0 or both) and m not in CONSONANT:
+            out.append(f"{'a strong beat' if t % strong_every == 0 else 'both starting'} at {t} is {gap} semitones apart")
+        elif m not in CONSONANT:
+            if m not in PASSING:
+                out.append(f'{gap} semitones apart at {t}')
+            moved = x if x['t'] == t else y
+            if not steps_one_side(e1 if moved is x else e2, moved):
+                out.append(f'a {gap}-semitone clash at {t} that does not pass by step')
+        if prev:
+            m1, m2 = x['midi'] - prev[0], y['midi'] - prev[1]
+            if m1 and m2:
+                if (m1 > 0) != (m2 > 0):
+                    stats['contrary'] += 1
+                else:
+                    stats['similar'] += 1
+                if prev[2] % 12 == m and m in (0, 7):
+                    out.append(f"{'octaves' if m == 0 else 'fifths'} in a row at {t}")
+            elif m1 or m2:
+                stats['oblique'] += 1
+        prev = (x['midi'], y['midi'], gap)
+    if 1 in signs and -1 in signs:
+        out.append('the parts cross')
+    if (ex['upper'] == 1 and -1 in signs) or (ex['upper'] == 2 and 1 in signs):
+        out.append(f"Part {ex['upper']} is not on top")
+    for (t1, _), (t2, _) in list(zip(bars1, bars2))[:-1]:
+        stats['bars'] += 1
+        stats['same_rhythm'] += t1 == t2
+    if ex['at'] != [[len(bars1), len([e for e in e1 if not e['rest']])], [len(bars2), len(notes2)]]:
+        out.append(f"alphaTab read {ex['at']}")
+    return out, stats
+
+
+DUET_JS = '''async ({ page, earlier, inst1, inst2, level, from, to }) => {
+  const out = [];
+  for (let n = from; n <= to; n++) {
+    let d = null, at = null, error = null, again = null, solo = null;
+    try {
+      d = SightReading.duet(page, inst1, inst2, n, earlier || level);
+      again = SightReading.duet(page, inst1, inst2, n, earlier || level).xml === d.xml;
+      solo = SightReading.exercise(page, inst1, n).xml;
+      const score = alphaTab.importer.ScoreLoader.loadScoreFromBytes(new TextEncoder().encode(d.xml), new alphaTab.Settings());
+      at = score.tracks.map(t => [t.staves[0].bars.length, t.staves[0].bars.reduce((k, b) => k + b.voices[0].beats.filter(x => !x.isRest).length, 0)]);
+    } catch (e) { error = String(e && e.message || e); }
+    out.push(d ? { xml: d.xml, solo, widened: d.widened, upper: d.upper, at, again, error, n } : { error, n });
+  }
+  return out;
+}'''
+DUET_COUNT = int(os.environ.get('DUET_COUNT', '1000'))  # numbers per page and pairing, Part 2 on the same page
+DUET_OTHER = int(os.environ.get('DUET_OTHER', '250'))  # and for each other level
+PAIRS = [('violin', 'violin'), ('violin', 'viola'), ('viola', 'violin'), ('viola', 'viola')]
+
+
 PATTERN_JS = '''async ({ page, inst, length, noRepeats, from, to }) => {
   const out = [];
   for (let n = from; n <= to; n++) {
@@ -361,6 +585,49 @@ async def main():
                 print(f"  FAIL  {page['id']} {tag}: Flash a bar patterns, {sum(len(w) for w in bad.values())} problem(s)")
             else:
                 print(f"  ok    {page['id']} {tag}: {made} Flash a bar patterns follow the rules ({', '.join(f'{k} {v}' for k, v in sorted(shapes.items()))})")
+            done += made
+        # Duets: every page and pairing, Part 2 on the same page (DUET_COUNT numbers), open strings, harder and each
+        # earlier page (DUET_OTHER numbers each).
+        for page in pages:
+            k = pages.index(page)
+            levels = [('same', DUET_COUNT), ('open', DUET_OTHER), ('harder', DUET_OTHER)] + [(p['id'], DUET_OTHER) for p in PAGES[:k] if page in PAGES]
+            bad, made, widened = {}, 0, 0
+            totals = {'contrary': 0, 'similar': 0, 'oblique': 0, 'same_rhythm': 0, 'bars': 0}
+            for inst1, inst2 in PAIRS:
+                for level, count in levels:
+                    earlier = next((p for p in PAGES if p['id'] == level), None)
+                    for start in range(1, count + 1, 250):
+                        got = await pg.evaluate(DUET_JS, {'page': page, 'earlier': earlier, 'inst1': inst1, 'inst2': inst2, 'level': level, 'from': start, 'to': min(count, start + 249)})
+                        for ex in got:
+                            where = f"{page['id']} {inst1}+{inst2} {level} #{ex['n']}"
+                            if ex['error']:
+                                bad.setdefault('could not be made or read: ' + ex['error'], []).append(where); continue
+                            made += 1
+                            widened += bool(ex['widened'])
+                            if not ex['again']:
+                                bad.setdefault('the same number gave a different duet', []).append(where)
+                            problems, stats = check_duet(page, inst1, inst2, level, ex, PAGES)
+                            for key in totals:
+                                totals[key] += stats[key]
+                            for problem in problems:
+                                bad.setdefault(re.sub(r' at \d+$', '', problem), []).append(where)
+            moves = totals['contrary'] + totals['similar'] + totals['oblique']
+            similar = totals['similar'] / max(1, moves)
+            same_rhythm = totals['same_rhythm'] / max(1, totals['bars'])
+            if similar > 0.3:
+                bad.setdefault(f'the parts move the same way {round(100 * similar)}% of the time (want mostly against each other or one holding)', []).append(page['id'])
+            if same_rhythm > 0.2:
+                bad.setdefault(f'{round(100 * same_rhythm)}% of bars have the same rhythm in both parts (want the parts to take turns)', []).append(page['id'])
+            tag = '[book page]' if page in PAGES else '[made-up page]'
+            if bad:
+                for what, where in list(bad.items())[:8]:
+                    failures.append(f"{page['id']} duets: {what} ({len(where)}, e.g. {', '.join(where[:3])})")
+                print(f"  FAIL  {page['id']} {tag}: duets, {sum(len(w) for w in bad.values())} problem(s)")
+            else:
+                print(f"  ok    {page['id']} {tag}: {made} duets follow the rules (4 pairings; moving against each other "
+                      f"{round(100 * totals['contrary'] / max(1, moves))}%, one holding {round(100 * totals['oblique'] / max(1, moves))}%, "
+                      f"the same way {round(100 * similar)}%; bars with the same rhythm {round(100 * same_rhythm)}%; "
+                      f"with a few notes from outside Part 2's page {round(100 * widened / max(1, made))}%)")
             done += made
         # Violin and viola with one number: the same exercise, a fifth apart (when the page has no viola notes of its own).
         same = await pg.evaluate('''(page) => { const v = SightReading.exercise(page, 'violin', 42), a = SightReading.exercise(page, 'viola', 42);
