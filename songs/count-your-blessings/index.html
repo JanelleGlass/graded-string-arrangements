@@ -252,6 +252,20 @@ hr.div { border: 0; border-top: 1px solid var(--line); margin: 0; }
 .pointer .ring, .pointer.rest .ball { display: none; }
 .pointer.rest .ring { display: block; }
 @media print { .point-layer { display: none; } }
+/* Look ahead (the sight-reading page): the cover over the notes already due sits between the counts and the ball */
+.look-layer { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; z-index: 2; }
+@media print { .look-layer { display: none; } }
+/* With the ball off, the cursor shows where the hands are, over the cover */
+#sheet.look-cursor .at-cursor-beat { visibility: visible; z-index: 4; }
+#g-ahead.on .cyc-badge { color: #1D5B72; }
+#g-ahead .ah-long .cyc-badge.stack > span { line-height: 1.1; text-align: center; }
+#g-ahead .ah-long .cyc-badge.stack { justify-items: center; }
+.ah-short { display: none; }
+html.small #g-ahead .ah-short { display: contents; }
+html.small #g-ahead .ah-long { display: none; }
+html.small #g-ahead.cyc { padding: 0 6px 0 5px; gap: 2px; }
+#g-ahead svg.cyc-ico { display: none; } /* bigger screens say it in words */
+html.small #g-ahead svg.cyc-ico { display: block; width: 19px !important; height: 19px !important; }
 /* Its switch, in the strip after Counting: the ball after two even bounces (the beat) or a long one and two short ones
    (the rhythm), teal; grey and crossed out when off */
 .fab-btn svg.pt-ico { width: 22px; height: 22px; fill: none; }
@@ -700,6 +714,7 @@ body.following .host-only { display: none !important; }
     <button class="fab-btn cyc" id="g-look" type="button"></button>
     <button class="fab-btn cyc" id="g-count" type="button"></button>
     <button class="fab-btn" id="g-point" type="button" aria-pressed="true"></button>
+    <button class="fab-btn cyc" id="g-ahead" type="button" hidden></button>
     </div>
     <div class="fab-set" role="group" aria-label="Playback settings">
     <button class="fab-btn host-only" id="g-tempo" type="button" aria-expanded="false" aria-controls="pop-tempo" title="Tempo"><svg class="qn" viewBox="0 0 10 24" aria-hidden="true"><ellipse cx="4.6" cy="19.2" rx="4.4" ry="3.1" transform="rotate(-22 4.6 19.2)"/><rect x="7.7" y="1" width="1.5" height="18.2"/></svg><span id="tempoChip">100</span></button>
@@ -732,6 +747,8 @@ body.following .host-only { display: none !important; }
   // A song with a Piano part also loads GeneralUser GS's Grand Piano, added to the strings ('' = no piano).
   const PIANO_SOUNDFONT_URL = '';
   const PDF_URL = ''; // Paste the Payhip product link here when it exists.
+  // Look ahead (notes vanish a little before they sound): only the sight-reading page has it (tools/build_site.py).
+  const LOOK_AHEAD = false;
   const BASE_TEMPO = 96; // written tempo, from bar 1 of the score
   // A score that changes tempo partway through: the tempo control reads as a percentage of the written tempos,
   // since a single "♩ =" number would only be right for the first section.
@@ -794,7 +811,19 @@ body.following .host-only { display: none !important; }
     if (!LAYOUTS[id]) LAYOUTS[id] = [{ name: m[2], short: m[2], insts, one: true, who, note: 'This piece has one line, for ' + who + '.' }];
     return LAYOUTS[id];
   }
-  const layoutRows = (id) => LAYOUTS[id] || oneLine(id);
+  // A duet (the sight-reading page's duets): two parts, one instrument each, named "Violin — Part 1" and "Viola — Part
+  // 2" (the same instrument twice for two violins). Its id names the two instruments ("duet:01"), so saved choices find it
+  // before the score has loaded; the other instruments are greyed out.
+  function duetRows(id) {
+    const m = /^duet:([0-3])([0-3])$/.exec(id || '');
+    if (!m) return undefined;
+    const insts = [Number(m[1]), Number(m[2])];
+    const who = insts[0] === insts[1] ? 'two ' + INSTRUMENTS[insts[0]].toLowerCase() + 's' : andList(insts.map(i => INSTRUMENTS[i].toLowerCase()));
+    if (!LAYOUTS[id]) LAYOUTS[id] = insts.map((i, k) => ({ name: 'Part ' + (k + 1), short: 'Part ' + (k + 1), insts: [i], duet: true, who,
+      note: k ? 'A second part on the same chords, to play with Part 1.' : 'The exercise from the book page.' }));
+    return LAYOUTS[id];
+  }
+  const layoutRows = (id) => LAYOUTS[id] || oneLine(id) || duetRows(id);
   let layout, ROWS, PARTS; // the song's layout, its rows, and for each part (by number) its row and instrument
   function useLayout(id) {
     layout = id; ROWS = layoutRows(id); PARTS = [];
@@ -805,7 +834,12 @@ body.following .host-only { display: none !important; }
   const layoutOf = (names) => Object.keys(LAYOUTS).find(id => {
     const want = LAYOUTS[id].flatMap(row => row.piano ? ['Piano'] : (row.insts || [0, 1, 2, 3]).map(i => INSTRUMENTS[i] + ' — ' + row.name));
     return want.length === names.length && want.every((w, k) => names[k].replace(/\s*\(pizz\.\)\s*$/, '').replace(/\s*[—–-]\s*/, ' — ').trim() === w);
-  }) || oneLineOf(names) || 'tiers';
+  }) || oneLineOf(names) || duetOf(names) || 'tiers';
+  function duetOf(names) {
+    const parts = names.map(n => /^(Violin|Viola|Cello|Bass)\s*[—–-]\s*Part ([12])$/.exec(n.trim()));
+    if (parts.length !== 2 || parts.some((p, k) => !p || p[2] !== String(k + 1))) return undefined;
+    return 'duet:' + parts.map(p => INSTRUMENTS.indexOf(p[1])).join('');
+  }
   function oneLineOf(names) {
     const parts = names.map(n => /^(Violin|Viola|Cello|Bass)\s*[—–-]\s*(.+?)(?:\s*\(pizz\.\))?$/.exec(n.trim()));
     if (!parts.length || parts.some(p => !p || p[2] !== parts[0][2])) return undefined;
@@ -820,6 +854,15 @@ body.following .host-only { display: none !important; }
     { id: 'all', label: 'Every note' },
     { id: 'first', label: 'First time only' },
     { id: 'off', label: 'Off' },
+  ];
+  // Look ahead: three levels, by how long before it sounds a note vanishes, in beats (a dotted quarter in 6/8) or a bar
+  // (Janelle, 2026-11-12: three levels, named Level 1 to 3, of half a beat, a beat and a bar; it began with ½, 1 and 2
+  // beats and a bar, named by the amount).
+  const AHEAD = [
+    { id: 'off', badge: 'Off', short: 'Off' },
+    { id: 'half', badge: 'Level 1', short: '1', beats: 0.5, say: 'half a beat', level: 1 },
+    { id: 'beat', badge: 'Level 2', short: '2', beats: 1, say: 'one beat', level: 2 },
+    { id: 'bar', badge: 'Level 3', short: '3', bar: true, say: 'a bar', level: 3 },
   ];
   const FOLLOW = [
     { id: 'pulse', label: 'Pulsing notes' },
@@ -865,7 +908,9 @@ body.following .host-only { display: none !important; }
   const rowOf = (ti) => PARTS[ti]?.row ?? -1;
   const instOf = (ti) => PARTS[ti]?.inst ?? 0;
   // Violin, Melody; a piece with one line, its first instrument (one part, big enough to read, as on every song).
-  const firstVisit = () => [ROWS[0].one ? 0 : trackIndex(ROWS.findIndex(r => r.name === 'Melody'), 0)];
+  // A duet: the part this device plays (window.sightReading.own: 0 or 1; the sight-reading page's "I play").
+  const ownPart = () => { const k = window.sightReading?.own; return Number.isInteger(k) && k >= 0 && k < PARTS.length ? k : 0; };
+  const firstVisit = () => ROWS[0].duet ? [ownPart()] : [ROWS[0].one ? 0 : trackIndex(ROWS.findIndex(r => r.name === 'Melody'), 0)];
   const indexList = (v, n) => Array.isArray(v) ? [...new Set(v.filter(x => Number.isInteger(x) && x >= 0 && x < n))].sort((a, b) => a - b) : null;
   // Settings saved before every part had its own eye: an eye per instrument and per level (every instrument chosen
   // at every level chosen); before that, one instrument and level, maybe with the tune above or all four
@@ -916,6 +961,8 @@ body.following .host-only { display: none !important; }
     metro: ['off', 'on', 'count', 'countonly'].includes(saved.metro) ? saved.metro : 'off',
     // Bigger or smaller music (the − and + in the corner): a step on ZOOMS.
     zoom: ZOOMS.includes(saved.zoom) ? saved.zoom : 1,
+    // Look ahead (the sight-reading page only): off, or how far ahead of the music the notes vanish.
+    ahead: !LOOK_AHEAD ? 'off' : saved.ahead === 'two' ? 'beat' : AHEAD.some(a => a.id === saved.ahead) ? saved.ahead : 'off', // 2 beats is gone
   };
   // Phones (upright or on their side): one long line.
   const smallMQ = window.matchMedia('(max-width: 600px) and (orientation: portrait), (max-height: 500px) and (orientation: landscape)');
@@ -951,7 +998,7 @@ body.following .host-only { display: none !important; }
   // While the music is drawn for paper (Print), it is on pages for a moment; the saved choice stays the screen's.
   let printing = null;
   const onPaper = () => !!printing && printing.stage === 'paper'; // drawing the music for paper
-  const save = () => store.set({ zoom: state.zoom, parts: savedId(), partsFull: layout, seen: state.seen, heard: state.heard, hearOpen: state.hearOpen, colorMode: state.colorMode, fingerMode: state.fingerMode, tempo: state.tempo, follow: state.follow, countBy: state.unit, fingers: state.fingers, counts: state.countAlong ? 'on' : 'off', pointer: state.pointer ? state.ballBy : 'off', layout: printing ? printing.layout : state.layout, letterMode: state.letterMode, lettersBig: state.letterModeBig, metro: state.metro });
+  const save = () => store.set({ zoom: state.zoom, parts: savedId(), partsFull: layout, seen: state.seen, heard: state.heard, hearOpen: state.hearOpen, colorMode: state.colorMode, fingerMode: state.fingerMode, tempo: state.tempo, follow: state.follow, countBy: state.unit, fingers: state.fingers, counts: state.countAlong ? 'on' : 'off', pointer: state.pointer ? state.ballBy : 'off', layout: printing ? printing.layout : state.layout, letterMode: state.letterMode, lettersBig: state.letterModeBig, metro: state.metro, ahead: state.ahead });
 
   // ---- Room reverb ----
   // alphaTab plays through Web Audio; route whatever it sends to the speakers through a small reverb bus.
@@ -1062,6 +1109,9 @@ body.following .host-only { display: none !important; }
     const hops = on && by === 'rhythm' ? 'M1 21C1 4.5 9 4.5 9 21C9 14.5 12 14.5 12 21C12 15 15 15 15 20' : 'M1 21C1 8 8 8 8 21C8 8 15 8 15 20';
     return `<svg class="pt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="${hops}" fill="none" stroke="${c}" stroke-width="1.6" stroke-dasharray="1.4 1.9" stroke-linecap="round"/><circle cx="19.4" cy="18.4" r="3.8" fill="${c}"/>`
       + (on ? '' : '<path d="M3 21 21 3" stroke="#FFFFFF" stroke-width="4.4" stroke-linecap="round"/><path d="M3 21 21 3" stroke="#8A948F" stroke-width="2.2" stroke-linecap="round"/>') + '</svg>'; };
+  // Look ahead: an eye looking to the right (teal when on, grey when off).
+  const aheadIco = (on) => { const c = on ? '#1D5B72' : '#8A948F';
+    return `<svg class="cyc-ico" viewBox="0 0 24 24" style="width:22px;height:22px" aria-hidden="true"><path d="M2 12c2.6-4.2 5.9-6.3 10-6.3s7.4 2.1 10 6.3c-2.6 4.2-5.9 6.3-10 6.3S4.6 16.2 2 12z" fill="none" stroke="${c}" stroke-width="1.8" stroke-linejoin="round"/><circle cx="15" cy="12" r="3" fill="${c}"/></svg>`; };
   const BALL_WORD = { beat: 'on the beat (a bounce on every count)', rhythm: 'on the rhythm (a bounce on every note)' };
   function renderCycles() {
     $('g-metro').innerHTML = metroIco(state.metro !== 'off') + stackBadge(Object.values(METRO_BADGE), METRO_BADGE[state.metro]);
@@ -1082,7 +1132,16 @@ body.following .host-only { display: none !important; }
     $('g-point').innerHTML = pointIco(pOn, state.ballBy);
     $('g-point').setAttribute('aria-pressed', String(pOn));
     $('g-point').setAttribute('aria-label', 'Bouncing ball: ' + (pOn ? BALL_WORD[state.ballBy] : 'off') + '. Tap to change.');
-    for (const id of ['g-metro', 'g-colors', 'g-look', 'g-layout', 'g-count', 'g-point']) $(id).title = $(id).getAttribute('aria-label').replace(/\. Tap to change\.$/, '');
+    const ah = AHEAD.find(a => a.id === state.ahead);
+    // An eye looking ahead, then "Look ahead" over the level; phones (no room on an iPhone SE turned sideways) show
+    // just the level ("1", "2", "3"), and a tap says how far ahead in words.
+    $('g-ahead').innerHTML = aheadIco(!!ah.say) + '<span class="ah-long">' + stackBadge(AHEAD.map(a => 'Look ahead<br>' + a.badge), 'Look ahead<br>' + ah.badge) + '</span>'
+      + '<span class="ah-short">' + stackBadge(AHEAD.map(a => a.short), ah.short) + '</span>';
+    $('g-ahead').setAttribute('aria-label', (ah.say ? 'Look ahead, level ' + ah.level + ': each note vanishes ' + ah.say + ' before it is played' : 'Look ahead: off') + '. Tap to change.');
+    $('g-ahead').classList.toggle('on', !!ah.say);
+    // Look ahead with the ball off: the cursor shows where the hands are, over the vanished notes.
+    $('sheet').classList.toggle('look-cursor', !!ah.say && !state.pointer);
+    for (const id of ['g-metro', 'g-colors', 'g-look', 'g-layout', 'g-count', 'g-point', 'g-ahead']) $(id).title = $(id).getAttribute('aria-label').replace(/\. Tap to change\.$/, '');
   }
   function toast(text, ms = 1700) {
     const el = $('toast');
@@ -1127,6 +1186,22 @@ body.following .host-only { display: none !important; }
     changed({ size: true, layout: true });
     toast(state.layout === 'line' ? 'Music: one long line' : 'Music: pages');
   });
+  $('g-ahead').hidden = !LOOK_AHEAD;
+  $('g-ahead').addEventListener('click', () => {
+    setPop(null);
+    const was = state.ahead, ah = AHEAD[(AHEAD.findIndex(a => a.id === state.ahead) + 1) % AHEAD.length];
+    state.ahead = ah.id;
+    let also = '';
+    // Look ahead starts with a count-in and at the written tempo (on the sight-reading page, the slowest for its book
+    // page), so the eyes have the beat before the first note goes (Janelle's brief, 2026-11-09).
+    if (was === 'off' && ah.say) {
+      if (!countInSet()) { state.metro = state.metro === 'on' ? 'count' : 'countonly'; applyMetro(); also += ', with a count-in'; }
+      if (state.tempo !== SPEED_BASE) { setTempo(SPEED_BASE); also += (also ? ' and' : ',') + ' back to ' + (TEMPO_PERCENT ? '100%' : '\u2669 = ' + SPEED_BASE); }
+    }
+    save(); renderCycles();
+    if (!ah.say) clearLook();
+    toast(ah.say ? 'Look ahead, level ' + ah.level + ': each note vanishes ' + ah.say + ' before you play it' + also : 'Look ahead off', ah.say ? 2800 : 1700);
+  });
   // ---- Parts: what is on the page, and what plays ----
   // A level (or a level and voice) on each row, with an eye and a speaker for each instrument: every part is on the
   // page or not, and plays or not, on its own.
@@ -1153,7 +1228,7 @@ body.following .host-only { display: none !important; }
   // A part the song doesn't have (no cello or bass Inner in a 34-part song, no cello or bass Countermelody or Concert
   // part, no violin or bass in a piece for viola and cello): greyed out in its place, and a tap says why.
   function mixNone(list, kind, r, i) {
-    const why = 'No ' + ROWS[r].name + ' part for ' + INSTRUMENTS[i].toLowerCase() + (ROWS[r].one ? ': this piece is for ' + ROWS[r].who
+    const why = 'No ' + ROWS[r].name + (ROWS[r].duet ? '' : ' part') + ' for ' + INSTRUMENTS[i].toLowerCase() + (ROWS[r].duet ? ': this duet is for ' + ROWS[r].who : ROWS[r].one ? ': this piece is for ' + ROWS[r].who
       : ROWS[r].extra ? ': it is written for violin and viola' : ' in this piece: cellos and basses play a Bass Line or a Melody');
     const b = mixTog(list, kind, kind + '-' + r + '-' + i, why, () => toast(why, 2600));
     b.classList.add('none'); b.setAttribute('aria-disabled', 'true');
@@ -1165,7 +1240,7 @@ body.following .host-only { display: none !important; }
     list.classList.toggle('voices', layout !== 'tiers');
     // Levels and voices: the group rule over the table. It scrolls away with the rows, so a short screen gets the room back.
     if (layout.startsWith('voices')) mixCell(list, 'group-rule', 'One player on Melody, the lowest player on Bass Line, everyone else on Inner');
-    mixCell(list, 'mix-h lvl', layout === 'tiers' ? 'Level' : ROWS[0].one ? 'Part' : 'Level & voice'); mixCell(list, 'mix-h grp', 'See');
+    mixCell(list, 'mix-h lvl', layout === 'tiers' ? 'Level' : ROWS[0].one || ROWS[0].duet ? 'Part' : 'Level & voice'); mixCell(list, 'mix-h grp', 'See');
     mixCell(list, 'mix-h hcol', '', true); mixCell(list, 'mix-h grp hcol', 'Hear', true);
     INST_ABBR.forEach((a) => mixCell(list, 'mix-h ab', a));
     mixCell(list, 'mix-h ab hcol', '', true);
@@ -1197,13 +1272,19 @@ body.following .host-only { display: none !important; }
   // the six levels, each part goes to the level it came from.
   const FROM_TIERS = (t, i) => ['Open Strings', 'Easy Melody', 'Melody', i < 2 ? 'Inner' : 'Bass Line', 'Advanced Melody', i < 2 ? 'Advanced Inner' : 'Advanced Bass Line'][t];
   function switchLayout(id) {
+    const wasDuet = !!ROWS[0]?.duet;
     const was = PARTS.map(p => ({ inst: p.inst, old: ROWS[p.row].old ?? p.row, name: layout === 'tiers' ? FROM_TIERS(p.row, p.inst) : ROWS[p.row].name }));
     useLayout(id);
-    const match = ({ inst, old, name }) => id === 'tiers' ? trackIndex(old, inst) : PARTS.findIndex(p => p.inst === inst && ROWS[p.row].name === name);
+    // A duet's parts keep their places when an instrument changes (Part 1 stays Part 1).
+    const match = ({ inst, old, name }) => id === 'tiers' ? trackIndex(old, inst) : PARTS.findIndex(p => (p.inst === inst || ROWS[p.row].duet) && ROWS[p.row].name === name);
     const move = (list) => list && [...new Set(list.map(ti => match(was[ti])))].filter(ti => ti >= 0).sort((a, b) => a - b);
     state.seen = move(state.seen);
     if (!state.seen.length) state.seen = firstVisit();
     state.heard = move(state.heard);
+    // Into a duet: the part this device plays on the page, one big staff as on every song, and both parts playing, so
+    // the other part plays along (Hear's speakers out). Out of one: the parts on the page play again.
+    if (ROWS[0].duet && !wasDuet) { state.seen = firstVisit(); state.heard = PARTS.map((_, k) => k); state.hearOpen = true; }
+    else if (!ROWS[0].duet && wasDuet) { state.heard = null; state.hearOpen = false; }
     noteTier = null;
     buildMix();
   }
@@ -1717,7 +1798,10 @@ body.following .host-only { display: none !important; }
     const insts = new Set(strings.map(instOf)), tiers = new Set(strings.map(rowOf));
     score.tracks.forEach((t, i) => {
       const inst = SHORT[INSTRUMENTS[instOf(i)]], tier = ROWS[rowOf(i)]?.short ?? '';
-      const name = ROWS[rowOf(i)]?.piano ? 'Pno' : tiers.size > 1 && insts.size > 1 ? inst + ' ' + tier : tiers.size > 1 ? tier : inst;
+      // A duet always names the part ("Part 2"), with the instrument too when the two parts' instruments differ.
+      const duetInsts = ROWS[rowOf(i)]?.duet && new Set(PARTS.map(p => p.inst));
+      const name = ROWS[rowOf(i)]?.piano ? 'Pno' : duetInsts ? (duetInsts.size > 1 ? inst + ' ' : '') + tier
+        : tiers.size > 1 && insts.size > 1 ? inst + ' ' + tier : tiers.size > 1 ? tier : inst;
       t.shortName = name; t.name = name;
     });
   }
@@ -2769,6 +2853,7 @@ body.following .host-only { display: none !important; }
     num.animate([{ transform: 'scale(1.25)', opacity: 1 }, { transform: 'scale(1)', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'forwards' });
     clearTimeout(counting.timer);
     counting.left--;
+    counting.at = performance.now(); // heard now (Look ahead counts from here)
     const beatMs = counting.beatMs;
     const done = counting.left <= 0;
     counting.timer = setTimeout(endCountIn, done ? beatMs * 0.9 : beatMs * 1.6);
@@ -3844,6 +3929,7 @@ body.following .host-only { display: none !important; }
   function gridTick(now) {
     if (!playing) return;
     updatePointer(now);
+    updateLook(now);
     if ((pulseOn() || state.countAlong) && score) {
       const est = playedTick(now);
       if (est >= 0) {
@@ -3869,6 +3955,143 @@ body.following .host-only { display: none !important; }
       }
     }
     requestAnimationFrame(gridTick);
+  }
+
+  // ---- Look ahead (the sight-reading page, 2026-11-12) ----
+  // The eyes are the headlights, the hands are the car (Janelle's brief): while the music plays, each note vanishes a
+  // little before it sounds, with everything on it (head, stem, its part of a beam, finger number, note name, its
+  // counts), so the eyes stay ahead while the hands keep a beat that won't wait. The staff lines, bar lines, clef and
+  // key stay, and the bouncing ball (or, with the ball off, the cursor) always shows where the hands are. Measured in
+  // beats, so it scales with the tempo, and timed to what is heard: the picture's clock, which waits for the speaker
+  // (holdPictureForSound), and during a count-in the clicks as they are heard. The notes come back when the music stops.
+  // How: for each line of music and each part on the page, a band the colour of the paper covers the music from the
+  // line's first note up to the first note not yet due, with copies of the staff lines and bar lines on top. It sits
+  // between the counts and the ball. Measured after each drawing, the first time it is needed.
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const lookLayer = document.createElementNS(SVGNS, 'svg');
+  lookLayer.setAttribute('class', 'look-layer');
+  lookLayer.setAttribute('aria-hidden', 'true');
+  let look = null; // { bands: [{ left, right, top, bottom, items: [{ tick, left }], clip, cut }], H, t }
+  function buildLook() {
+    lookLayer.replaceChildren();
+    look = { bands: [], H: -Infinity, t: null };
+    const surf = $('sheet').querySelector('.at-surface'), wrap = $('sheet').querySelector('.at-cursors');
+    if (!api || !api.boundsLookup || !score || !surf || !wrap) return;
+    if (lookLayer.parentNode !== wrap) wrap.insertBefore(lookLayer, pointLayer.parentNode === wrap ? pointLayer : null);
+    lookLayer.setAttribute('width', surf.offsetWidth); lookLayer.setAttribute('height', surf.offsetHeight);
+    const sr = surf.getBoundingClientRect();
+    const box = (el) => { const r = el.getBoundingClientRect(); return { l: r.left - sr.left, r: r.right - sr.left, t: r.top - sr.top, b: r.bottom - sr.top }; };
+    const systems = api.boundsLookup.staffSystems;
+    // The staves (a part's five lines) in each line of music, top to bottom.
+    const staves = systems.map(sys => (sys.bars[0] ? sys.bars[0].bars : []).map((bb, k) => ({ top: bb.visualBounds.y, bottom: bb.visualBounds.y + bb.visualBounds.h, k })));
+    // Staff lines and bar lines, as drawn: copied over the cover. A staff line is thin and long; a bar line runs from
+    // the top of a staff to the bottom of one (a stem never lines up with both).
+    const all = staves.flat(), lines = [];
+    const space = all[0] ? (all[0].bottom - all[0].top) / 4 : 10, tol = Math.max(3, space * 0.3);
+    for (const r of surf.querySelectorAll('svg rect')) {
+      const b = box(r), w = b.r - b.l, h = b.b - b.t, mid = (b.t + b.b) / 2;
+      if (w <= 0 || h <= 0) continue;
+      const staffLine = h < space * 0.4 && w > space * 3 && all.some(s => [0, 1, 2, 3, 4].some(i => Math.abs(mid - (s.top + i * space)) < tol));
+      const barLine = w < space * 0.6 && h > space * 3.5 && all.some(s => Math.abs(b.t - s.top) < tol) && all.some(s => Math.abs(b.b - s.bottom) < tol);
+      if (staffLine || barLine) lines.push({ ...b, fill: r.getAttribute('fill') || getComputedStyle(r).fill || '#000' });
+    }
+    // Where each note's drawing starts on the left: its head (or rest), its sharp or flat, a finger number to its left.
+    const accidentals = [];
+    for (const t of surf.querySelectorAll('g.at > text')) { const k = t.textContent.codePointAt(0); if (k >= 0xE260 && k <= 0xE264) accidentals.push(box(t)); }
+    const fins = new Map();
+    for (const t of surf.querySelectorAll('text.fin[data-beat]')) { const id = t.dataset.beat; fins.set(id, Math.min(fins.get(id) ?? Infinity, box(t).l)); }
+    const shown = new Set(shownIndexes()), paper = getComputedStyle($('sheet')).backgroundColor || '#FFFFFF';
+    systems.forEach((sys, si) => {
+      const sTop = sys.realBounds.y, sBot = sys.realBounds.y + sys.realBounds.h, list = staves[si];
+      list.forEach((st, k) => {
+        const items = [];
+        let right = -Infinity;
+        for (const mb of sys.bars) {
+          const bb = mb.bars[k];
+          if (!bb) continue;
+          right = Math.max(right, bb.visualBounds.x + bb.visualBounds.w);
+          for (const be of bb.beats) {
+            const beat = be.beat;
+            if (!shown.has(beat.voice.bar.staff.track.index)) continue;
+            if (ROWS[0].duet && Number.isInteger(window.sightReading?.own) && beat.voice.bar.staff.track.index !== window.sightReading.own) continue; // a duet: only my part
+            const g = surf.querySelector('g.b' + beat.id);
+            const gb = g && box(g);
+            let left = gb && gb.r > gb.l ? Math.min(gb.l, be.visualBounds.x) : be.visualBounds.x;
+            if (fins.has(String(beat.id))) left = Math.min(left, fins.get(String(beat.id)));
+            if (gb) for (const a of accidentals) if (a.r <= gb.l + 2 && a.r >= gb.l - (st.bottom - st.top) * 0.5 && a.b > st.top - (st.bottom - st.top) && a.t < st.bottom + (st.bottom - st.top)) left = Math.min(left, a.l);
+            items.push({ tick: score.masterBars[beat.voice.bar.index].start + beat.playbackStart, left: left - 2 });
+          }
+        }
+        if (!items.length) return;
+        items.sort((a, b) => a.tick - b.tick || a.left - b.left);
+        const top = k === 0 ? sTop : (list[k - 1].bottom + st.top) / 2, bottom = k === list.length - 1 ? sBot : (st.bottom + list[k + 1].top) / 2;
+        const left = Math.min(...items.map(i => i.left)), band = { left, right, top, bottom, items, cut: left };
+        // The cover: a clip that grows to the right over the paper and the copied lines.
+        const id = 'look-' + si + '-' + k + '-' + Math.random().toString(36).slice(2, 7);
+        const cp = document.createElementNS(SVGNS, 'clipPath'); cp.setAttribute('id', id);
+        band.clip = document.createElementNS(SVGNS, 'rect');
+        Object.entries({ x: left, y: top, width: 0, height: bottom - top }).forEach(([a, v]) => band.clip.setAttribute(a, v));
+        cp.appendChild(band.clip);
+        const g = document.createElementNS(SVGNS, 'g'); g.setAttribute('clip-path', 'url(#' + id + ')');
+        const bg = document.createElementNS(SVGNS, 'rect');
+        Object.entries({ x: left, y: top, width: right - left + 2, height: bottom - top, fill: paper }).forEach(([a, v]) => bg.setAttribute(a, v));
+        g.appendChild(bg);
+        for (const l of lines) {
+          if (l.r < left || l.l > right || l.b < top || l.t > bottom) continue;
+          const c = document.createElementNS(SVGNS, 'rect');
+          Object.entries({ x: l.l, y: l.t, width: l.r - l.l, height: l.b - l.t, fill: l.fill }).forEach(([a, v]) => c.setAttribute(a, v));
+          g.appendChild(c);
+        }
+        lookLayer.append(cp, g);
+        look.bands.push(band);
+      });
+    });
+  }
+  // What is heard now, in the music's own ticks: before the first note (during the count-in, or while the first note is
+  // on its way to the speaker) it is that far before the start.
+  function heardTick(now) {
+    const rate = 0.016 * (pos.bpm || BASE_TEMPO * tempoScale * (api.playbackSpeed || 1)); // ticks a millisecond
+    if (counting) {
+      if (counting.at == null) return -Infinity; // the first click isn't heard yet
+      const mb = score.masterBars[barAtTick(markTick)], click = 3840 / mb.timeSignatureDenominator;
+      // The music starts one click after the last one: after a click, (clicks left + 1) clicks to go.
+      return markTick - (counting.left + 1) * click + (now - counting.at) * click / counting.beatMs;
+    }
+    if (now < heardAt) return pos.tick - (heardAt - now) * rate;
+    return playedTick(now);
+  }
+  // How far ahead the notes vanish, in ticks, at this place in the music.
+  function aheadTicks(t) {
+    const a = AHEAD.find(x => x.id === state.ahead);
+    if (!a || !a.say) return null;
+    const mb = score.masterBars[barAtTick(Math.max(0, t))];
+    if (a.bar) return mb.calculateDuration();
+    const compound = mb.timeSignatureDenominator === 8 && mb.timeSignatureNumerator % 3 === 0 && mb.timeSignatureNumerator > 3;
+    return a.beats * (compound ? 1440 : 3840 / mb.timeSignatureDenominator);
+  }
+  function updateLook(now) {
+    if (!LOOK_AHEAD || !score || !api) return;
+    const t = heardTick(now), dt = t === -Infinity ? null : aheadTicks(t);
+    if (dt == null) { if (look && look.H > -Infinity) clearLook(); return; }
+    if (!look) buildLook();
+    // Only forward while playing on, so a note never comes back for a moment; a jump back (a tap on an earlier note)
+    // starts again from there.
+    const H = t + dt;
+    look.H = look.t != null && t < look.t - 480 ? H : Math.max(look.H, H);
+    look.t = t;
+    for (const b of look.bands) {
+      let cut = b.left, due = false;
+      for (const it of b.items) { if (it.tick <= look.H + 1) due = true; else { cut = due ? it.left : b.left; break; } }
+      if (due && b.items[b.items.length - 1].tick <= look.H + 1) cut = b.right + 2;
+      cut = Math.max(b.left, cut);
+      if (cut !== b.cut) { b.cut = cut; b.clip.setAttribute('width', Math.max(0, cut - b.left)); }
+    }
+  }
+  // The music has stopped (or Look ahead is off): every note comes back.
+  function clearLook() {
+    if (!look) return;
+    look.H = -Infinity; look.t = null;
+    for (const b of look.bands) if (b.cut !== b.left) { b.cut = b.left; b.clip.setAttribute('width', 0); }
   }
 
   // ---- Music size ----
@@ -5037,24 +5260,61 @@ body.following .host-only { display: none !important; }
     return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
   }
 
-  async function boot() {
-    buildControls();
-    if (typeof alphaTab === 'undefined') return fail('The music reader could not load. Check your connection and reload the page.');
-    let xmlBuf, fontUrl;
-    try {
-      const [xr, fr] = await Promise.all([fetch(SCORE_URL), fetch(FONT_URL)]);
-      if (!xr.ok || !fr.ok) throw new Error('missing');
-      xmlBuf = await xr.arrayBuffer();
-      fontUrl = await toDataUrl(new Blob([await fr.arrayBuffer()], { type: 'font/woff2' }));
-    } catch { return fail('The score did not load. Reload the page to try again.'); }
-
+  // A score (MusicXML) read into the reader: the string colors, finger numbers and words from the file, the layout of
+  // its parts (the Parts table follows), then alphaTab's own reading of it.
+  function readScore(xmlBuf, settings) {
     const xmlDoc = new DOMParser().parseFromString(new TextDecoder().decode(xmlBuf), 'application/xml');
     if (padPickup(xmlDoc)) xmlBuf = new TextEncoder().encode(new XMLSerializer().serializeToString(xmlDoc)).buffer;
     marks = readMarks(xmlDoc);
     words = readWords(xmlDoc);
     // The six levels, levels and voices, or one line, from the part names; the Parts table follows.
     const found = layoutOf([...xmlDoc.querySelectorAll('part-list > score-part')].map(p => p.querySelector('part-name')?.textContent.trim() || ''));
-    if (found !== layout) { switchLayout(found); buildControls(); }
+    if (found !== layout) {
+      switchLayout(found);
+      if (state.heard && !state.heard.length) state.heard = [...state.seen]; // nothing left to hear: hear what's seen
+      buildControls();
+    }
+    const next = alphaTab.importer.ScoreLoader.loadScoreFromBytes(new Uint8Array(xmlBuf), settings);
+    score = next; pickupExtra = 0;
+    prepareScore();
+    markSame();
+  }
+  // New music in place of the music on the page, with the same settings, sounds and size (the sight-reading page's New
+  // exercise, and its Violin / Viola): playing stops, and Play starts again from the beginning.
+  function newScore(xmlBuf) {
+    if (!api || printing) return false;
+    cancelLoopGap(); clearTimers();
+    if (playing || counting) api.stop();
+    endCountIn();
+    loop = null; markTick = 0; markBeat = null;
+    try { api.playbackRange = null; } catch {}
+    try { readScore(xmlBuf, api.settings); } catch { fail('The music could not be read.'); return false; }
+    // The tempo marks are halved again for very slow playing (playSpeed), from this score's own marks.
+    tempoScale = 1; writtenTempos = null;
+    bounceRoom = { key: '', widths: new Map(), tries: 0 }; nameRoom = { part: 0, line: 0 }; fitTries = 0;
+    xmap = null; lineState = null; lastScrollKey = null;
+    $('sheet').scrollLeft = 0;
+    applySize();
+    labelStaves(shownIndexes());
+    api.renderScore(score, shownIndexes());
+    playSpeed(state.tempo / SPEED_BASE);
+    applyAudio();
+    return true;
+  }
+
+  async function boot() {
+    buildControls();
+    if (typeof alphaTab === 'undefined') return fail('The music reader could not load. Check your connection and reload the page.');
+    let xmlBuf, fontUrl;
+    // A page that makes its own music (the sight-reading page, sight-reading/practice.js) hands it over as MusicXML
+    // instead of a score file.
+    const made = window.readerScore;
+    try {
+      const [xr, fr] = await Promise.all([made ? null : fetch(SCORE_URL), fetch(FONT_URL)]);
+      if ((xr && !xr.ok) || !fr.ok) throw new Error('missing');
+      xmlBuf = made ? await made() : await xr.arrayBuffer();
+      fontUrl = await toDataUrl(new Blob([await fr.arrayBuffer()], { type: 'font/woff2' }));
+    } catch { return fail(made ? 'The music could not be made. Reload the page to try again.' : 'The score did not load. Reload the page to try again.'); }
 
     const s = new alphaTab.Settings();
     s.core.useWorkers = false;
@@ -5083,19 +5343,26 @@ body.following .host-only { display: none !important; }
     s.player.scrollMode = alphaTab.ScrollMode.Continuous; // the page's own scroller below does the moving
 
     try {
-      score = alphaTab.importer.ScoreLoader.loadScoreFromBytes(new Uint8Array(xmlBuf), s);
+      readScore(xmlBuf, s);
     } catch (e) { return fail('The score file could not be read.'); }
-    prepareScore();
-    markSame();
 
     api = new alphaTab.AlphaTabApi($('sheet'), s);
     api.customScrollHandler = scroller;
     holdPictureForSound();
-    window.reader = { api, score, conductor, xmap: () => xmap, line: () => lineState, at: () => playedTick(performance.now()), lag: reportLag };
+    window.reader = { api, get score() { return score; }, conductor, xmap: () => xmap, line: () => lineState, at: () => playedTick(performance.now()), lag: reportLag, newScore,
+      // The parts on the page and the parts that play, from outside (the sight-reading page's "I play" in a duet).
+      parts: ({ seen, heard, hearOpen } = {}) => {
+        const s = indexList(seen, PARTS.length), h = indexList(heard, PARTS.length);
+        if (s && s.length) state.seen = s;
+        if (h) state.heard = h;
+        if (typeof hearOpen === 'boolean') state.hearOpen = hearOpen && !!state.heard;
+        look = null;
+        changed({ parts: true, audio: true });
+      }, look: () => look && { H: look.H, t: look.t, ahead: state.ahead, bands: look.bands.map(b => ({ left: b.left, right: b.right, top: b.top, bottom: b.bottom, cut: b.cut })) } };
     api.error.on(() => fail('Something went wrong drawing the music. Reload the page to try again.'));
     api.renderStarted.on(() => { if (!fitPending) fitTries = 0; if (!namePending) nameTries = 0; head = null; lineHead.classList.remove('on'); clearTimeout(printTimer); });
     api.renderFinished.on(() => { namePending = false; if (fitNames()) return; // drawn again with room for the part names
-      $('loading').hidden = true; ink = null; styleWords(); fitSurface(); placeFingers(); if (fitLeftRoom()) return; trackNotes(true); buildCounts(); placeTimeSigButtons(); drawLoop(); drawStartMark(); keepPlace(); xmap = null; if (!playing && state.layout === 'line') { setHalf(); centerOnTick(api.tickPosition || 0, false); }
+      $('loading').hidden = true; ink = null; styleWords(); fitSurface(); placeFingers(); if (fitLeftRoom()) return; trackNotes(true); buildCounts(); look = null; placeTimeSigButtons(); drawLoop(); drawStartMark(); keepPlace(); xmap = null; if (!playing && state.layout === 'line') { setHalf(); centerOnTick(api.tickPosition || 0, false); }
       // A phone on its side: size the line to the screen, then bring it into view.
       fitPending = false;
       if (!fitToHeight() && shortLand.matches && state.layout === 'line' && !playing) revealSheet(false, true);
@@ -5171,7 +5438,7 @@ body.following .host-only { display: none !important; }
       setPlaying(playing);
       // The first note reaches the speaker a moment after Play: until then the music waits (pos.at is that moment).
       if (playing && !was) { conductor.startingUntil = 0; clearStalePieces(); lastGrid = null; pos.at = heardAt = performance.now() + soundLag(); requestAnimationFrame(gridTick); lineState = null; revealSheet(true, true); if (state.layout === 'line' && !lineRaf) lineRaf = requestAnimationFrame(lineFollow); }
-      if (!playing) endCountIn();
+      if (!playing) { endCountIn(); clearLook(); }
       if (!playing && e.stopped) { activeBeats = []; trackNotes(); clearNow(); }
       // Stopped or paused: frame the note Play will start from (the player settles on its spot a moment later).
       if (!playing && was) for (const ms of [150, 450]) setTimeout(() => { if (!playing && !conductor.following) { markTick = api.tickPosition || 0; drawStartMark(); } }, ms);

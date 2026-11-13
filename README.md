@@ -20,6 +20,18 @@ with a play-along reader for each piece. Live at https://graded-string-arrangeme
 The site itself is plain static files; Vercel serves the folder as it is (the working files above are
 left out by `.vercelignore`). `CLAUDE.md` has the full how-to.
 
+## Sight-reading (unlisted for now)
+
+`sight-reading/` is a page of endless reading exercises for violin and viola, page by page with a sight-reading book in
+the works: `generator.js` makes each exercise from a book page's rules (`pages.json`, four placeholder pages for now),
+and the reader plays it. Look ahead (a button in its strip) makes each note vanish a little before it sounds, so the
+eyes stay ahead of the hands. `sight-reading/flash/` is Flash a bar: a short pattern shows, hides, and the student plays
+it from that glance, with a streak and levels; with Listen on, the microphone marks each note right or wrong, early or
+late (worked out in the browser; nothing is recorded or saved). Duet (a button in its row) adds a second part on the
+same chords, for violin and viola in any pairing, at the same page, on open strings, at an earlier page or harder for a
+teacher; one link gives the same duet on every device, each showing the part it plays. `tests/listening.py` checks the
+listening. `tests/sight_reading.py` checks 1,000 exercises per page and instrument against the rules, and the duets.
+
 ## Adding a piece
 
 1. Put its 24-part score at `songs/<new-piece>/<new-piece>.xml`.

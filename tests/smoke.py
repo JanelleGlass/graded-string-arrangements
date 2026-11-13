@@ -60,10 +60,29 @@ What it checks
      not a stale copy in one long line; and where the print window doesn't open by itself, a card offers a Print button.
      Joy to the World's violin melody, which used to leave one line on a second sheet, prints on one sheet.
      Download PDF saves the same sheet as a PDF file, named for the song and its parts, without a print window.
+  2b. The sight-reading page (unlisted), at laptop and phone-landscape sizes: an exercise from the book page and number
+     in the address, its row (book page, Violin / Viola, exercise number, New exercise) in sight over the music,
+     the page's starting look (string colors, plain notes) and tempo, Play moving the music; New exercise changing the
+     music and the number in the address; a typed number bringing an exercise back, the same after a reload; Viola in
+     alto clef with the viola's strings, kept after a reload; another book page starting with its own look again.
+     (The generator's music rules are checked by tests/sight_reading.py.)
+     Look ahead (laptop in one long line and on pages, phone): turning it on brings a count-in and the page's tempo;
+     at its three levels (½ beat, 1 beat, 1 bar), at 60 and 120, while it plays, every note due within that time of what is
+     heard is covered and no other is (checked against each note's place on the screen, during a count-in too), the
+     staff lines and bar lines are drawn over the cover, and every note comes back when the music stops.
+     Flash a bar (laptop, iPad upright, phone both ways round): the pattern drawn inside its card; a round goes look,
+     hide, count in, play, check, with Start, Got it and Not yet each usable only when they apply; Got it counts the
+     streak and three in a row move up a level; the level, streak and best are still there after a reload; Not yet
+     starts the streak again; − and + change the level; Violin / Viola is kept with the sight-reading page's. The
+     sight-reading page's Flash a bar button opens it on the same book page.
+     Listen (Flash a bar, laptop): with no microphone it says so and stays off; with a made-up microphone
+     (tests/listen_takes.js) it asks for the timing check first and keeps its answer, marks a round played as written
+     with a tick on every note and "Every note right", marks a wrong note with a cross and a late one "late", and is
+     still on after a reload.
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
      the teacher conducts, a student follows, and the student's music keeps up with the teacher's.
-  4. The app layer: the browser can install the site, every file is saved after one visit, every song
-     opens and plays with the server stopped and the network off, and an update reaches the saved
+  4. The app layer: the browser can install the site, every file is saved after one visit, every song (and the
+     sight-reading page, New exercise too) opens and plays with the server stopped and the network off, and an update reaches the saved
      copy without downloading the unchanged files (the string sounds) again.
 
 Offline options (only needed where the internet is filtered):
@@ -789,6 +808,461 @@ FINGERS_CLEAR_JS = '''() => { const touching = []; let checked = 0;
     } }
   return { checked, touching }; }'''
 # How many sheets of Letter paper the print takes (Chromium's own PDF of the print).
+MUSIC_JS = """() => reader.score.tracks[0].staves[0].bars.map(b => b.voices[0].beats.map(x => x.isRest ? 'r' : x.notes.map(n => n.realValue).join('+') + ':' + x.duration).join(',')).join('|')"""
+
+
+async def sight_reading_checks(browser, base):
+    """The sight-reading page: the reader with music made on the page for a book page and an exercise number."""
+    print('Sight-reading page')
+    for label, w, h in [('laptop', 1366, 860), ('phone landscape', 844, 390), ('iPhone SE landscape', 667, 375)]:
+        ctx = await browser.new_context(device_scale_factor=1)
+        await setup(ctx)
+        errors = []
+        try:
+            pg = await open_reader(ctx, f'{base}/sight-reading/?page=v1-02&n=7', errors, 'sight-reading', w, h)
+        except Exception as e:
+            check(False, f'{label}: sight-reading page loads ({e.__class__.__name__})')
+            await ctx.close()
+            continue
+        ck = lambda ok, what: check(ok, f'{label}: {what}')
+        title = (await pg.evaluate("() => document.getElementById('infoBtn').firstChild.textContent")).strip()
+        ck(title == 'Sight-reading', f'title reads "Sight-reading" ("{title}")')
+        got = await pg.evaluate("""() => ({ page: document.getElementById('srPage').value, n: document.getElementById('srNum').value,
+          tracks: reader.score.tracks.length, bars: reader.score.masterBars.length, clef: reader.score.tracks[0].staves[0].bars[0].clef,
+          look: document.querySelector('#g-look .now .word').textContent, colors: document.querySelector('#g-colors .now').textContent,
+          tempo: document.getElementById('tempoChip').textContent, key: document.getElementById('srKey').textContent,
+          strings: [...document.querySelectorAll('#legend .key-head')].map(e => e.textContent).join('') })""")
+        ck(got['page'] == 'v1-02' and got['n'] == '7', f"book page and number from the address ({got['page']}, {got['n']})")
+        ck(got['tracks'] == 1 and got['bars'] == 4, f"one part, four bars ({got['tracks']}, {got['bars']})")
+        ck(got['look'] == 'Plain notes' and got['colors'] == 'All', f"starts with string colors and plain notes, as the page says ({got['colors']}, {got['look']})")
+        ck(got['tempo'] == '60', f"starts at the page's slowest tempo ({got['tempo']})")
+        ck(got['key'] == 'A major' and got['strings'] == 'EADG', f"violin in A major with its strings ({got['key']}, {got['strings']})")
+        drawn = await pg.evaluate("() => document.querySelectorAll('#sheet .at-surface > *').length")
+        ck(drawn > 0, 'notes are drawn')
+        wide = await pg.evaluate('() => document.documentElement.scrollWidth - window.innerWidth')
+        ck(wide <= 1, f'no sideways scrolling ({wide}px extra)')
+        # The row: every control on the screen, above the music, clear of All songs.
+        row = await pg.evaluate("""() => { const r = (id) => document.getElementById(id).getBoundingClientRect();
+          const ids = ['srPage', 'srViolin', 'srViola', 'srNum', 'srDuet', 'srFlash', 'srNew'], home = r('homeBtn'), surf = document.querySelector('#sheet .at-surface').getBoundingClientRect();
+          return { inside: ids.every(id => { const b = r(id); return b.width > 0 && b.left >= 0 && b.right <= innerWidth && b.top >= 0 && b.bottom <= innerHeight; }),
+                   above: ids.every(id => r(id).bottom <= surf.top + 1), clear: ids.every(id => { const b = r(id); return b.left >= home.right || b.top >= home.bottom; }) }; }""")
+        ck(row['inside'] and row['above'] and row['clear'], f'the row (book page, Violin / Viola, number, Duet, Flash a bar, New exercise) is on the screen over the music ({row})')
+        href = await pg.get_attribute('#srFlash', 'href')
+        ck(href == 'flash/?page=v1-02', f'Flash a bar opens on the same book page ({href})')
+        await pg.click('#play'); await pg.wait_for_timeout(2500)
+        tick = await pg.evaluate('() => reader.at()')
+        ck(tick > 0, f'Play moves the music forward (tick {round(tick)})')
+        await pg.click('#play')
+        first = await pg.evaluate(MUSIC_JS)
+        await pg.click('#srNew'); await pg.wait_for_timeout(1500)
+        n2 = await pg.input_value('#srNum')
+        second = await pg.evaluate(MUSIC_JS)
+        ck(n2 != '7' and f'n={n2}' in pg.url and second != first, f'New exercise brings new music and its number, in the address too (#{n2}, {pg.url})')
+        await pg.click('#play'); await pg.wait_for_timeout(2000)
+        tick = await pg.evaluate('() => reader.at()')
+        ck(tick > 0, f'the new exercise plays (tick {round(tick)})')
+        await pg.click('#play')
+        await pg.fill('#srNum', '7'); await pg.press('#srNum', 'Enter'); await pg.wait_for_timeout(1500)
+        ck(await pg.evaluate(MUSIC_JS) == first and 'n=7' in pg.url, 'typing a number brings that exercise back')
+        await pg.click('#srViola'); await pg.wait_for_timeout(1500)
+        got = await pg.evaluate("""() => ({ clef: reader.score.tracks[0].staves[0].bars[0].clef, key: document.getElementById('srKey').textContent,
+          strings: [...document.querySelectorAll('#legend .key-head')].map(e => e.textContent).join(''), pressed: document.getElementById('srViola').getAttribute('aria-pressed') })""")
+        ck(got['clef'] == 1 and got['key'] == 'D major' and got['strings'] == 'ADGC' and got['pressed'] == 'true',
+           f"Viola: alto clef, D major, the viola's strings ({got})")
+        viola = await pg.evaluate(MUSIC_JS)
+        await pg.reload()
+        await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
+        await pg.wait_for_timeout(1000)
+        again = await pg.evaluate(MUSIC_JS)
+        pressed = await pg.get_attribute('#srViola', 'aria-pressed')
+        ck(again == viola and pressed == 'true', 'after a reload: still viola, and the same number gives the same music')
+        # Another book page starts with its own look again, after the student changed it.
+        await pg.click('#g-look'); await pg.wait_for_timeout(1200)
+        async with pg.expect_navigation():
+            await pg.select_option('#srPage', 'v1-04')
+        await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
+        await pg.wait_for_timeout(1000)
+        look = await pg.evaluate("() => document.querySelector('#g-look .now .word').textContent")
+        ck('page=v1-04' in pg.url and look == 'Plain notes', f'another book page opens with its own look ({pg.url}, {look})')
+        ck(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
+        await ctx.close()
+
+
+# The whole score: each part's notes, bar by bar (both parts of a duet).
+SCORE_JS = """() => reader.score.tracks.map(t => t.name.replace(/^.*?(Part \\d)$/, '$1') + '=' + t.staves[0].bars.map(b => b.voices[0].beats.map(x => x.isRest ? 'r' : x.notes.map(n => n.realValue).join('+') + ':' + x.duration).join(',')).join('|')).join(' / ')"""
+# The parts on the page (drawn), and the duet's facts.
+DUET_JS = """() => ({ drawn: reader.api.tracks.map(t => t.index), tracks: reader.score.tracks.length, labels: reader.api.tracks.map(t => t.name),
+  rows: [...document.querySelectorAll('#mixParts .mix-name .lvl-long')].map(e => e.textContent),
+  hear: [...document.querySelectorAll('#mixParts .tog.hear:not(.none)')].map(b => b.getAttribute('aria-pressed')),
+  hearSame: document.getElementById('hearSame').checked, url: location.search, src: document.getElementById('srSource').textContent,
+  clefs: reader.score.tracks.map(t => t.staves[0].bars[0].clef), fifths: reader.score.tracks.map(t => t.staves[0].bars[0].keySignature),
+  duet: document.getElementById('srDuet').getAttribute('aria-pressed'), instOff: document.getElementById('srInst').classList.contains('off'),
+  mine: [1, 2].map(k => document.getElementById('srMine' + k).getAttribute('aria-pressed')) })"""
+# Look ahead with both parts of a duet on the page: which notes are covered, in which part.
+DUET_LOOK_JS = """() => { const l = reader.look(); if (!l || l.t == null) return null;
+  const surf = document.querySelector('#sheet .at-surface').getBoundingClientRect(), sc = reader.score, out = [];
+  for (const t of reader.api.tracks) for (const bar of t.staves[0].bars) for (const b of bar.voices[0].beats) {
+    const g = document.querySelector('g.b' + b.id); if (!g) continue;
+    const r = g.getBoundingClientRect(), x = (r.left + r.right) / 2 - surf.left, y = (r.top + r.bottom) / 2 - surf.top;
+    const band = l.bands.find(d => y >= d.top && y <= d.bottom);
+    out.push({ part: t.index, tick: sc.masterBars[bar.index].start + b.playbackStart, covered: !!band && x < band.cut });
+  }
+  return { H: l.H, t: l.t, beats: out }; }"""
+
+
+async def duet_checks(browser, base):
+    """Duets on the sight-reading page (round 5): two devices with one exercise number read the same duet, each its own
+    part; the Duet card; Look ahead hides only the part this device plays."""
+    print('Sight-reading: duets')
+    url = f'{base}/sight-reading/?page=v1-03&n=321&duet=violin-viola&part2=same'
+    devices = []
+    for label, w, h, part in [('teacher laptop', 1366, 860, 2), ('student phone landscape', 844, 390, 1)]:
+        ctx = await browser.new_context(device_scale_factor=1)
+        await setup(ctx)
+        await ctx.add_init_script(f"try {{ if (!sessionStorage.getItem('set')) {{ sessionStorage.setItem('set', 1); localStorage.setItem('sight-reading', JSON.stringify({{ part: {part} }})); }} }} catch (e) {{}}")
+        errors = []
+        try:
+            pg = await open_reader(ctx, url, errors, 'duet ' + label, w, h)
+        except Exception as e:
+            check(False, f'duet, {label}: page loads ({e.__class__.__name__})')
+            await ctx.close()
+            continue
+        devices.append((label, ctx, pg, errors, part))
+    if len(devices) < 2:
+        for d in devices:
+            await d[1].close()
+        return
+    music = [await pg.evaluate(SCORE_JS) for _, _, pg, _, _ in devices]
+    check(music[0] == music[1] and 'Part 1=' in music[0] and 'Part 2=' in music[0],
+          f'two devices with one exercise number and the same duet choices get the same duet ({len(music[0])} characters of music each)')
+    for label, ctx, pg, errors, part in devices:
+        ck = lambda ok, what: check(ok, f'duet, {label}: {what}')
+        got = await pg.evaluate(DUET_JS)
+        ck(got['tracks'] == 2 and got['clefs'] == [4, 1] and got['fifths'] == [3, 3],  # alphaTab's clefs: 4 treble (G2), 1 alto (C3)
+           f"two parts, violin (treble clef) over viola (alto clef), both in Part 1's key ({got['tracks']}, {got['clefs']}, {got['fifths']})")
+        ck(got['drawn'] == [part - 1] and got['mine'] == (['true', 'false'] if part == 1 else ['false', 'true']),
+           f"the page shows the part this device plays, Part {part} ({got['drawn']}, I play {got['mine']})")
+        ck(got['hear'] == ['true', 'true'] and not got['hearSame'], f"both parts play (Hear: {got['hear']}, Hear the parts I see: {got['hearSame']})")
+        ck(got['rows'] == ['Part 1', 'Part 2'], f"the Parts table has Part 1 and Part 2 ({got['rows']})")
+        ck(got['labels'] == [('Vln Part 1' if part == 1 else 'Vla Part 2')], f"the staff is labelled with its part ({got['labels']})")
+        ck('Duet for violin and viola, Part 2 on this page' in got['src'] and got['duet'] == 'true' and got['instOff'],
+           f"the details say it is a duet, the Duet button is on and Violin / Viola is greyed out ({got['src']})")
+        wide = await pg.evaluate('() => document.documentElement.scrollWidth - window.innerWidth')
+        ck(wide <= 1, f'no sideways scrolling ({wide}px extra)')
+        await pg.click('#play'); await pg.wait_for_timeout(2000)
+        tick = await pg.evaluate('() => reader.at()')
+        ck(tick > 0, f'the duet plays (tick {round(tick)})')
+        await pg.click('#play')
+    # The teacher's laptop: the Duet card, I play, Look ahead on my part only, Solo and back.
+    label, ctx, pg, errors, _ = devices[0]
+    ck = lambda ok, what: check(ok, f'duet, {label}: {what}')
+    await pg.click('#srDuet'); await pg.wait_for_timeout(300)
+    card = await pg.evaluate("""() => { const b = document.getElementById('srDuetPop').getBoundingClientRect();
+      return { open: !document.getElementById('srDuetPop').hidden, inside: b.left >= 0 && b.right <= innerWidth && b.top >= 0 && b.bottom <= innerHeight } }""")
+    ck(card['open'] and card['inside'], f'the Duet card opens on the screen ({card})')
+    await pg.click('#srMine1'); await pg.wait_for_timeout(1500)
+    got = await pg.evaluate(DUET_JS)
+    ck(got['drawn'] == [0] and got['hear'] == ['true', 'true'], f"I play Part 1: the page shows Part 1, both still play ({got['drawn']}, {got['hear']})")
+    await pg.click('#srDuetX')
+    # Both parts on the page, then Look ahead: only Part 1 (mine) vanishes.
+    await pg.click('#g-parts'); await pg.wait_for_timeout(500)
+    await pg.click('#see-1-1'); await pg.wait_for_timeout(1500)
+    await pg.click('#g-parts'); await pg.wait_for_timeout(400)
+    ck((await pg.evaluate(DUET_JS))['drawn'] == [0, 1], 'Parts puts the other part on the page too')
+    await pg.evaluate("() => { const t = document.getElementById('tempo'); t.value = 90; t.dispatchEvent(new Event('input')); }")
+    while 'level 3' not in (await pg.get_attribute('#g-ahead', 'aria-label') or ''):
+        await pg.click('#g-ahead')
+    while (await pg.text_content('#g-metro .now')) != 'Off':
+        await pg.click('#g-metro')
+    await pg.click('#restart'); await pg.click('#play')
+    problems, samples = [], 0
+    for ms in (1500, 1200, 1500):
+        await pg.wait_for_timeout(ms)
+        st = await pg.evaluate(DUET_LOOK_JS)
+        if not st:
+            problems.append('no cover'); continue
+        samples += 1
+        mine = [b for b in st['beats'] if b['part'] == 0 and abs(b['tick'] - st['H']) > 40]
+        other = [b for b in st['beats'] if b['part'] == 1]
+        if any(b['covered'] != (b['tick'] <= st['H']) for b in mine):
+            problems.append(f"Part 1's notes covered wrongly at {round(st['t'])}")
+        if any(b['covered'] for b in other):
+            problems.append(f"Part 2's notes covered at {round(st['t'])}")
+    await pg.click('#play')
+    ck(not problems and samples == 3, f"Look ahead hides Part 1's notes as they come and never Part 2's ({samples} checks{': ' + '; '.join(problems) if problems else ''})")
+    while (await pg.get_attribute('#g-ahead', 'aria-label') or '').find('Off') < 0 and 'level' in (await pg.get_attribute('#g-ahead', 'aria-label') or ''):
+        await pg.click('#g-ahead')
+    # The card's choices change the music and the address: Part 2 on viola to violin, Part 2 open strings.
+    await pg.click('#srDuet'); await pg.wait_for_timeout(300)
+    before = await pg.evaluate(SCORE_JS)
+    await pg.click('#srP2violin'); await pg.wait_for_timeout(1500)
+    got = await pg.evaluate(DUET_JS)
+    ck('duet=violin-violin' in got['url'] and got['clefs'] == [4, 4] and 'two violins' in got['src'], f"Part 2 on violin: two violins, in the address too ({got['url']}, {got['clefs']})")
+    await pg.select_option('#srLevel', 'open'); await pg.wait_for_timeout(1500)
+    got = await pg.evaluate(DUET_JS)
+    ck('part2=open' in got['url'] and 'Part 2 on open strings' in got['src'], f"Part 2 on open strings, in the address too ({got['url']})")
+    first = (await pg.evaluate(SCORE_JS)).split(' / ')[0]
+    ck(first == before.split(' / ')[0], 'Part 1 stays the same exercise whatever Part 2 is')
+    levels = await pg.evaluate("() => [...document.getElementById('srLevel').options].map(o => o.value)")
+    ck(levels == ['same', 'v1-01', 'v1-02', 'open', 'harder'] or levels == ['same', 'open', 'v1-01', 'v1-02', 'harder'],
+       f'Part 2 can be on this page, an earlier page, open strings or harder ({levels})')
+    await ctx.grant_permissions(['clipboard-read', 'clipboard-write'])
+    await pg.click('#srCopy'); await pg.wait_for_timeout(300)
+    link = await pg.evaluate('() => navigator.clipboard.readText()')
+    ck(link.endswith(got['url']) and '/sight-reading/' in link, f'Copy the link copies this duet ({link})')
+    await pg.click('#srSolo'); await pg.wait_for_timeout(1500)
+    got = await pg.evaluate(DUET_JS)
+    ck(got['tracks'] == 1 and 'duet=' not in got['url'] and got['duet'] == 'false' and not got['instOff'],
+       f"Solo: one part again, and the address drops the duet ({got['tracks']}, {got['url']})")
+    await pg.click('#srDuetOn'); await pg.wait_for_timeout(1500)
+    got = await pg.evaluate(DUET_JS)
+    ck('duet=violin-violin' in got['url'] and 'part2=open' in got['url'], f"Duet again: the last duet choices come back ({got['url']})")
+    for label, ctx, pg, errors, _ in devices:
+        check(not errors, f'duet, {label}: no script errors' + (f': {errors[:3]}' if errors else ''))
+        await ctx.close()
+    # An iPhone SE turned sideways: the row and the card fit.
+    ctx = await browser.new_context(device_scale_factor=1)
+    await setup(ctx)
+    errors = []
+    try:
+        pg = await open_reader(ctx, url, errors, 'duet SE', 667, 375)
+        await pg.click('#srDuet'); await pg.wait_for_timeout(300)
+        fit = await pg.evaluate("""() => { const r = (id) => document.getElementById(id).getBoundingClientRect(), ids = ['srPage', 'srViolin', 'srViola', 'srNum', 'srDuet', 'srFlash', 'srNew', 'srCopy'];
+          return { inside: ids.every(id => { const b = r(id); return b.width > 0 && b.left >= 0 && b.right <= innerWidth && b.top >= 0 && b.bottom <= innerHeight; }), page: r('srPage').width } }""")
+        check(fit['inside'] and fit['page'] > 90, f'duet, iPhone SE landscape: the row and the Duet card fit on the screen ({fit})')
+        check(not errors, 'duet, iPhone SE landscape: no script errors' + (f': {errors[:3]}' if errors else ''))
+    except Exception as e:
+        check(False, f'duet, iPhone SE landscape: page loads ({e.__class__.__name__})')
+    await ctx.close()
+
+
+LOOK_JS = """() => { const l = reader.look(); if (!l || l.t == null) return null;
+  const surf = document.querySelector('#sheet .at-surface').getBoundingClientRect(), sc = reader.score, out = [];
+  for (const bar of sc.tracks[0].staves[0].bars) for (const b of bar.voices[0].beats) {
+    const g = document.querySelector('g.b' + b.id); if (!g) continue;
+    const r = g.getBoundingClientRect(), x = (r.left + r.right) / 2 - surf.left, y = (r.top + r.bottom) / 2 - surf.top;
+    const band = l.bands.find(d => y >= d.top && y <= d.bottom);
+    out.push({ tick: sc.masterBars[bar.index].start + b.playbackStart, covered: !!band && x < band.cut });
+  }
+  return { H: l.H, t: l.t, at: reader.at(), beats: out, lines: document.querySelectorAll('.look-layer g > rect').length - l.bands.length,
+           cuts: l.bands.map(b => b.cut - b.left), counting: !document.getElementById('count').hidden }; }"""
+AHEAD_TICKS = {'Level 1': 480, 'Level 2': 960, 'Level 3': 3840}  # half a beat, a beat and a bar, in 4/4
+AHEAD_SAY = {'Level 1': 'level 1: each note vanishes half a beat', 'Level 2': 'level 2: each note vanishes one beat',
+             'Level 3': 'level 3: each note vanishes a bar'}  # its button's label
+
+
+async def look_ahead_checks(browser, base):
+    """Look ahead on the sight-reading page: notes vanish the chosen time before they are heard."""
+    print('Sight-reading: Look ahead')
+    for label, w, h, pages in [('laptop, one long line', 1366, 860, False), ('laptop, pages', 1366, 860, True), ('phone landscape', 844, 390, False)]:
+        ctx = await browser.new_context(device_scale_factor=1)
+        await setup(ctx)
+        errors = []
+        try:
+            pg = await open_reader(ctx, f'{base}/sight-reading/?page=v1-03&n=40', errors, 'look ahead', w, h)
+        except Exception as e:
+            check(False, f'{label}: Look ahead page loads ({e.__class__.__name__})')
+            await ctx.close()
+            continue
+        ck = lambda ok, what: check(ok, f'{label}: {what}')
+        if pages:
+            await pg.click('#g-layout'); await pg.wait_for_timeout(2000)
+        await pg.evaluate("() => { const t = document.getElementById('tempo'); t.value = 90; t.dispatchEvent(new Event('input')); }")
+        await pg.click('#g-ahead')
+        got = await pg.evaluate("() => ({ label: document.getElementById('g-ahead').getAttribute('aria-label'), metro: document.querySelector('#g-metro .now').textContent, tempo: document.getElementById('tempoChip').textContent })")
+        ck('level 1: each note vanishes half a beat' in got['label'] and got['metro'] == 'Count-in only' and got['tempo'] == '60',
+           f"turning Look ahead on brings a count-in and the page's tempo ({got})")
+        problems, samples = [], 0
+        for setting in ['Level 1', 'Level 2', 'Level 3']:
+            while AHEAD_SAY[setting] + ' ' not in await pg.get_attribute('#g-ahead', 'aria-label'):
+                await pg.click('#g-ahead')
+            for tempo in (60, 120):
+                await pg.evaluate("(v) => { const t = document.getElementById('tempo'); t.value = v; t.dispatchEvent(new Event('input')); }", tempo)
+                # The first run of each setting counts in (and is checked during the count-in); the others start at once.
+                count_in = tempo == 60
+                while (await pg.text_content('#g-metro .now')) != ('Count-in only' if count_in else 'Off'):
+                    await pg.click('#g-metro')
+                await pg.click('#restart')
+                await pg.click('#play')
+                beat_ms = 60000 / tempo
+                waits = ([beat_ms * 2.6] if count_in else []) + [beat_ms * (5.3 if count_in else 1.3), beat_ms * 1.1, beat_ms * 1.7]
+                for ms in waits:
+                    await pg.wait_for_timeout(ms)
+                    st = await pg.evaluate(LOOK_JS)
+                    if not st:
+                        problems.append(f'{setting} at {tempo}: no cover'); continue
+                    samples += 1
+                    want = AHEAD_TICKS[setting]
+                    if abs(st['H'] - st['t'] - want) > 40:
+                        problems.append(f"{setting} at {tempo}: notes vanish {round(st['H'] - st['t'])} ticks ahead, not {want}")
+                    if not st['counting'] and abs(st['t'] - st['at']) > 0.06 * tempo * 16:
+                        problems.append(f"{setting} at {tempo}: the cover's clock {round(st['t'])} is not the heard one {round(st['at'])}")
+                    wrong = [b for b in st['beats'] if abs(b['tick'] - st['H']) > 40 and b['covered'] != (b['tick'] <= st['H'])]
+                    if wrong:
+                        problems.append(f"{setting} at {tempo}: {len(wrong)} note(s) covered wrongly at heard {round(st['t'])} (e.g. {wrong[0]})")
+                    if any(st['cuts']) and st['lines'] < 5:
+                        problems.append(f"{setting} at {tempo}: staff lines not drawn over the cover ({st['lines']})")
+                await pg.click('#play')
+                await pg.wait_for_timeout(400)
+                back = await pg.evaluate('() => reader.look().bands.every(b => b.cut === b.left)')
+                if not back:
+                    problems.append(f'{setting} at {tempo}: the notes did not come back when the music stopped')
+        ck(not problems and samples >= 18, f'at levels 1, 2 and 3 (½ beat, 1 beat, 1 bar), at 60 and 120, the right notes vanish while it plays, and come back when it stops ({samples} checks{": " + "; ".join(problems[:4]) if problems else ""})')
+        ck(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
+        await ctx.close()
+
+
+async def flash_round(pg, answer):
+    """One round of Flash a bar, in the order it should go; returns the phases seen and whether each button was usable
+    only when it applies."""
+    seen, wrong = [], []
+    await pg.click('#start')
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 15:
+        st = await pg.evaluate("""() => ({ ...flash.state(), start: !document.getElementById('start').disabled,
+          got: !document.getElementById('gotIt').disabled, no: !document.getElementById('notYet').disabled })""")
+        tag = st['phase'] + ('/hidden' if st['covered'] else '/shown')
+        if not seen or seen[-1] != tag:
+            seen.append(tag)
+        if st['start'] or (st['got'] != (st['phase'] == 'check')) or (st['no'] != (st['phase'] == 'check')):
+            wrong.append(tag)
+        if st['phase'] == 'check':
+            break
+        await pg.wait_for_timeout(15)
+    await pg.click('#gotIt' if answer else '#notYet')
+    await pg.wait_for_function("() => flash.state().phase === 'ready' && flash.state().drawn", timeout=15000)
+    return seen, wrong
+
+
+async def flash_checks(browser, base):
+    """Flash a bar: a pattern shows, hides, and the student plays it from that glance."""
+    print('Sight-reading: Flash a bar')
+    for label, w, h in [('laptop', 1366, 860), ('iPad upright', 820, 1180), ('phone landscape', 844, 390), ('phone upright', 390, 844)]:
+        ctx = await browser.new_context(device_scale_factor=1, viewport={'width': w, 'height': h})
+        await setup(ctx)
+        await ctx.add_init_script("try { localStorage.setItem('gsa-flash-fast', '1'); } catch (e) {}")  # every wait ten times shorter
+        errors = []
+        pg = await ctx.new_page()
+        pg.on('pageerror', lambda e: errors.append(str(e)))
+        ck = lambda ok, what: check(ok, f'Flash a bar, {label}: {what}')
+        try:
+            await pg.goto(f'{base}/sight-reading/flash/?page=v1-02')
+            await pg.wait_for_function("() => window.flash && flash.state().phase === 'ready' && flash.state().drawn", timeout=60000)
+        except Exception as e:
+            ck(False, f'page loads ({e.__class__.__name__})')
+            await ctx.close()
+            continue
+        fit = await pg.evaluate("""() => { const m = document.getElementById('music').getBoundingClientRect(), s = document.querySelector('#score .at-surface svg');
+          const r = document.getElementById('score').getBoundingClientRect();
+          return { svg: !!s, inside: r.left >= m.left - 1 && r.right <= m.right + 1 && r.top >= m.top - 1 && r.bottom <= m.bottom + 1, wide: document.documentElement.scrollWidth - innerWidth,
+                   buttons: ['notYet', 'start', 'gotIt'].map(id => { const b = document.getElementById(id).getBoundingClientRect(); return b.bottom <= innerHeight + 1 && b.width > 60; }) }; }""")
+        ck(fit['svg'] and fit['inside'] and fit['wide'] <= 1 and all(fit['buttons']), f'the pattern is drawn inside its card, and the three buttons are on the screen ({fit})')
+        seen, wrong = await flash_round(pg, True)
+        order = ['flash/shown', 'flash/hidden', 'count/hidden', 'play/hidden', 'check/shown']
+        ck([x for x in seen if x in order] == order or [x for x in seen if x in order] == order[:2] + order[:2] + order[2:], f'a round goes look, hide, count in, play, check ({seen})')
+        ck(not wrong, f'Start, Got it and Not yet are usable only when they apply ({wrong[:3]})')
+        st = await pg.evaluate('() => flash.state()')
+        ck(st['streak'] == 1 and st['best'] == 1, f"Got it counts the streak ({st['streak']}, best {st['best']})")
+        if label == 'laptop':
+            for _ in range(2):
+                await flash_round(pg, True)
+            st = await pg.evaluate("() => ({ ...flash.state(), toast: document.getElementById('toast').textContent, lv: document.getElementById('level').textContent })")
+            ck(st['level'] == 1 and st['streak'] == 3 and 'Level up' in st['toast'] and st['lv'].startswith('Level 2'), f"three in a row move up a level ({st['lv']}, {st['toast']})")
+            await pg.reload()
+            await pg.wait_for_function("() => window.flash && flash.state().phase === 'ready' && flash.state().drawn", timeout=60000)
+            st = await pg.evaluate('() => flash.state()')
+            ck(st['level'] == 1 and st['streak'] == 3 and st['best'] == 3, f"the level, streak and best stay after a reload ({st['level']}, {st['streak']}, {st['best']})")
+            await flash_round(pg, False)
+            st = await pg.evaluate('() => flash.state()')
+            ck(st['streak'] == 0 and st['best'] == 3, f"Not yet starts the streak again, the best stays ({st['streak']}, {st['best']})")
+            await pg.click('#lvDown'); await pg.wait_for_timeout(300)
+            down = await pg.evaluate('() => flash.state().level')
+            await pg.click('#lvUp'); await pg.wait_for_timeout(300)
+            up = await pg.evaluate('() => flash.state().level')
+            ck(down == 0 and up == 1, f'− and + change the level ({down}, {up})')
+            await pg.click('#flViola')
+            await pg.wait_for_function("() => flash.state().phase === 'ready' && flash.state().drawn", timeout=15000)
+            inst = await pg.evaluate("() => JSON.parse(localStorage.getItem('sight-reading') || '{}').inst")
+            clef = await pg.evaluate("() => [...document.querySelectorAll('#score text')].some(t => t.textContent.codePointAt(0) === 0xE05C)")
+            ck(inst == 'viola' and clef, f'Viola: kept with the sight-reading page, in alto clef ({inst}, alto clef {clef})')
+        ck(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
+        await ctx.close()
+
+
+MIC_STUB = """window.__mistakes = {};
+window.flashMicStub = (round) => {
+  const lat = 0.15, sr = 48000, start = round.t0 - 0.3, m = window.__mistakes;
+  const clicks = round.clicks.map((t, i) => ({ t: t - start + lat, strong: i % 4 === 0 }));
+  let notes;
+  if (round.kind === 'timing') notes = round.playOn.map(t => ({ midi: 69, t: t - start + lat + 0.01, dur: round.beat * 0.7 }));
+  else {
+    const p = round.pattern;
+    notes = p.midis.map((midi, i) => ({ midi: midi + (m.wrong === i ? 1 : 0), t: round.T0 + p.starts[i] * round.beat - start + lat + (m.late === i ? 0.35 * round.beat : 0),
+      dur: ((p.starts[i + 1] ?? p.beats) - p.starts[i]) * round.beat - (m.late === i ? 0.35 * round.beat : 0) }));
+  }
+  const end = (round.kind === 'timing' ? round.clicks[7] : round.T0 + round.pattern.beats * round.beat) - start + 1;
+  return { samples: ListenTakes.take({ notes, clicks, length: end, seed: 5 }), sampleRate: sr, start };
+};"""
+
+
+async def listen_checks(browser, base):
+    """Flash a bar's Listen, with no microphone and with a made-up one."""
+    print('Sight-reading: Flash a bar, Listen')
+    ck = lambda ok, what: check(ok, f'Listen: {what}')
+    ready = "() => window.flash && flash.state().phase === 'ready' && flash.state().drawn"
+    # No microphone in this browser: Listen says so and stays off.
+    ctx = await browser.new_context(device_scale_factor=1, viewport={'width': 1366, 'height': 860})
+    await setup(ctx)
+    pg = await ctx.new_page()
+    await pg.goto(f'{base}/sight-reading/flash/?page=v1-02')
+    await pg.wait_for_function(ready, timeout=60000)
+    await pg.click('#listen')
+    await pg.wait_for_timeout(1500)
+    st = await pg.evaluate("() => ({ on: flash.state().listen, toast: document.getElementById('toast').textContent })")
+    ck(not st['on'] and 'microphone' in st['toast'], f"with no microphone it says so and stays off ({st})")
+    await ctx.close()
+    # A made-up microphone (the round's own sound, made by tests/listen_takes.js).
+    ctx = await browser.new_context(device_scale_factor=1, viewport={'width': 1366, 'height': 860})
+    await setup(ctx)
+    await ctx.add_init_script("localStorage.setItem('sight-reading-flash', JSON.stringify({ level: { 'v1-02': 3 } }));")  # 1 second, one look
+    await ctx.add_init_script(MIC_STUB)
+    errors = []
+    pg = await ctx.new_page()
+    pg.on('pageerror', lambda e: errors.append(str(e)))
+    await pg.goto(f'{base}/sight-reading/flash/?page=v1-02')
+    await pg.add_script_tag(url=f'{base}/tests/listen_takes.js')
+    await pg.wait_for_function(ready, timeout=60000)
+    await pg.click('#listen')
+    await pg.wait_for_function(ready, timeout=15000)
+    st = await pg.evaluate("() => ({ say: document.getElementById('say').textContent, label: document.getElementById('startLbl').textContent, on: flash.state().listen })")
+    ck(st['on'] and 'Timing check' in st['say'] and st['label'] == 'Check', f"turned on, it asks for the timing check first ({st})")
+    await pg.click('#start')
+    await pg.wait_for_function("() => flash.state().offset != null", timeout=40000)
+    await pg.wait_for_function(ready, timeout=15000)
+    off = await pg.evaluate('() => flash.state().offset')
+    ck(0.1 < off < 0.3, f'the timing check finds the delay (made up as 0.15 s; read {round(off, 3)} s)')
+    for mistakes, want in [({}, 'right'), ({'wrong': 1, 'late': 0}, 'mistakes')]:
+        await pg.evaluate('(m) => { window.__mistakes = m; }', mistakes)
+        await pg.click('#start')
+        await pg.wait_for_function("() => flash.state().phase === 'check'", timeout=40000)
+        await pg.wait_for_timeout(300)
+        st = await pg.evaluate('() => flash.state()')
+        n = len(st['pattern']['midis'])
+        if want == 'right':
+            ck(st['marks'] == ['mark right:✓'] * n and 'Every note right' in (st['heard'] or ''), f"a round played as written: a tick on every note ({st['marks']}, {st['heard']})")
+        else:
+            ck('mark wrong:✗' in st['marks'] and 'when:late' in st['marks'], f"a wrong note gets a cross, a late one 'late' ({st['marks']}, {st['heard']})")
+        await pg.click('#gotIt')
+        await pg.wait_for_function(ready, timeout=15000)
+    await pg.reload()
+    await pg.add_script_tag(url=f'{base}/tests/listen_takes.js')
+    await pg.wait_for_function(ready, timeout=60000)
+    st = await pg.evaluate("() => ({ on: flash.state().listen, offset: flash.state().offset, label: document.getElementById('listenLbl').textContent })")
+    ck(st['on'] and st['offset'] == off and st['label'] == 'Listening', f'after a reload Listen is still on, with its timing ({st})')
+    ck(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
+    await ctx.close()
+
+
 async def sheets_printed(pg):
     pdf = await pg.pdf(format='Letter', prefer_css_page_size=True, print_background=True)
     return len(re.findall(rb'/Type\s*/Page(?![a-zA-Z])', pdf))
@@ -1131,6 +1605,26 @@ async def app_checks(browser):
         if not os.environ.get('NO_WEBFONTS'):
             check(await sp.evaluate(LETTERING_JS), f'offline: {slug} has its lettering')
         await sp.close()
+    try:
+        sp = await open_reader(ctx, f'{base}/sight-reading/?page=v1-03&n=12', errors, 'sight-reading', 844, 390)
+        drawn = await sp.evaluate("() => document.querySelectorAll('#sheet .at-surface > *').length")
+        before = await sp.evaluate(MUSIC_JS)
+        await sp.click('#srNew'); await sp.wait_for_timeout(1500)
+        after = await sp.evaluate(MUSIC_JS)
+        await sp.click('#play'); await sp.wait_for_timeout(2500)
+        tick = await sp.evaluate('() => reader.at()')
+        check(drawn > 0 and after != before and tick > 0, f'offline: the sight-reading page opens, New exercise works, and it plays (tick {round(tick)})')
+        await sp.close()
+    except Exception as e:
+        check(False, f'offline: the sight-reading page opens ({e.__class__.__name__})')
+    try:
+        fp = await ctx.new_page()
+        await fp.goto(f'{base}/sight-reading/flash/?page=v1-03')
+        await fp.wait_for_function("() => window.flash && flash.state().phase === 'ready' && flash.state().drawn", timeout=60000)
+        check(True, 'offline: Flash a bar opens and draws its pattern')
+        await fp.close()
+    except Exception as e:
+        check(False, f'offline: Flash a bar opens ({e.__class__.__name__})')
     stray = await ctx.new_page()
     try:
         await stray.goto(base + '/songs/not-saved/')
@@ -1422,6 +1916,11 @@ async def main():
         await voices40_checks(browser, base)
         await voices_checks(browser, base)
         await one_line_checks(browser, base)
+        await sight_reading_checks(browser, base)
+        await look_ahead_checks(browser, base)
+        await duet_checks(browser, base)
+        await flash_checks(browser, base)
+        await listen_checks(browser, base)
         await print_checks(browser, base)
         await extras_checks(browser, base)
         await piano_checks(browser, base)
