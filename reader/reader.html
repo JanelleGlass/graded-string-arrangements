@@ -227,8 +227,8 @@ hr.div { border: 0; border-top: 1px solid var(--line); margin: 0; }
 /* A held note (half note, dotted quarter…): a line joins the counts it lasts through, and lights up as the note is held */
 .count-link { position: absolute; z-index: 0; border-radius: 999px; background: #CDD4D1; transition: background 0.12s; }
 .count-link.now { background: #1D5B72; }
-/* The bouncing ball: a small teal ball above each part's staff, one bounce per count, from note to note; over a rest,
-   a hollow ring (quiet) */
+/* The bouncing ball: a small teal ball above each part's staff, a bounce on every count (the beat) or on every note
+   (the rhythm), from note to note; over a rest, a hollow ring (quiet) */
 .point-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; }
 /* A layer of its own (will-change): without it Janelle saw the ball and the note under it blink more, not less (2026-11-10) */
 .pointer { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; will-change: transform; }
@@ -250,7 +250,8 @@ html.small #g-ahead .ah-long { display: none; }
 html.small #g-ahead.cyc { padding: 0 6px 0 5px; gap: 2px; }
 #g-ahead svg.cyc-ico { display: none; } /* bigger screens say it in words */
 html.small #g-ahead svg.cyc-ico { display: block; width: 19px !important; height: 19px !important; }
-/* Its switch, at the top beside Print: the ball, teal when on, grey and crossed out when off */
+/* Its switch, in the strip after Counting: the ball after two even bounces (the beat) or a long one and two short ones
+   (the rhythm), teal; grey and crossed out when off */
 .fab-btn svg.pt-ico { width: 22px; height: 22px; fill: none; }
 #g-point[aria-pressed="true"] { border-color: #1D5B72; }
 .wake-card { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 950; padding: 18px 28px; border: 0; border-radius: 16px;
@@ -931,8 +932,10 @@ body.following .host-only { display: none !important; }
     fingers: saved.fingers === 'right' || saved.fingers === 'left' ? 'left' : 'inside',
     // The counts under the notes: on unless switched off with the Counting switch beside them.
     countAlong: saved.counts !== 'off',
-    // The pointer (a finger hopping to the next note): on unless switched off (Janelle, 2026-11-05).
+    // The bouncing ball: on unless switched off (Janelle, 2026-11-05), bouncing on the beat (every count) or on the
+    // rhythm (every note; Janelle, 2026-11-12). Saved as 'beat', 'rhythm' or 'off' ('on', from before, is the beat).
     pointer: saved.pointer !== 'off',
+    ballBy: saved.pointer === 'rhythm' ? 'rhythm' : 'beat',
     layout: saved.layout === 'page' ? 'page' : 'line',
     // Letter names inside the notes: phones start with them on, bigger screens off (each kept on its own).
     letterMode: saved.letterMode === 'off' ? 'off' : 'all',
@@ -978,7 +981,7 @@ body.following .host-only { display: none !important; }
   // While the music is drawn for paper (Print), it is on pages for a moment; the saved choice stays the screen's.
   let printing = null;
   const onPaper = () => !!printing && printing.stage === 'paper'; // drawing the music for paper
-  const save = () => store.set({ zoom: state.zoom, parts: savedId(), partsFull: layout, seen: state.seen, heard: state.heard, hearOpen: state.hearOpen, colorMode: state.colorMode, fingerMode: state.fingerMode, tempo: state.tempo, follow: state.follow, countBy: state.unit, fingers: state.fingers, counts: state.countAlong ? 'on' : 'off', pointer: state.pointer ? 'on' : 'off', layout: printing ? printing.layout : state.layout, letterMode: state.letterMode, lettersBig: state.letterModeBig, metro: state.metro, ahead: state.ahead });
+  const save = () => store.set({ zoom: state.zoom, parts: savedId(), partsFull: layout, seen: state.seen, heard: state.heard, hearOpen: state.hearOpen, colorMode: state.colorMode, fingerMode: state.fingerMode, tempo: state.tempo, follow: state.follow, countBy: state.unit, fingers: state.fingers, counts: state.countAlong ? 'on' : 'off', pointer: state.pointer ? state.ballBy : 'off', layout: printing ? printing.layout : state.layout, letterMode: state.letterMode, lettersBig: state.letterModeBig, metro: state.metro, ahead: state.ahead });
 
   // ---- Room reverb ----
   // alphaTab plays through Web Audio; route whatever it sends to the speakers through a small reverb bus.
@@ -1083,13 +1086,16 @@ body.following .host-only { display: none !important; }
     : '<rect x="7" y="1" width="14" height="16" rx="1.8" fill="none" stroke="#1D5B72" stroke-width="1.4"/><path d="M9.5 4.6h9M9.5 6.8h9M9.5 11h9M9.5 13.2h9" stroke="#1D5B72" stroke-width="1.1" fill="none"/>') + '</svg>';
   // A button's labels, all in one spot (the button is as wide as the longest), with the current one showing.
   const stackBadge = (labels, now) => '<span class="cyc-badge stack">' + labels.map(t => '<span' + (t === now ? ' class="now"' : '') + '>' + t + '</span>').join('') + '</span>';
-  // The ball and its switch's icon: a teal ball, with a dotted arc for the bounce (grey and crossed out when off).
-  const pointIco = (on) => { const c = on ? '#1D5B72' : '#8A948F';
-    return `<svg class="pt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20C5 6 11 6 13 13" fill="none" stroke="${c}" stroke-width="1.6" stroke-dasharray="1.6 2.2" stroke-linecap="round"/><circle cx="17" cy="16.5" r="4.6" fill="${c}"/>`
+  // The ball and its switch's icon: a teal ball after its bounces, dotted: two even ones for the beat, a long one and
+  // two short ones for the rhythm (grey and crossed out when off).
+  const pointIco = (on, by) => { const c = on ? '#1D5B72' : '#8A948F';
+    const hops = on && by === 'rhythm' ? 'M1 21C1 4.5 9 4.5 9 21C9 14.5 12 14.5 12 21C12 15 15 15 15 20' : 'M1 21C1 8 8 8 8 21C8 8 15 8 15 20';
+    return `<svg class="pt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="${hops}" fill="none" stroke="${c}" stroke-width="1.6" stroke-dasharray="1.4 1.9" stroke-linecap="round"/><circle cx="19.4" cy="18.4" r="3.8" fill="${c}"/>`
       + (on ? '' : '<path d="M3 21 21 3" stroke="#FFFFFF" stroke-width="4.4" stroke-linecap="round"/><path d="M3 21 21 3" stroke="#8A948F" stroke-width="2.2" stroke-linecap="round"/>') + '</svg>'; };
   // Look ahead: an eye looking to the right (teal when on, grey when off).
   const aheadIco = (on) => { const c = on ? '#1D5B72' : '#8A948F';
     return `<svg class="cyc-ico" viewBox="0 0 24 24" style="width:22px;height:22px" aria-hidden="true"><path d="M2 12c2.6-4.2 5.9-6.3 10-6.3s7.4 2.1 10 6.3c-2.6 4.2-5.9 6.3-10 6.3S4.6 16.2 2 12z" fill="none" stroke="${c}" stroke-width="1.8" stroke-linejoin="round"/><circle cx="15" cy="12" r="3" fill="${c}"/></svg>`; };
+  const BALL_WORD = { beat: 'on the beat (a bounce on every count)', rhythm: 'on the rhythm (a bounce on every note)' };
   function renderCycles() {
     $('g-metro').innerHTML = metroIco(state.metro !== 'off') + stackBadge(Object.values(METRO_BADGE), METRO_BADGE[state.metro]);
     $('g-metro').setAttribute('aria-label', METRO_WORD[state.metro] + '. Tap to change.');
@@ -1105,10 +1111,10 @@ body.following .host-only { display: none !important; }
     $('g-count').innerHTML = stackBadge(['Counting: On', 'Counting: Off'], cOn ? 'Counting: On' : 'Counting: Off');
     $('g-count').setAttribute('aria-label', 'Counts under the notes: ' + (cOn ? 'on' : 'off') + '. Tap to change.');
     const pOn = state.pointer;
-    // The bouncing ball's switch: a round button at the top beside Print (the strip has no room on an iPhone SE on its side).
-    $('g-point').innerHTML = pointIco(pOn);
+    // The bouncing ball's switch: a round button in the strip, stepping through the beat, the rhythm and off.
+    $('g-point').innerHTML = pointIco(pOn, state.ballBy);
     $('g-point').setAttribute('aria-pressed', String(pOn));
-    $('g-point').setAttribute('aria-label', 'Bouncing ball (it bounces on each count, from note to note): ' + (pOn ? 'on' : 'off') + '. Tap to change.');
+    $('g-point').setAttribute('aria-label', 'Bouncing ball: ' + (pOn ? BALL_WORD[state.ballBy] : 'off') + '. Tap to change.');
     const ah = AHEAD.find(a => a.id === state.ahead);
     // An eye looking ahead, then "Look ahead" over the level; phones (no room on an iPhone SE turned sideways) show
     // just the level ("1", "2", "3"), and a tap says how far ahead in words.
@@ -3555,10 +3561,12 @@ body.following .host-only { display: none !important; }
 
   // ---- The bouncing ball ----
   // For young students who can't read rhythms yet (Janelle, 2026-11-05/06): a small ball above each part's staff
-  // bounces once on every count, landing as the count is heard: on a held note it bounces in place (a half note two
-  // bounces, a whole note four), then it arcs over to the next note, so the eye sees where it's going while it flies.
-  // Over a rest it is a hollow ring. Tied notes count as one. (A finger came first: hopping, then gliding; Janelle
-  // found the hops too much and chose the ball.)
+  // bounces from note to note, landing as the sound is heard, so the eye sees where it's going while it flies. Its
+  // switch steps through two ways and off (Janelle, 2026-11-12: "follow the beat or the rhythm or off"): the beat, a
+  // bounce on every count, steady, skimming over the notes between counts (a half note two bounces, two eighths one);
+  // the rhythm, a bounce on every note, one long flight over a held note (until then it bounced on every count and
+  // every note). Over a rest it is a hollow ring. Tied notes count as one. (A finger came first: hopping, then
+  // gliding; Janelle found the hops too much and chose the ball.)
   const pointLayer = document.createElement('div');
   pointLayer.className = 'point-layer';
   var pointRuns = []; // (var: drawStartMark can ask before this line has run) per part on the page: its finger and the notes (and rests) it stops on
@@ -3582,8 +3590,8 @@ body.following .host-only { display: none !important; }
     }
     return out;
   }
-  // Counts faster than this (a minute) and the ball bounces on the big beats instead; a little lower to go back, so
-  // it doesn't flick between the two at the edge.
+  // Counts faster than this (a minute) and the ball on the beat bounces on the big beats instead; a little lower to go
+  // back, so it doesn't flick between the two at the edge. On the rhythm it keeps to the notes.
   const BIG_BEATS_FROM = 150, COUNTS_BELOW = 130;
   let bigMode = false;
   // Every count in the piece (pickups counted from the end of their bar, as the counts do): where the ball lands.
@@ -3636,15 +3644,19 @@ body.following .host-only { display: none !important; }
         }
       });
       if (!stops.length) continue;
-      // Where the ball lands while each note lasts: its start and every count inside it.
-      for (let k = 0; k < stops.length; k++) {
+      const first = stops[0].tick, lastEnd = stops[stops.length - 1].end, inside = (c) => c > first + 1 && c < lastEnd - 1;
+      // Where the ball lands: on the beat, every count (it starts on the first note, a pickup too); on the rhythm,
+      // every note (fine). Fast, on the beat: only the big beats (big).
+      const fine = state.ballBy === 'rhythm' ? stops.map(st => st.tick) : [first, ...counts.filter(inside)];
+      const big = [first, ...bigTicks().filter(inside)];
+      // How many times it lands from each note to the next (roomForBounces gives the bar room for them).
+      for (let k = 0, j = 0; k < stops.length; k++) {
         const a = stops[k].tick, b = stops[k + 1] ? stops[k + 1].tick : stops[k].end;
-        stops[k].lands = [a, ...counts.filter(c => c > a + 1 && c < b - 1)];
+        while (j < fine.length && fine[j] < a - 1) j++;
+        let n = 0;
+        while (j + n < fine.length && fine[j + n] < b - 1) n++;
+        stops[k].hops = n;
       }
-      const lastEnd = stops[stops.length - 1].end;
-      // Where the ball lands: on every count and every note (counts), or only on the big beats (big).
-      const fine = stops.flatMap(st => st.lands);
-      const big = [stops[0].tick, ...bigTicks().filter(c => c > stops[0].tick + 1 && c < lastEnd - 1)];
       const d = ballD(stops[0].space), rr = d / 2;
       const el = document.createElement('div');
       el.className = 'pointer';
@@ -3748,7 +3760,7 @@ body.following .host-only { display: none !important; }
     return true;
   }
   const bounceRoomWanted = () => state.pointer && state.layout === 'line' && !onPaper() && !!score;
-  const bounceRoomKey = () => JSON.stringify([state.seen, lookNow().id, state.fingers, state.countAlong, state.zoom, document.documentElement.classList.contains('small')]);
+  const bounceRoomKey = () => JSON.stringify([state.seen, lookNow().id, state.fingers, state.countAlong, state.zoom, document.documentElement.classList.contains('small'), state.ballBy]);
   // Called by applySize, just before each drawing: the widths this layout wants, or none.
   function applyBounceRoom() {
     if (!score) return;
@@ -3776,7 +3788,7 @@ body.following .host-only { display: none !important; }
       // apart; 2026-11-12: three, with the even spacing, a little too wide).
       const s = run.stops, hop = ballD(s[0].space) * 2.7; // then a tiny bit wider (2026-11-12)
       for (let k = 0; k + 1 < s.length; k++) {
-        const cur = s[k], nxt = s[k + 1], flights = cur.lands.length;
+        const cur = s[k], nxt = s[k + 1], flights = cur.hops;
         if (flights < 2 || nxt.sys !== cur.sys) continue;
         const gap = nxt.x - cur.x, want = flights * hop;
         if (gap > 0 && gap < want * 0.97) {
@@ -3823,11 +3835,12 @@ body.following .host-only { display: none !important; }
     ballClock = { t, at: now };
     return t;
   }
-  // Playing: the ball lands on every count as it is heard, and on every note as it starts; between landings it flies
-  // in an arc, higher for a longer flight. On a held note it travels forward a bounce at a time, each landing a share of
-  // the way to the next note in proportion to the time (a half note's second bounce lands halfway), then lands on the
-  // next note (Janelle, 2026-11-06: it bounced in place on the note before). Fast, it lands only on the big beats,
-  // skimming over the notes between (bigBeat). From the end of a line to the next line down the page it hops off the
+  // Playing: the ball lands on every count as it is heard (the beat), or on every note as it starts (the rhythm);
+  // between landings it flies in an arc, higher for a longer flight. On the beat it travels over a held note a bounce
+  // at a time, each landing a share of the way to the next note in proportion to the time (a half note's second bounce
+  // lands halfway; Janelle, 2026-11-06: it bounced in place on the note before), and a count between two notes lands
+  // a share of the way between them the same way. Fast, on the beat, it lands only on the big beats, skimming over the
+  // notes between (bigBeat). From the end of a line to the next line down the page it hops off the
   // end, then drops straight down onto the next line's first note, falling faster as it goes, landing on the beat
   // (Janelle, 2026-11-10: it floated down from above).
   function ballSpot(run, T) {
@@ -3851,7 +3864,7 @@ body.following .host-only { display: none !important; }
     if (!bigMode && perMin > BIG_BEATS_FROM) bigMode = true; else if (bigMode && perMin < COUNTS_BELOW) bigMode = false;
     for (const run of pointRuns) {
       const s = run.stops;
-      let L = bigMode ? run.lands.big : run.lands.fine, end = run.lands.end;
+      let L = bigMode && state.ballBy !== 'rhythm' ? run.lands.big : run.lands.fine, end = run.lands.end;
       if (t < s[0].tick) { putPointer(run, s[0].x, s[0].y, s[0].rest); continue; }
       // The last flight of a loop goes back to the loop's first note, landing as the loop ends.
       const toLoop = r && r.endTick < end + 1;
@@ -3884,13 +3897,16 @@ body.following .host-only { display: none !important; }
   }
   $('g-point').addEventListener('click', () => {
     setPop(null);
-    state.pointer = !state.pointer;
+    // The beat, then the rhythm, then off, then the beat again.
+    if (!state.pointer) { state.pointer = true; state.ballBy = 'beat'; }
+    else if (state.ballBy === 'beat') state.ballBy = 'rhythm';
+    else state.pointer = false;
     save(); renderCycles();
     if (state.pointer && api && score) { const wrap = $('sheet').querySelector('.at-cursors'); if (wrap && !pointLayer.parentNode) wrap.insertBefore(pointLayer, markLayer); }
-    // The music is drawn again: the even spacing (and in one long line the bars widened for the bounces) comes and
-    // goes with the ball.
+    // The music is drawn again: the even spacing (and in one long line the bars widened for the bounces, which the
+    // beat and the rhythm need differently) comes and goes with the ball.
     if (api && score) { holdPlace(); applySize(); api.render(); } else buildPointer();
-    toast(state.pointer ? 'Bouncing ball on: it bounces on each count' : 'Bouncing ball off');
+    toast(state.pointer ? 'Bouncing ball ' + BALL_WORD[state.ballBy] : 'Bouncing ball off', 2200);
   });
 
   function gridTick(now) {

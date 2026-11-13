@@ -24,7 +24,8 @@ What it checks
      after every change of key) stay pinned at the left edge.
      On pages every count sits under its own staff, clear of the music; with Counting off the lines of music sit
      closer together, and switched on again they make room for the counts. At the smallest size (0.15x) the counts
-     shrink with the music and still sit clear of it. The bouncing ball's button (at the top) hides and shows the ball above the part.
+     shrink with the music and still sit clear of it. The bouncing ball's button (in the strip) steps the ball above the part
+     through the beat, the rhythm and off.
      Laptop: the Full screen button goes in and out of full screen. Phone (acting like an iPhone,
      which doesn't allow it): no Full screen button, and pinching the music makes it bigger and smaller.
      The Parts panel: the music runs a little under a tab at the right edge, which pulls the panel out over it, each part's eye
@@ -321,14 +322,19 @@ async def song_checks(browser, base):
                 on = False
             check(off and on, f'{label}: the Counting button in the strip hides and shows the counts')
             await pg.wait_for_timeout(1000)
-            # The bouncing ball: above the part, on at first, switched off and on again with its button in the strip.
+            # The bouncing ball: above the part, on the beat at first; its button in the strip steps to the rhythm, off,
+            # and the beat again.
             fingers = "() => document.querySelectorAll('#sheet .pointer').length"
-            had = await pg.evaluate(fingers)
+            said = "() => document.getElementById('g-point').title"
+            had, by = await pg.evaluate(fingers), await pg.evaluate(said)
+            await pg.click('#g-point'); await pg.wait_for_timeout(1500)
+            rhythm, by2 = await pg.evaluate(fingers), await pg.evaluate(said)
             await pg.click('#g-point'); await pg.wait_for_timeout(300)
             gone = await pg.evaluate(fingers)
             await pg.click('#g-point'); await pg.wait_for_timeout(300)
-            back_on = await pg.evaluate(fingers)
-            check(had > 0 and gone == 0 and back_on == had, f'{label}: the bouncing ball button hides and shows the ball ({had}, off {gone}, on {back_on})')
+            back_on, by3 = await pg.evaluate(fingers), await pg.evaluate(said)
+            check(had > 0 and 'beat' in by and rhythm == had and 'rhythm' in by2 and gone == 0 and back_on == had and 'beat' in by3,
+                  f'{label}: the bouncing ball button steps through the beat, the rhythm and off ({had} "{by}", {rhythm} "{by2}", off {gone}, {back_on} "{by3}")')
             # Nothing in the strip moves as labels change: each changing button keeps one width.
             widths = []
             for _ in range(5):
