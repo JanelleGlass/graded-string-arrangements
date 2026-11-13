@@ -38,6 +38,14 @@
   const SITE_GONE_MS = 10000; // the home page's Follow goes when the teacher hasn't been heard for this long,
   const SITE_FOLLOWED_GONE_MS = 30000; // and a following device stops following after this long
   const FOLLOW_KEY = 'gsa-follow', CONDUCT_KEY = 'gsa-conduct'; // in this tab only (sessionStorage)
+  // One device conducts at a time (Janelle, 2026-11-13: signed in on two iPads and her iPhone, a device that had conducted
+  // earlier took it up again by itself on each new piece, and students' music lurched between them). gsa-conduct holds
+  // when this tab took the lead (Date.now()); where two devices conduct, the one where Conduct was pressed last leads and
+  // the other stops by itself, quietly (no "stop" for the students).
+  const conducting = () => { try { return !!sessionStorage.getItem(CONDUCT_KEY); } catch { return false; } };
+  const conductSince = () => { try { return Number(sessionStorage.getItem(CONDUCT_KEY)) || 0; } catch { return 0; } };
+  let tabId = '';
+  try { tabId = sessionStorage.getItem('gsa-tab') || ''; if (!tabId) { tabId = Math.random().toString(36).slice(2, 10); sessionStorage.setItem('gsa-tab', tabId); } } catch { tabId = Math.random().toString(36).slice(2, 10); }
   const tab = {
     get(k) { try { return sessionStorage.getItem(k) === '1'; } catch { return false; } },
     set(k, on) { try { on ? sessionStorage.setItem(k, '1') : sessionStorage.removeItem(k); } catch {} },
@@ -98,7 +106,7 @@
     const main = sb.channel(`conduct:${TEST}${song}`, { config: { private: true, broadcast: { self: false } } });
     const inn = sb.channel(`conduct-in:${TEST}${song}`, { config: { private: true, broadcast: { self: false }, presence: { key: me } } });
     const handlers = new Map(), peerCbs = [], connCbs = [];
-    const hosts = new Map();    // peer -> when last heard on the teacher's channel
+    const hosts = new Map();    // peer -> { t: when last heard on the teacher's channel, since: when it took the lead }
     let here = new Map();       // peer -> presence on the students' channel
     const pings = new Map();    // peer -> a ping waiting to be answered
     let mine = {}, tracked = null, beatTimer = 0, gcTimer = 0, last = new Map(), closed = false;
@@ -109,6 +117,7 @@
         const presence = { ...(peer === me ? mine : here.get(peer) || {}) };
         delete presence.conducting;
         if (peer === me ? mine.conducting : hosts.has(peer)) presence.conducting = true;
+        if (peer !== me && hosts.has(peer)) presence.since = hosts.get(peer).since || 0;
         if (pings.has(peer)) Object.assign(presence, { following: true, ping: pings.get(peer) });
         return { peer, isMe: peer === me, sameTab: peer === me, presence };
       });
@@ -124,16 +133,16 @@
       for (const cb of peerCbs) { try { cb({ peers: list, joined, updated, left }); } catch {} }
     }
     const connected = () => connCbs.forEach((cb) => { try { cb(); } catch {} });
-    function sawHost(peer, off) {
-      const had = hosts.has(peer);
-      if (off) hosts.delete(peer); else hosts.set(peer, Date.now());
-      if (had !== hosts.has(peer)) fire();
+    function sawHost(peer, off, since) {
+      const had = hosts.get(peer);
+      if (off) hosts.delete(peer); else hosts.set(peer, { t: Date.now(), since: since != null ? since : had ? had.since : 0 });
+      if (!had !== !hosts.has(peer) || (had && hosts.has(peer) && had.since !== hosts.get(peer).since)) fire();
     }
 
-    main.on('broadcast', { event: 'beat' }, ({ payload }) => payload && sawHost(payload.from, payload.off));
+    main.on('broadcast', { event: 'beat' }, ({ payload }) => payload && sawHost(payload.from, payload.off, payload.since));
     main.on('broadcast', { event: '*' }, ({ event, payload }) => {
       if (!payload || event === 'beat') return;
-      if (!hosts.has(payload.from)) sawHost(payload.from, false); else hosts.set(payload.from, Date.now());
+      if (!hosts.has(payload.from)) sawHost(payload.from, false); else hosts.get(payload.from).t = Date.now();
       for (const cb of handlers.get(event) || []) { try { cb({ data: payload.data, peer: payload.from, sameTab: false }); } catch {} }
     });
     inn.on('presence', { event: 'sync' }, () => {
@@ -149,7 +158,7 @@
     });
     gcTimer = setInterval(() => {
       const gone = mine.following ? FOLLOWED_GONE_MS : HOST_GONE_MS;
-      const old = [...hosts].filter(([, t]) => Date.now() - t > gone).map(([p]) => p);
+      const old = [...hosts].filter(([, h]) => Date.now() - h.t > gone).map(([p]) => p);
       if (old.length) { old.forEach((p) => hosts.delete(p)); fire(); }
     }, 1000);
 
@@ -174,7 +183,7 @@
       return inn.track(JSON.parse(want));
     }
     const sendMain = (event, data) => main.send({ type: 'broadcast', event, payload: { from: me, data } });
-    function beat(off) { return main.send({ type: 'broadcast', event: 'beat', payload: { from: me, off: !!off } }); }
+    function beat(off) { return main.send({ type: 'broadcast', event: 'beat', payload: { from: me, off: !!off, since: mine.since || 0 } }); }
     const bye = () => { if (mine.conducting) beat(true); };
     addEventListener('pagehide', bye);
     await track();
@@ -234,9 +243,9 @@
     location.href = songUrl(slug);
   }
   function sayHere() {
-    if (!site || !teacher || !tab.get(CONDUCT_KEY)) return;
+    if (!site || !teacher || !conducting()) return;
     const title = song ? document.title : null;
-    site.send({ type: 'broadcast', event: 'here', payload: { song, title } });
+    site.send({ type: 'broadcast', event: 'here', payload: { song, title, from: tabId, since: conductSince() } });
   }
   async function startSite() {
     if (site) return;
@@ -246,13 +255,24 @@
     const ch = sb.channel(`conduct:${TEST}__site`, { config: { private: true, broadcast: { self: false } } });
     ch.on('broadcast', { event: 'here' }, ({ payload }) => {
       if (!payload) return;
+      const since = payload.since || 0;
+      // Another device of the teacher's is conducting too: the one where Conduct was pressed last leads.
+      if (teacher && conducting() && payload.from !== tabId) {
+        if (since > conductSince()) giveWay(); else return;
+      }
+      // A student stays with the teacher it has while she is heard, whatever another (earlier) device says.
+      if (siteHost && siteHost.from && payload.from !== siteHost.from && since < (siteHost.since || 0)
+        && Date.now() - siteSeen < SITE_GONE_MS) return;
       const was = siteHost && siteHost.song;
-      siteHost = { song: payload.song || null, title: payload.title || null };
+      siteHost = { song: payload.song || null, title: payload.title || null, from: payload.from || '', since };
       siteSeen = Date.now();
       if (tab.get(FOLLOW_KEY) && siteHost.song && siteHost.song !== song) { goTo(siteHost.song); return; }
       if (was !== siteHost.song || !was) siteChanged();
     });
-    ch.on('broadcast', { event: 'off' }, () => { siteHost = null; tab.set(FOLLOW_KEY, false); siteChanged(); });
+    ch.on('broadcast', { event: 'off' }, ({ payload }) => {
+      if (payload && payload.from && siteHost && siteHost.from && payload.from !== siteHost.from) return; // not the teacher it follows
+      siteHost = null; tab.set(FOLLOW_KEY, false); siteChanged();
+    });
     ch.subscribe((status) => { if (status === 'SUBSCRIBED') sayHere(); });
     site = ch;
     clearInterval(siteTimer);
@@ -268,10 +288,18 @@
     if (tab.get(FOLLOW_KEY)) siteSeen = Date.now(), siteHost = siteHost || { song: null, title: null, pending: true };
     if (home) homeUi();
   }
-  function setConducting(on) {
-    tab.set(CONDUCT_KEY, on);
+  // since: when the lead was taken (Conduct pressed); kept as it is when conducting carries on to the next page.
+  function setConducting(on, since) {
+    try { if (on) sessionStorage.setItem(CONDUCT_KEY, String(since || conductSince() || Date.now())); else sessionStorage.removeItem(CONDUCT_KEY); } catch {}
     if (on) sayHere();
-    else if (site) site.send({ type: 'broadcast', event: 'off', payload: {} });
+    else if (site) site.send({ type: 'broadcast', event: 'off', payload: { from: tabId } });
+    if (home) homeUi();
+  }
+  // Another device took the lead: stop conducting here without telling the students to stop.
+  const giveWayCbs = [];
+  function giveWay() {
+    try { sessionStorage.removeItem(CONDUCT_KEY); } catch {}
+    giveWayCbs.forEach((cb) => { try { cb(); } catch {} });
     if (home) homeUi();
   }
   function setFollow(on) {
@@ -290,7 +318,7 @@
       document.body.append(pill);
     }
     const kids = [];
-    if (teacher && tab.get(CONDUCT_KEY)) {
+    if (teacher && conducting()) {
       kids.push(el('span', { class: 'pt-pill-txt' }, 'Conducting: open a song'),
         el('button', { class: 'pt-pill-btn', type: 'button', on: () => setConducting(false) }, 'Stop'));
     } else if (tab.get(FOLLOW_KEY) && siteHost) {
@@ -406,11 +434,14 @@
   window.playTogether = {
     wantsFollow: () => tab.get(FOLLOW_KEY),
     setFollow,
-    wantsConduct: () => tab.get(CONDUCT_KEY),
+    wantsConduct: conducting,
+    conductSince,
+    onGiveWay(cb) { giveWayCbs.push(cb); },
+    giveWay,
     setConducting,
     onSite(cb) { siteCbs.push(cb); },
     // The song the teacher is conducting somewhere on the site (null: on the home page), or undefined: nobody conducting.
-    teacherAt: () => (siteHost && !siteHost.pending && !(teacher && tab.get(CONDUCT_KEY)) ? { song: siteHost.song, title: siteHost.title } : undefined),
+    teacherAt: () => (siteHost && !siteHost.pending && !(teacher && conducting()) ? { song: siteHost.song, title: siteHost.title } : undefined),
     room,
     canLead: () => !!teacher,
     open,

@@ -2185,7 +2185,7 @@ body.following .host-only { display: none !important; }
   const LOOP_GLIDE_MS = 450;       // how long the slide back to the loop's first note takes
   const conductor = { room: null, me: null, hosting: false, following: false, hostPeer: null, offset: 0, bestRtt: Infinity, pongs: 0, synced: false,
     pings: new Map(), last: null, seq: 0, timers: [], posTimer: 0, pingTimer: 0, followers: 0, volume: 1, errs: [], startedAt: 0, lastFix: 0,
-    sentVer: 0, seenVer: -1, startingUntil: 0, quiet: 0, waiting: false, odd: 0 };
+    sentVer: 0, seenVer: -1, startingUntil: 0, quiet: 0, waiting: false, odd: 0, since: 0, lastBy: new Map() };
   const clock = () => performance.now();
   // The written tempo (quarter notes a minute) at a tick: the last tempo mark at or before it.
   function tempoAtTick(tick) {
@@ -2426,7 +2426,7 @@ body.following .host-only { display: none !important; }
   }
   document.addEventListener('pointerdown', () => {
     if (!$('wakeCard') || $('wakeCard').hidden) return;
-    wakeAudio().then(() => { if (conductor.following && conductor.synced && conductor.last) applyCommand(conductor.last, true); });
+    wakeAudio().then(() => { const last = hostLast(); if (conductor.following && conductor.synced && last) applyCommand(last, true); });
   }, true);
   // The website: a device that followed the teacher here from another page follows again by itself, once its player
   // is ready (before that, a start from the teacher can't be kept).
@@ -2473,7 +2473,8 @@ body.following .host-only { display: none !important; }
     const canLead = conductor.canLead !== false;                 // students who can't conduct never see Conduct
     const site = conductor.site;                                 // the website (window.playTogether)
     const g = $('g-together'), f = $('g-follow');
-    let label = '', on = false, show = !!conductor.room && canLead && (conductor.hosting || (!other && !conductor.following && moreOpen));
+    // The teacher sees Conduct even while another of her devices conducts: pressing it moves the lead here.
+    let label = '', on = false, show = !!conductor.room && canLead && (conductor.hosting || (!conductor.following && moreOpen));
     if (conductor.hosting) { on = true; label = conductor.followers ? 'Conducting · ' + conductor.followers : 'Conducting'; }
     else label = 'Conduct';
     g.hidden = !show;
@@ -2499,21 +2500,52 @@ body.following .host-only { display: none !important; }
   function stopHosting() {
     conductSend({ type: 'stop', tick: 0 });
     conductor.hosting = false; clearInterval(conductor.posTimer);
-    if (conductor.room) conductor.room.presence({ conducting: null }).catch(() => {});
+    if (conductor.room) conductor.room.presence({ conducting: null, since: null }).catch(() => {});
   }
-  async function startHosting() {
+  // carry: conducting carries on from the last page (it keeps the moment Conduct was pressed there).
+  async function startHosting(carry) {
     if (conductor.joining) await conductor.joining; // the website: just signed in, still connecting
     if (!conductor.room || conductor.hosting) return;
     const room = conductor.room;
     try { await room.emit('conduct', { type: 'hello', seq: ++conductor.seq }); if (room !== conductor.room || conductor.hosting) return; }
     catch (e) { conductor.canLead = false; conductorUi(); if (conductor.site) toast('Couldn’t reach the students. Check the internet.', 2600); return; }
+    // Conducting and following don't mix: Conduct pressed on a device that followed the teacher ends its following.
+    if (conductor.following) stopFollowing();
+    if (conductor.site && conductor.site.wantsFollow()) conductor.site.setFollow(false);
     conductor.hosting = true;
-    conductor.room.presence({ conducting: true }).catch(() => {});
+    // When this device took the lead: where two of the teacher's devices conduct, the later one leads.
+    conductor.since = (carry && conductor.site && conductor.site.conductSince()) || Date.now();
+    conductor.room.presence({ conducting: true, since: conductor.since }).catch(() => {});
     clearInterval(conductor.posTimer);
     conductor.posTimer = setInterval(hostReport, 500);
-    if (conductor.site) conductor.site.setConducting(true); // carries on when the teacher opens another song
+    if (conductor.site) conductor.site.setConducting(true, conductor.since); // carries on when the teacher opens another song
     conductorUi();
   }
+  // Another of the teacher's devices took the lead after this one (she pressed Conduct there): stop conducting here,
+  // quietly (the students carry on with the other device), stop this device's music, and say so.
+  function giveWay() {
+    if (!conductor.hosting) return;
+    conductor.hosting = false; clearInterval(conductor.posTimer); clearTimers();
+    if (loopGap) { clearTimeout(loopGap); loopGap = 0; setPlaying(playing); }
+    if (playing) api.pause();
+    if (conductor.room) conductor.room.presence({ conducting: null, since: null }).catch(() => {});
+    if (conductor.site) conductor.site.giveWay();
+    conductorUi();
+    toast('Another device is conducting now', 3000);
+  }
+  // Follower: the conducting device changed. Its clock and its commands are its own: set the clock again, then catch up.
+  function resync() {
+    clearTimers();
+    conductor.offset = 0; conductor.bestRtt = Infinity; conductor.pongs = 0; conductor.synced = false; conductor.pings.clear();
+    conductor.seenVer = -1; conductor.odd = 0;
+    pingHost(8);
+    clearInterval(conductor.repingTimer);
+    conductor.repingTimer = setInterval(() => {
+      if (!conductor.following || conductor.synced) { clearInterval(conductor.repingTimer); return; }
+      pingHost(8);
+    }, 3000);
+  }
+  const hostLast = () => conductor.lastBy.get(conductor.hostPeer) || null;
   $('g-together').addEventListener('click', () => {
     if (conductor.hosting) { stopHosting(); if (conductor.site) conductor.site.setConducting(false); conductorUi(); return; }
     if (!conductor.room) return;
@@ -2543,15 +2575,16 @@ body.following .host-only { display: none !important; }
         const mine = ++turn;
         if (conductor.following) stopFollowing();
         if (conductor.hosting) stopHosting();
-        conductor.room = null; conductor.hostPeer = null; conductor.followers = 0; conductor.me = null; conductor.last = null;
+        conductor.room = null; conductor.hostPeer = null; conductor.followers = 0; conductor.me = null; conductor.last = null; conductor.lastBy.clear();
         conductorUi();
         const room = await site.room().catch(() => null);
         if (mine !== turn) { if (room) room.leave(); return; }
         conductor.canLead = site.canLead();
         if (room) attachRoom(room);
         conductorUi();
-        // The teacher was conducting on the page before: carry on here.
-        if (room && conductor.canLead && site.wantsConduct()) startHosting();
+        // The teacher was conducting on the page before: carry on here. Not on a device that was following her (it
+        // conducted once, earlier in this tab): that took up conducting again by itself on every piece (2026-11-13).
+        if (room && conductor.canLead && site.wantsConduct()) { if (site.wantsFollow()) site.giveWay(); else startHosting(true); }
       };
       const rejoin = () => {
         const p = join().finally(() => { if (conductor.joining === p) conductor.joining = null; });
@@ -2559,6 +2592,7 @@ body.following .host-only { display: none !important; }
       };
       site.onChange(rejoin);
       site.onSite(() => conductorUi());
+      if (site.onGiveWay) site.onGiveWay(giveWay);
       rejoin();
       return;
     }
@@ -2575,7 +2609,7 @@ body.following .host-only { display: none !important; }
       const cmd = msg.data;
       if (cmd.type === 'hello') return;
       // Remember the host's latest command so a follower can catch up once its clock is set.
-      if (cmd.type === 'play' || cmd.type === 'pause' || cmd.type === 'stop') conductor.last = cmd;
+      if (cmd.type === 'play' || cmd.type === 'pause' || cmd.type === 'stop') conductor.lastBy.set(msg.peer, cmd);
       if (!(conductor.following && conductor.synced && msg.peer === conductor.hostPeer)) return;
       // Nothing arrives before it was sent: a report that seems to means this device's idea of the host's clock is
       // behind (the pings that set it met a slow patch on the way back), which kept its music a little late. Move it up.
@@ -2587,6 +2621,9 @@ body.following .host-only { display: none !important; }
     room.on('pong', (msg) => {
       const d = msg.data || {};
       if (!conductor.following || d.to !== conductor.me || !conductor.pings.has(d.id)) return;
+      // Only the device this one follows: two of the teacher's devices conducting both answer, and their clocks are
+      // minutes apart (each counts from when its page opened), so mixing them threw the music far off.
+      if (msg.peer !== conductor.hostPeer) return;
       const t0 = conductor.pings.get(d.id), t1 = clock();
       conductor.pings.delete(d.id);
       const rtt = t1 - t0;
@@ -2594,20 +2631,30 @@ body.following .host-only { display: none !important; }
       // After a few answers the clock is known well enough: catch up with whatever the host is doing.
       if (++conductor.pongs >= 4 && !conductor.synced) {
         conductor.synced = true;
-        if (conductor.last) applyCommand(conductor.last, true);
+        const last = hostLast();
+        if (last) applyCommand(last, true);
       }
     });
     room.onPeers((change) => {
       const meNow = change.peers.find(p => p.isMe && p.sameTab);
       if (meNow) conductor.me = meNow.peer;
-      const host = change.peers.find(p => !p.sameTab && p.presence && p.presence.conducting);
+      // Who conducts. Two of the teacher's devices may for a moment (one is about to give way): stay with the one this
+      // device has while it still conducts, else take the one where Conduct was pressed last.
+      const hosts = change.peers.filter(p => !p.sameTab && p.presence && p.presence.conducting);
+      const host = hosts.find(p => p.peer === conductor.hostPeer)
+        || hosts.sort((a, b) => (b.presence.since || 0) - (a.presence.since || 0))[0];
       const hostPeer = host ? host.peer : null;
       if (hostPeer !== conductor.hostPeer) {
+        const was = conductor.hostPeer;
         if (conductor.following && !hostPeer) stopFollowing();
         conductor.hostPeer = hostPeer;
+        // Another device took over: its clock and its commands are its own, so set the clock again and catch up.
+        if (conductor.following && hostPeer && was) resync();
         // The website: this device followed the teacher here from another page, so it follows again by itself.
         if (hostPeer) setTimeout(autoFollow, 0);
       }
+      // Conducting here, and another device took the lead after this one did: give way to it.
+      if (conductor.hosting && hosts.some(p => (p.presence.since || 0) > conductor.since)) giveWay();
       if (conductor.hosting) {
         // Answer pings, and bring newcomers up to date.
         for (const p of [...change.joined, ...change.updated]) {

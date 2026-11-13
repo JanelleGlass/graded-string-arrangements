@@ -180,6 +180,28 @@ one goes missing.
   sent moves the student's idea of the teacher's clock up (its pings met a slow patch). Checked with a stand-in for
   Supabase that delays, bunches and drops messages per device (Wi-Fi, hotspot, and freezes of 3 to 9 s), with a teacher
   and two students: Play, Pause, tempo, a second student joining, a loop.
+- One device conducts at a time (Janelle's first group class, 2026-11-12: "every once in a while someone's device would
+  freeze ... the animation just looked like it was stuck and lurching forward and backwards or just not moving at all";
+  she was signed in on two iPads and her iPhone, and the logs showed two of them opening each piece together). A device
+  that had conducted earlier in its tab took up conducting again by itself on every piece (the carry-over in
+  `gsa-conduct`), so two devices conducted at once; both answered a student's clock pings, and their clocks count from
+  when each page opened, minutes apart, so a student could set its clock by one and take positions from the other; and
+  it could follow the one that wasn't playing. Now: `gsa-conduct` holds when the lead was taken (Date.now() when Conduct
+  was pressed, kept as conducting carries from page to page); beats, presence (`since`) and the site's `here` carry it;
+  where two devices conduct, the one where Conduct was pressed last leads and the other gives way by itself (`giveWay`:
+  no "stop" for the students, its own music stops, toast "Another device is conducting now"), on the same piece through
+  the room and on different pieces through `conduct:__site`. Conduct shows on a signed-in device even while another
+  conducts, so pressing it moves the lead there. A student stays with the device it follows while that one conducts,
+  takes clock answers only from it, keeps the last command per device (`lastBy`), and sets its clock again when the
+  lead moves (`resync`). A tab that follows doesn't take up conducting again (its stale carry-over is dropped), and
+  pressing Conduct ends following. Followers keep the teacher on `conduct:__site` whose `since` is latest. Checked with
+  `SCENARIO=two node tests/together_sim.js`: before, after Conduct was pressed on the second iPad and it played, the
+  student stood still the whole time; after, it moved over and kept up.
+- What the logs can tell (Janelle asked, 2026-11-13): Supabase keeps about a day of logs. `edge_logs` has a line for each
+  page that connects (`/realtime/v1/websocket` with `eventsPerSecond=60` in the query: the website), with the browser
+  and network, and each check of the teacher's sign-in (`/rest/v1/conduct_classes`, one per page she opens); `realtime_logs`
+  has the server's errors (none in her first class). The messages themselves, songs and freezes are not logged, and the
+  site counts no visits (Vercel's Analytics could). Report counts and device kinds, never addresses or places.
 - Tests use their own channels (`conduct:test-...`) when localStorage has `gsa-together-test` (tests/smoke.py sets it):
   on 2026-11-10 a local test on Silent Night met Janelle conducting it on the live site, and its students followed her.
 - Testing needs a teacher account: make a throwaway one in `auth.users` with a row in `conduct_classes`, and delete it

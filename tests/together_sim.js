@@ -10,6 +10,7 @@
 // Connections: wifi, hotspot (slow and uneven, with freezes of up to 1.5 s), bad (also drops of 3 to 9 s, after which
 // what was sent meanwhile is lost). SEED=2 gives other freezes; SONG=<slug> another song (default the-first-noel).
 // ALPHATAB_JS=<file> serves alphaTab from a local copy (see CLAUDE.md); TRACE=<file> writes every sample there.
+// SCENARIO=two: the teacher signed in on two iPads instead (see twoTeachers below).
 // On good Wi-Fi and the hotspot a student keeps within a quarter of a beat, apart from the second or two it takes to
 // join; on the bad connection a student whose own connection dropped catches up within about a second of it coming back.
 const { chromium } = require('playwright');
@@ -77,8 +78,9 @@ function server(dev, m) {
   else if (m.op === 'bcast') { if (!members.has(dev)) return; for (const [d] of members) if (d !== dev) deliver(d, { op: 'bcast', ch: m.ch, event: m.event, payload: m.payload }, sAt); }
 }
 
-async function device(browser, name, teacher) {
+async function device(browser, name, teacher, init) {
   const ctx = await browser.newContext({ viewport: { width: 1366, height: 860 } });
+  if (init) await ctx.addInitScript(init);
   await ctx.addInitScript(() => { try { localStorage.setItem('gsa-together-test', '1'); } catch (e) {} });
   if (teacher) await ctx.addInitScript(() => { try { localStorage.setItem('gsa-teacher', '{}'); } catch (e) {} });
   if (ALPHATAB) await ctx.route('https://cdn.jsdelivr.net/npm/@coderline/**', (r) => r.fulfill({ path: ALPHATAB, contentType: 'application/javascript', headers: { 'Access-Control-Allow-Origin': '*' } }));
@@ -133,8 +135,65 @@ async function dragBars(page, from, to) {
   await page.mouse.up();
 }
 
+// SCENARIO=two: the teacher signed in on two iPads (Janelle's class, 2026-11-13: students' music lurched back and forth
+// and stopped). The second iPad opens the piece while the first conducts and plays; it had conducted earlier in its tab,
+// so it takes up conducting again by itself. Then the teacher presses Conduct on the second iPad and plays there.
+// A student follows throughout; it should stay with one teacher, and move over cleanly when Conduct is pressed.
+async function twoTeachers(browser) {
+  const T = await device(browser, 'teacher iPad 1', true);
+  const S = await device(browser, 'student', false);
+  await T.page.waitForFunction(() => reader.conductor.room, null, { timeout: 30000 });
+  await T.page.waitForSelector('#g-together:not([hidden])', { timeout: 30000 }); await T.page.click('#g-together');
+  await T.page.waitForFunction(() => reader.conductor.hosting, null, { timeout: 30000 });
+  await follow(S);
+  const samples = [];
+  let stop = false, phase = '', T2 = null;
+  const sampler = (async () => {
+    while (!stop) {
+      const r = await Promise.all([T, T2, S].map((d) => (d ? d.page.evaluate(STATE).catch(() => null) : null)));
+      if (r[0] && r[2]) samples.push({ t: now(), phase, a: r[0], b: r[1], s: r[2] });
+      await new Promise((res) => setTimeout(res, 100));
+    }
+  })();
+  const step = async (what, fn, wait) => { phase = what; log.push(`${at()} ${what}`); await fn(); await new Promise((r) => setTimeout(r, wait)); };
+  await step('iPad 1 plays', () => T.page.click('#play'), 6000);
+  await step('iPad 2 opens the piece (it conducted earlier in its tab)', async () => {
+    T2 = await device(browser, 'teacher iPad 2', true, () => { if (!sessionStorage.getItem('sim-once')) { sessionStorage.setItem('sim-once', '1'); sessionStorage.setItem('gsa-conduct', '1'); } });
+  }, 4000);
+  // Students coming and going (every arrival or departure changes who the student sees as conducting).
+  await step('another student opens the piece, then closes it', async () => {
+    const S2 = await device(browser, 'student 2', false);
+    await new Promise((r) => setTimeout(r, 5000));
+    await S2.page.context().close();
+  }, 6000);
+  await step('iPad 1 pauses', () => T.page.click('#play'), 3000);
+  await step('Conduct pressed on iPad 2', async () => {
+    if (!(await T2.page.evaluate(() => reader.conductor.hosting))) await T2.page.click('#g-together');
+  }, 4000);
+  await step('iPad 2 plays', () => T2.page.click('#play'), 12000);
+  await step('iPad 2 pauses', () => T2.page.click('#play'), 3000);
+  stop = true; await sampler;
+  console.log(log.sort((x, y) => parseFloat(x) - parseFloat(y)).join('\n'));
+  // Against whichever iPad the student follows: is the student with it, or off somewhere?
+  const byPhase = {};
+  let prev = null;
+  for (const smp of samples) {
+    const ph = (byPhase[smp.phase] = byPhase[smp.phase] || { n: 0, stuck: 0, far: 0, jumps: 0, moving: 0, hosts: new Set() });
+    const lead = [smp.a, smp.b].filter((x) => x && x.hosting);
+    ph.hosts.add(lead.length);
+    // The iPad the student should be with: iPad 1 until Conduct is pressed on iPad 2.
+    const a = /Conduct pressed|iPad 2 plays|iPad 2 pauses/.test(smp.phase) && smp.b ? smp.b : smp.a;
+    ph.n++;
+    if (a.playing) { ph.moving++; if (!smp.s.playing) ph.stuck++; else if (Math.abs(a.at - smp.s.at) > 960) ph.far++; }
+    if (prev && smp.s.playing && prev.s.playing && Math.abs((smp.s.at - prev.s.at) - (smp.t - prev.t) * 1.6) > 480) ph.jumps++;
+    prev = smp;
+  }
+  for (const [p, v] of Object.entries(byPhase)) console.log(`${p}: devices conducting ${[...v.hosts].join('/')}; teacher's music moving ${v.moving} of ${v.n} samples; student stopped ${v.stuck}, over a beat off ${v.far}, jumps ${v.jumps}`);
+}
+
 (async () => {
   const browser = await chromium.launch();
+  if (process.env.SCENARIO === 'two') { await twoTeachers(browser); await browser.close(); process.exit(0); }
   const T = await device(browser, 'teacher', true);
   const S1 = await device(browser, 'student1', false);
   const S2 = await device(browser, 'student2', false);
