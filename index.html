@@ -82,6 +82,9 @@ h2 { margin: 0 0 14px; font-family: var(--font-display); font-weight: 600; font-
 .voices .what { color: var(--muted); font-size: 0.92rem; }
 footer { color: var(--muted); font-size: 0.84rem; border-top: 1px solid var(--line); padding-top: 18px; max-width: 46rem; }
 footer p { margin: 0 0 6px; }
+/* A quiet way in to the sight-reading page, at the very bottom (Janelle, 2026-11-13: "an inconspicuous button") */
+.quiet-link { display: inline-block; margin-top: 10px; padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-weight: 600; text-decoration: none; }
+.quiet-link:hover, .quiet-link:focus-visible { color: var(--accent); border-color: var(--accent); }
 @media (max-width: 560px) { .wrap { padding: 32px 18px 44px; gap: 32px; } .lede { font-size: 1.02rem; } 
   .tabs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; margin-bottom: -8px; }
   .tabs button { padding: 8px 6px; font-size: 0.9rem; } }
@@ -229,6 +232,7 @@ footer p { margin: 0 0 6px; }
   <footer>
     <p>Free. Playback is synthesized: a guide to notes and timing, not tone.</p>
     <p>Music drawn and played with alphaTab (alphatab.net) · Bravura music font (SIL Open Font License) · string and piano sounds from the GeneralUser GS sound bank by S. Christian Collins.</p>
+    <p><a class="quiet-link" href="sight-reading/">Sight-reading practice →</a></p>
   </footer>
 </div>
 <script>
