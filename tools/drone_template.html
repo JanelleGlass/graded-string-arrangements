@@ -1,0 +1,39 @@
+<title>Drone</title>
+<meta name="description" content="A drone to tune to: any key, round the circle of fifths, in pure or piano tuning.">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,500;0,600;1,500&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="drone.css?v={{DRONE_CSS}}">
+<script src="drone.js?v={{DRONE_JS}}"></script>
+</head>
+<body>
+<a class="dr-back" href="../">&larr; All songs</a>
+<main class="dr">
+  <header class="dr-head">
+    <h1>Drone</h1>
+    <div class="dr-now">
+      <button type="button" class="dr-step" id="prev" aria-label="Previous key" title="Previous key"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4-4.6-4.6z"/></svg><span class="dr-word">Previous</span></button>
+      <div class="dr-name" aria-live="polite"><b id="keyName">C major</b> <span class="dr-also" id="keyAlso"></span><small id="keyNotes"></small></div>
+      <button type="button" class="dr-step" id="next" aria-label="Next key" title="Next key"><span class="dr-word">Next</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.6 16.6 10 18l6-6-6-6-1.4 1.4 4.6 4.6z"/></svg></button>
+    </div>
+    <button type="button" class="dr-start" id="start" aria-pressed="false"><svg class="dr-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg><svg class="dr-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg><span class="dr-swap"><span>Start</span><span>Stop</span></span></button>
+  </header>
+
+  <div class="dr-keys" id="keys" role="group" aria-label="Keys, round the circle of fifths"></div>
+
+  <div class="dr-set" id="settings" role="group" aria-label="Drone settings">
+    <button type="button" class="dr-opt" data-set="notes"><span class="dr-lbl">Notes</span><b class="dr-swap"></b></button>
+    <button type="button" class="dr-opt" data-set="voicing"><span class="dr-lbl">Voicing</span><b class="dr-swap"></b></button>
+    <button type="button" class="dr-opt" data-set="tuning"><span class="dr-lbl">Tuning</span><b class="dr-swap"></b></button>
+    <div class="dr-opt dr-a" role="group" aria-label="Reference A"><button type="button" id="aDown" aria-label="Lower A">&minus;</button><span class="dr-a-txt"><span class="dr-lbl">A =</span><b id="aVal">440</b></span><button type="button" id="aUp" aria-label="Higher A">+</button></div>
+    <button type="button" class="dr-opt" data-set="octave"><span class="dr-lbl">Octave</span><b class="dr-swap"></b></button>
+    <button type="button" class="dr-opt" data-set="sound"><span class="dr-lbl">Sound</span><b class="dr-swap"></b></button>
+    <label class="dr-opt dr-vol"><span class="dr-lbl">Volume</span><input type="range" id="vol" min="0" max="100" step="1" aria-label="Volume"></label>
+  </div>
+  <p class="dr-how">A page-turn pedal or the arrow keys change key; the space bar starts and stops.</p>
+</main>
+<div class="dr-toast" id="toast" role="status" hidden></div>
+<script src="page.js?v={{PAGE_JS}}"></script>
+</body>
+</html>
