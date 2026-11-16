@@ -119,7 +119,7 @@ svg { display: block; }
   .dr-opt b { font-size: 0.9rem; }
   .dr-lbl { font-size: 0.64rem; }
   .dr-a > button { width: 32px; }
-  .dr-vol { grid-column: 1 / -1; grid-template-columns: auto 1fr; gap: 12px; padding: 0 16px; }
+  .dr-vol { grid-column: 1 / -1; grid-template-columns: auto 1fr; align-items: center; gap: 12px; padding: 0 16px; }
   .dr-vol input { width: 100%; }
   .dr-how { display: none; }
 }
