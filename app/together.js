@@ -330,6 +330,8 @@
     }
     pill.replaceChildren(...kids);
     pill.hidden = !kids.length;
+    // The screen stays on while the teacher conducts here or a student waits for her song (app/app.js).
+    if (window.gsaKeepAwake) window.gsaKeepAwake('home', (teacher && conducting()) || (tab.get(FOLLOW_KEY) && !!siteHost));
   }
   if (home) setTimeout(startSite, START_MS); else if (song) setTimeout(() => { startSite(); }, START_MS);
   try { localStorage.removeItem('gsa-class-code'); } catch {} // from the first version, which had class codes

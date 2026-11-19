@@ -12,8 +12,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Graded Strings">
 <style>body{margin:0;padding:0}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
-<script src="../../app/app.js?v=3a19f0d83d"></script>
-<script src="../../app/together.js?v=f21069f394"></script>
+<script src="../../app/app.js?v=fbce6b0ba4"></script>
+<script src="../../app/together.js?v=9655ca92b0"></script>
 <title>The Birthday of a King</title>
 <meta name="description" content="Read and play along with The Birthday of a King in four levels for violin, viola, cello and bass.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2471,6 +2471,19 @@ body.following .host-only { display: none !important; }
     $('teachLine').hidden = !site;
     if (site) $('teachBtn').textContent = canLead && conductor.room ? 'Conducting: you’re signed in as the teacher' : 'Teacher? Sign in to conduct';
     setDockH();
+    keepAwake();
+  }
+  // The screen stays on while the music plays, while this device conducts, and while it follows the teacher, waiting
+  // between pieces too (Janelle, 2026-11-19: students' screens went dark in group class). app/app.js holds it
+  // (window.gsaKeepAwake; not in the Claude preview). When the music stops it stays on a minute more, so a screen
+  // doesn't go dark the moment a piece ends.
+  let awakeTimer = 0;
+  function keepAwake() {
+    if (!window.gsaKeepAwake) return;
+    const on = playing || conductor.hosting || conductor.following || !!(conductor.site && conductor.site.wantsFollow());
+    clearTimeout(awakeTimer);
+    if (on) window.gsaKeepAwake('reader', true);
+    else awakeTimer = setTimeout(() => window.gsaKeepAwake('reader', false), 60000);
   }
   function stopHosting() {
     conductSend({ type: 'stop', tick: 0 });
@@ -3779,6 +3792,25 @@ body.following .host-only { display: none !important; }
   // short note's flag; otherwise a little (Janelle, 2026-11-12: 1.3 everywhere was a little too wide; at 1.15 a number
   // beside the next note touched an eighth note's flag).
   const evenRoom = () => (state.fingerMode !== 'off' && fingerSpot() === 'left' ? 1.35 : 1.2); // then a tiny bit wider (2026-11-12)
+  // With finger numbers beside the notes, no note gets less room than an eighth: in proportion, a sixteenth had half
+  // an eighth's room, and the next note's number ran into it (Janelle, 2026-11-18, Silent Night's "Si-lent night":
+  // dotted eighth, sixteenth, eighth). Longer notes keep their proportions. A note followed by a high- or low-finger
+  // arrow ("↓2", about twice a plain number's width) gets a dotted eighth's: after an eighth's flag the arrow touched it.
+  const evenFloor = (tick) => (state.fingerMode !== 'off' && fingerSpot() === 'left' ? (arrowNext().has(tick) ? 720 : 480) : 0);
+  // Where the next note has an arrow: the ticks (alphaTab's absoluteDisplayStart, its springs' timePosition) of the
+  // notes before them, in the parts on the page.
+  let arrowTicks = { key: '', ticks: new Set() };
+  function arrowNext() {
+    const key = state.seen.join();
+    if (arrowTicks.key === key || !score) return arrowTicks.ticks;
+    const ticks = new Set();
+    for (const ti of shownIndexes()) for (const bar of score.tracks[ti].staves[0].bars) for (const v of bar.voices) for (const b of v.beats) {
+      const n = b.nextBeat;
+      if (n && !n.isRest && n.notes.some(x => /[↑↓]/.test(x.finger || ''))) ticks.add(b.absoluteDisplayStart);
+    }
+    arrowTicks = { key, ticks };
+    return ticks;
+  }
   const evenSpacingOn = () => state.pointer && !onPaper();
   function findSpringFormula(root) {
     const seen = new Set(), queue = [[root, 0]];
@@ -3808,19 +3840,88 @@ body.following .host-only { display: none !important; }
   // True when the formula has just been replaced, so the music must be drawn again with it.
   function evenSpacingReady() {
     if (evenSpacing || !evenSpacingOn() || !api || !api.renderer) return false;
+    return springHook();
+  }
+  // Replaces the formula (once): the even spacing, and on phones the room after a bar line (startRoomFor).
+  function springHook() {
+    if (evenSpacing || !api || !api.renderer) return false;
     let found = null;
     try { found = findSpringFormula(api.renderer); } catch {}
     if (!found) { evenSpacing = { failed: true }; return false; } // the music stays spaced as alphaTab spaces it
     const { orig } = found;
     found.proto[found.name] = function (spring, duration, minDuration) {
       const k = orig.call(this, spring, duration, minDuration);
+      startRoomFor(spring);
       if (!evenSpacingOn() || !(duration > 0) || !(minDuration > 0)) return k;
       const give = 1 + 0.85 * Math.log2(duration / minDuration), quarter = 1 + 0.85 * Math.log2(960 / minDuration);
       // evenRoom(): every note a little wider than alphaTab's quarter, so a short note has room for the next note's
       // finger number after its flag (Janelle, 2026-11-12: the eighths in The Butterfly were tight).
-      return k * give / Math.max(0.05, evenRoom() * quarter * duration / 960);
+      return k * give / Math.max(0.05, evenRoom() * quarter * Math.max(duration, evenFloor(spring.timePosition)) / 960);
     };
     evenSpacing = found;
+    return true;
+  }
+  // Fingers to the left on a phone's screen: a bar's first note keeps its number clear of the bar line and the bar
+  // number (Janelle, 2026-11-18: in Silent Night "14" and a 4 read as 144, and in B-flat "↓1" sat on the bar line).
+  // fitLeftRoom does this on bigger screens with alphaTab's own fingerings, which make a line taller, so a phone
+  // turned sideways shrank the music (up to 12% in Silent Night in B-flat). Here the note's spring instead gets more
+  // room in front of it (alphaTab's preBeatWidth, the room it keeps for a sharp or flat), which changes no heights:
+  // measured after drawing, in the music's own units (so it holds at any size), and drawn again, at most three times.
+  let startRoom = { key: '', ticks: new Map(), tries: 0 };
+  const startRoomOn = () => !onPaper() && document.documentElement.classList.contains('small') && BIG() && fingerSpot() === 'left' && !!score;
+  function startRoomFor(spring) {
+    const add = startRoomOn() ? (startRoom.ticks.get(spring.timePosition) || 0) : 0, had = spring.gsaRoom || 0;
+    if (add === had || typeof spring.preBeatWidth !== 'number') return;
+    spring.preBeatWidth += add - had;
+    spring.gsaRoom = add;
+  }
+  // Each bar's first note whose number (to its left) runs into a bar line or a bar number: its tick and how far.
+  function crowdedStarts() {
+    const beats = new Map(), out = new Map();
+    for (const ti of shownIndexes()) for (const bar of score.tracks[ti].staves[0].bars) for (const v of bar.voices) for (const b of v.beats) beats.set(String(b.id), b);
+    for (const svg of $('sheet').querySelectorAll('.at-surface svg')) {
+      const ink = [];
+      for (const r of svg.querySelectorAll('rect')) { // bar lines
+        const x = +r.getAttribute('x'), y = +r.getAttribute('y'), w = +r.getAttribute('width'), h = +r.getAttribute('height');
+        if (w < h / 8) ink.push({ x, r: x + w, t: y, b: y + h });
+      }
+      for (const t of svg.querySelectorAll(':scope > text:not(.fin)')) { // bar numbers
+        const n = t.textContent.trim();
+        if (!/^\d+$/.test(n)) continue;
+        const b = t.getBBox();
+        ink.push({ x: b.x, r: b.x + t.getSubStringLength(0, n.length) + b.height * 0.35, t: b.y, b: b.y + b.height });
+      }
+      for (const f of svg.querySelectorAll('text.fin[data-beat]')) {
+        const beat = beats.get(f.dataset.beat);
+        if (f.getAttribute('text-anchor') !== 'end' || !beat || beat.index !== 0) continue;
+        const fs = +f.getAttribute('font-size'), x = +f.getAttribute('x'), y = +f.getAttribute('y');
+        const box = { x: x - f.getComputedTextLength() - fs * 0.15, r: x, t: y - fs * 0.72, b: y + fs * 0.05 };
+        let need = 0;
+        for (const o of ink) if (o.x < box.r - 0.5 && o.r > box.x && Math.min(o.b, box.b) - Math.max(o.t, box.t) > fs * 0.12) need = Math.max(need, o.r - box.x + fs * 0.1);
+        if (need > 0) out.set(beat.absoluteDisplayStart, Math.max(out.get(beat.absoluteDisplayStart) || 0, need));
+      }
+    }
+    return out;
+  }
+  // Returns true when it started a new drawing.
+  function fitStartRoom() {
+    if (!api) return false;
+    const key = startRoomOn() ? JSON.stringify([state.seen, lookNow().id]) : '';
+    if (key !== startRoom.key) {
+      // Other parts or another look: start again (drawn again first if this drawing still had room for the old ones).
+      const had = startRoom.ticks.size > 0;
+      startRoom = { key, ticks: new Map(), tries: 0 };
+      if (had) { api.render(); return true; }
+    }
+    if (!key || startRoom.tries >= 3) return false;
+    const crowded = crowdedStarts();
+    if (!crowded.size) return false;
+    const scale = api.settings.display.scale;
+    for (const [tick, px] of crowded) startRoom.ticks.set(tick, (startRoom.ticks.get(tick) || 0) + px / scale);
+    startRoom.tries++;
+    springHook();
+    if (evenSpacing && evenSpacing.failed) return false; // alphaTab changed: the numbers stay where they are
+    api.render();
     return true;
   }
   const bounceRoomWanted = () => state.pointer && state.layout === 'line' && !onPaper() && !!score;
@@ -5409,7 +5510,7 @@ body.following .host-only { display: none !important; }
     api.error.on(() => fail('Something went wrong drawing the music. Reload the page to try again.'));
     api.renderStarted.on(() => { if (!fitPending) fitTries = 0; if (!namePending) nameTries = 0; head = null; lineHead.classList.remove('on'); clearTimeout(printTimer); });
     api.renderFinished.on(() => { namePending = false; if (fitNames()) return; // drawn again with room for the part names
-      $('loading').hidden = true; ink = null; styleWords(); fitSurface(); placeFingers(); if (fitLeftRoom()) return; trackNotes(true); buildCounts(); look = null; placeTimeSigButtons(); drawLoop(); drawStartMark(); keepPlace(); xmap = null; if (!playing && state.layout === 'line') { setHalf(); centerOnTick(api.tickPosition || 0, false); }
+      $('loading').hidden = true; ink = null; styleWords(); fitSurface(); placeFingers(); if (fitLeftRoom() || fitStartRoom()) return; trackNotes(true); buildCounts(); look = null; placeTimeSigButtons(); drawLoop(); drawStartMark(); keepPlace(); xmap = null; if (!playing && state.layout === 'line') { setHalf(); centerOnTick(api.tickPosition || 0, false); }
       // A phone on its side: size the line to the screen, then bring it into view.
       fitPending = false;
       if (!fitToHeight() && shortLand.matches && state.layout === 'line' && !playing) revealSheet(false, true);
@@ -5483,6 +5584,7 @@ body.following .host-only { display: none !important; }
       const was = playing;
       playing = e.state === 1;
       setPlaying(playing);
+      keepAwake();
       // The first note reaches the speaker a moment after Play: until then the music waits (pos.at is that moment).
       if (playing && !was) { conductor.startingUntil = 0; clearStalePieces(); lastGrid = null; pos.at = heardAt = performance.now() + soundLag(); requestAnimationFrame(gridTick); lineState = null; revealSheet(true, true); if (state.layout === 'line' && !lineRaf) lineRaf = requestAnimationFrame(lineFollow); }
       if (!playing) { endCountIn(); clearLook(); }
