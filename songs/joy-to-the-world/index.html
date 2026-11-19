@@ -4313,7 +4313,7 @@ body.following .host-only { display: none !important; }
         continue;
       }
       const room = Math.min(from.y, to.y) - ballD(from.space) - Math.max(from.ceil ?? -Infinity, to.ceil ?? -Infinity);
-      const H = inside ? Math.max(0, Math.min(from.space * 0.5, room))
+      const H = inside ? Math.max(0, Math.min(from.space * 0.8, room)) // 0.5 at first: "a little higher" (Janelle, 2026-11-19)
         : Math.max(from.space * 0.4, Math.min(from.space * (0.9 + 0.7 * Math.min(2, beats)), room));
       const x = from.x + (to.x - from.x) * p, y = from.y + (to.y - from.y) * p - H * 4 * p * (1 - p);
       putPointer(run, x, y, p < 0.5 ? from.rest : to.rest);

@@ -723,7 +723,7 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   'on', saved before 2026-11-12, is the beat). Rhythm + beats ('both'; Janelle, 2026-11-19: "bounces on every note of
   the rhythm and also on every beat", so a long note is counted as a pulse inside it): the ball lands on every note
   and on every count, moving forward through a held note a share of the way per count as on the beat; a landing on a
-  count inside a held note (or rest) is a low bounce (half a staff space), a landing on a new note a full one, so a
+  count inside a held note (or rest) is a low bounce (0.8 of a staff space; half at first, then "a little higher"), a landing on a new note a full one, so a
   new note and "keep holding and count" look different (it first hopped on the spot; Janelle, 2026-11-19: "the ball
   still needs to move forward ... can they just be lower bounces"). It gets the beat's room. Fast, the counts inside
   notes come on the big beats only. Its switch is a round button in the strip, after Counting,
