@@ -213,6 +213,34 @@ one goes missing.
   card, "Your seat or stand number" (kept on the device, `localStorage` `gsa-seat`, sent in its presence; no names: the
   repo is public), and its Follow button says "Following · Seat 3". Size of the music isn't lockable (Janelle left it
   out). Checked with tests/mockroom.js, a teacher and two students on the Claude preview (scratchpad script, 2026-11-19).
+- Duo practice (Janelle's brief, 2026-11-19: a couple practising at home on two tablets; she chose a username and
+  password she makes for them over two saved links). How to set one up, in plain words: README, "Duo practice". A duo
+  login is NOT a studio account (the studio's `profiles` can be read by any signed-in account): it is a row in
+  `public.gsa_duos` (username, PBKDF2-SHA256 hash with 150,000 rounds and its salt, a 32-hex-character secret `room`,
+  `created_by`), RLS on with no policies and no grants to anon or authenticated, so only the `gsa-duo` Edge Function
+  (service role; source `tools/supabase/gsa-duo/index.ts`, deployed by hand, `verify_jwt` false because a duo signs in
+  with no session; the teacher's actions check her session against `conduct_classes`) reaches it: `login` for anyone,
+  `list`, `create`, `reset` (new password and new room: the old tablets are signed out), `remove` for the teacher.
+  Realtime policies "duo practice: a duo's own room (listen/send)" let anyone use topics `duo:<room>`, `duo:<room>:in`
+  and `duo:<room>:site`: knowing the room is the permission. The device keeps `{user, room, role}` in `localStorage`
+  `gsa-duo`. `app/together.js`: with a duo, the room is `duo:<room>` (main) and `duo:<room>:in` instead of the song's,
+  the site channel `duo:<room>:site` instead of `conduct:__site`; the leader conducts every song it opens by itself
+  (`gsa-conduct` set on load), the follower follows by itself (`gsa-follow` set on load, and kept when the leader
+  stops or isn't heard); `leader()` replaces "is a teacher" for sending. A bar at the top centre of every page (`.pt-duo`,
+  big type, a green / amber / red dot) says "Duo · Leading · the other tablet is following", "Duo · Following the
+  leader", "… waiting for …", or "Not connected: check the internet" (the room's channel status); a tap opens the duo
+  box: "I lead" / "I follow" (a `swap` message on the site channel makes the other tablet take the other role; both
+  reload) and Sign out. `/?duo` opens the duo sign-in; the teacher's box has "Duo logins" (list, make, New password,
+  Remove) and its sign-in has "Practising as a duo? Sign in here". The reader says "Tap to follow the leader" on its tap
+  card and "Duo practice: this tablet leads" on the About box's button. While following, a dropped connection doesn't
+  stop the music (it keeps time by itself, as for a class), but the bar turns red. Checked 2026-11-19 with two separate
+  headless browsers on the real project and a throwaway login (deleted after): sign-in, the follower going to the
+  leader's song, playing together within about 150 ticks through a count-in, Pause, tempo, each its own part, offline
+  and back without a reload, swapping. Two pages in one headless browser can't stand for two tablets there.
+- A device following the teacher has no count-in or metronome of its own (`applyMetro`, `startFollowing`): its
+  play-and-pause to wake the sound, with a count-in set, began the player's own count-in and left it stalled, its music
+  barely moving (found 2026-11-19 with "On + count-in" as the first-visit setting). The Claude-preview test's
+  "student keeps up" didn't catch it; the two-browser check did.
 - What the logs can tell (Janelle asked, 2026-11-13): Supabase keeps about a day of logs. `edge_logs` has a line for each
   page that connects (`/realtime/v1/websocket` with `eventsPerSecond=60` in the query: the website), with the browser
   and network, and each check of the teacher's sign-in (`/rest/v1/conduct_classes`, one per page she opens); `realtime_logs`

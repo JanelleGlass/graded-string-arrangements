@@ -32,6 +32,29 @@ same chords, for violin and viola in any pairing, at the same page, on open stri
 teacher; one link gives the same duet on every device, each showing the part it plays. `tests/listening.py` checks the
 listening. `tests/sight_reading.py` checks 1,000 exercises per page and instrument against the rules, and the duets.
 
+## Duo practice (two tablets at home)
+
+Two people practising together at home, each on their own tablet: one leads (picks the piece, presses Play, sets the
+tempo, the bars and the count-in), the other follows, and each tablet shows its own part.
+
+How to set one up (the teacher, no code):
+
+1. On any song page, tap the title, then "Teacher? Sign in to conduct", and sign in with the studio account.
+2. Tap "Duo logins". Type a username (letters, numbers, dots or dashes, for example `practice-duo`) and a password of at
+   least 6 characters, and tap "Make duo login".
+3. Send the two people the username, the password and this link: https://graded-string-arrangements.vercel.app/?duo
+4. On each tablet they open the link once and sign in, ticking "This tablet leads" on one of them. From then on the
+   site opens connected: a bar at the top says "Duo · Leading" or "Duo · Following", and whether the other tablet is
+   there. The follower's tablet goes to whatever piece the leader opens; after it opens a piece, one tap on the screen
+   lets it play.
+5. To swap who leads, tap the bar and choose "I lead" or "I follow": the other tablet swaps too.
+
+"New password" (on the same Duo logins screen) gives a duo a new password and signs both tablets out; "Remove" ends it.
+
+A duo login is not a studio account and can't see anything in the studio app. It is a row in the Supabase table
+`gsa_duos` (a scrambled password and a secret room name), reached only through the `gsa-duo` function
+(`tools/supabase/gsa-duo/index.ts`). The tablets need the internet; the screens stay on while a duo is signed in.
+
 ## Adding a piece
 
 1. Put its 24-part score at `songs/<new-piece>/<new-piece>.xml`.
