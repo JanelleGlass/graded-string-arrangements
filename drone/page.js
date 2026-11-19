@@ -3,7 +3,8 @@
 // and the space bar starts and stops), and the drone's settings, all visible, each a tap-to-change button like the
 // reader's strip. A setting that doesn't apply is greyed out in its place, and a tap says why. The sound is drone.js.
 // Settings stay on the device (localStorage 'drone'); whether it is playing doesn't. The screen is kept awake while it
-// plays (Screen Wake Lock, where the browser has it), since a phone that locks may stop the sound.
+// plays (window.gsaKeepAwake in app/app.js: Screen Wake Lock, where the browser has it), since a phone that locks may
+// stop the sound.
 (() => {
   const D = window.Drone;
   const $ = (id) => document.getElementById(id);
@@ -21,23 +22,8 @@
     toast.t = setTimeout(() => { el.hidden = true; }, t);
   }
 
-  // ---- Keeping the screen awake while it plays ----
-  let lock = null;
-  async function wake(on) {
-    try {
-      if (on && !lock && navigator.wakeLock && document.visibilityState === 'visible') {
-        lock = await navigator.wakeLock.request('screen');
-        lock.addEventListener('release', () => { lock = null; });
-      } else if (!on && lock) {
-        const l = lock;
-        lock = null;
-        await l.release();
-      }
-    } catch { lock = null; }
-  }
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && drone.state().playing) wake(true);
-  });
+  // ---- Keeping the screen awake while it plays: the app layer's (it asks again when the page shows, or on a tap) ----
+  const wake = (on) => { if (window.gsaKeepAwake) window.gsaKeepAwake('drone', on); };
 
   // ---- Start / Stop, the keys, Previous and Next ----
   function start() { drone.start(); wake(true); }
@@ -166,5 +152,5 @@
   render();
 
   // For the tests (tests/smoke.py).
-  window.drone = { state: () => ({ ...drone.state(), wake: !!lock }), drone };
+  window.drone = { state: () => drone.state(), drone };
 })();

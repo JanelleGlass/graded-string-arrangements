@@ -1564,6 +1564,8 @@ async def home_checks(browser, base):
     for s in SONGS:
         check(f"songs/{s['slug']}/" in links, f"card for {s['title']}")
     check(len(links) == len(SONGS), f'{len(links)} cards for {len(SONGS)} songs')
+    quiet = await pg.evaluate("() => [...document.querySelectorAll('footer a.quiet-link')].map(a => a.getAttribute('href'))")
+    check(quiet == ['sight-reading/', 'drone/'], f'the quiet pills at the bottom open sight-reading and the drone ({quiet})')
     # The cards sit in sections (Christmas, Hymns, Other), each under its heading, in the build's order.
     under = await pg.evaluate("""() => Object.fromEntries([...document.querySelectorAll('a.song')].map(a =>
       [a.getAttribute('href'), a.closest('section')?.querySelector('h2')?.textContent || '']))""")
