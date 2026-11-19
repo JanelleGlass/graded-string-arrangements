@@ -440,6 +440,14 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
 - iPhone: `navigator.audioSession.type = 'playback'` lets the music play with the ringer switch off
   (iOS 17 and later). Older iPhones stay silent on mute; there's nothing more to do there without a
   native app.
+- Screen stays on (Janelle, 2026-11-19: students' screens went dark in group class): `app/app.js` holds a Screen
+  Wake Lock through `window.gsaKeepAwake(why, on)` while any reason is on, asks again when the page shows and on the
+  next tap (Safari can refuse without one), and lets go when none is left. The reader's only hook is `keepAwake()`
+  (guarded, like `window.playTogether`; the Claude preview has no `gsaKeepAwake` and skips it): on while the music
+  plays, while this device conducts or follows, or waits to follow from song to song, and a minute more after the
+  music stops. The home page (`app/together.js`, `homeUi`) asks while the teacher conducts there or a student waits
+  for her song. Works in Chrome and Android (84+) and Safari 16.4+; in an iPhone home-screen app only from iOS 18.4
+  (older ones sleep as before: Settings, Display & Brightness, Auto-Lock).
 - App icon: the white note on teal (`assets/icon-*.png`, `assets/apple-touch-icon.png`), the same as
   the browser-tab icon. Janelle chose it over a design with the open strings in their colors (2026-10-16).
 - `sw.js` lists every song page's fingerprint. When sessions commit separately, whoever commits second
@@ -494,7 +502,13 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   fingerings of its own there ("4" and "i", or the wider "m" with an arrow), which keeps room before the note; they
   are never shown (placeFingers hides them) and the number goes in their place. Paper has less of that room than the
   screen, so it is checked again for paper and undone after printing. Not on a phone's screen: the fingerings make
-  the line a little taller and a phone fits its line to the screen's height, so the music shrank a step for one look. Finger numbers and note names show on every note (no "first time
+  the line a little taller and a phone fits its line to the screen's height, so the music shrank a step for one look.
+  On a phone (2026-11-18, Janelle: finger numbers overlapping in Silent Night; "14" and a 4 read as 144, "↓1" sat on
+  the bar line) the note's spring gets the room instead (`fitStartRoom`, `startRoomFor`): the same check after
+  drawing, then alphaTab's `preBeatWidth` on that note's spring (the room it keeps for a sharp or flat) grows by the
+  overlap, in the music's own units, through the same replaced spacing method as Even spacing below (`springHook`,
+  installed with the ball off too), and the music is drawn again, at most three times. It changes no heights, so the
+  music keeps its size: checked on every Silent Night part, both keys, phone sideways and upright. Finger numbers and note names show on every note (no "first time
   only"). The music stays the same size for all six looks, Plain notes too. Phones start on
   "Note names and fingers", laptops on "Fingers inside" (note names kept separately for each).
   Each look's little note head and words sit together in the middle of the button (black head for
@@ -669,7 +683,12 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   with finger numbers beside the notes, so the next note's number clears a short note's flag, else 1.2 (Janelle,
   2026-11-12: a number sat against an eighth note's flag in The Butterfly; 1.3 everywhere was then a little too wide,
   1.25 / 1.1 a tiny bit too narrow); alphaTab still keeps every note clear of
-  the next. If alphaTab changes and the method isn't found, the music is simply spaced as before.
+  the next. If alphaTab changes and the method isn't found, the music is simply spaced as before. With finger numbers
+  beside the notes no note gets less room than an eighth (`evenFloor`), and a note followed by a ↑ or ↓ arrow no less
+  than a dotted eighth (`arrowNext`; Janelle, 2026-11-18: in Silent Night's "Si-lent night", dotted eighth, sixteenth,
+  eighth, the sixteenth had half an eighth's room and the next note's 0 sat on it; 201 numbers across its parts on a
+  phone ran into a note, none with the ball off). So a sixteenth looks as long as an eighth there; longer notes keep
+  their proportions.
   Big beats when fast (Janelle, 2026-11-10): when the counts come faster than 150 a minute at the speed being played
   (back below 130), the ball on the beat bounces only on the big beats, skimming over the notes between: a dotted quarter in 6/8,
   9/8 and 12/8, the whole bar in 3/4 and 2/4, a half note in 4/4 (`bigBeat`); other time signatures keep their counts.
