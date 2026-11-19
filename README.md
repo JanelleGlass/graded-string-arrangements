@@ -32,6 +32,14 @@ same chords, for violin and viola in any pairing, at the same page, on open stri
 teacher; one link gives the same duet on every device, each showing the part it plays. `tests/listening.py` checks the
 listening. `tests/sight_reading.py` checks 1,000 exercises per page and instrument against the rules, and the duets.
 
+## Drone (a quiet link for now)
+
+`drone/` is a drone to tune scales to: twelve keys round the circle of fifths, each major with its relative minor, the
+tonic, tonic and fifth, or the triad, in pure or piano tuning, A = 438 to 445, three octaves and three sounds. The
+sound is made in the browser (`drone/drone.js`, no recordings), so it works offline; a Bluetooth page-turn pedal or the
+arrow keys step through the keys. Linked only by a small "Tuning drone →" pill at the bottom of the home page. It is round 1 of scale studies for violin and viola, which will play with it.
+`tests/drone.py` checks the tuning and the sound.
+
 ## Adding a piece
 
 1. Put its 24-part score at `songs/<new-piece>/<new-piece>.xml`.

@@ -16,6 +16,8 @@ Writes
                                needs, each with a fingerprint, so a change reaches copies already on phones
   sight-reading/index.html     the sight-reading page (unlisted): the reader with music made by
                                sight-reading/generator.js for the book pages in sight-reading/pages.json
+  drone/index.html             the Drone page (unlisted), from tools/drone_template.html: drone/drone.js makes the
+                               sound, drone/page.js is the page
 
 The app layer (offline copy, install button, iPhone sound) lives in app/app.js and sw.js, apart from
 the reader. The home-screen app file is manifest.webmanifest, with its icons in assets/.
@@ -451,6 +453,30 @@ def sight_reading_page(reader, pages, app, revs):
     return HEAD.replace('../../', '../') + app + own + head + '\n</head>\n<body>\n' + b.lstrip('\n') + '\n</body>\n</html>\n'
 
 
+DRONE = 'drone'
+DRONE_FILES = ['drone.js', 'page.js', 'drone.css']  # served beside its page with their fingerprints in the address
+DRONE_TEMPLATE = ROOT / 'tools' / 'drone_template.html'
+DRONE_MANIFEST = ROOT / DRONE / 'manifest.webmanifest'  # its own home-screen icon, "Drone", opening straight to it
+
+
+def drone_page(app, revs):
+    """The Drone page (scale studies round 1): a held note or chord in any key, round the circle of fifths, made in the
+    browser (drone/drone.js). Unlisted: no home-page card, and noindex. It links its own manifest, so Add to Home
+    Screen on /drone/ gives a "Drone" icon that opens straight to it."""
+    page = DRONE_TEMPLATE.read_text(encoding='utf-8')
+    for k, f in [('DRONE_JS', 'drone.js'), ('PAGE_JS', 'page.js'), ('DRONE_CSS', 'drone.css')]:
+        if page.count('{{' + k + '}}') != 1:
+            fail(f'tools/drone_template.html: expected one {{{{{k}}}}}')
+        page = page.replace('{{' + k + '}}', revs[f])
+    head = HEAD.replace('../../', '../')
+    for old, new in [('<link rel="manifest" href="../manifest.webmanifest">', '<link rel="manifest" href="manifest.webmanifest">'),
+                     ('<meta name="apple-mobile-web-app-title" content="Graded Strings">', '<meta name="apple-mobile-web-app-title" content="Drone">')]:
+        if head.count(old) != 1:
+            fail(f'tools/build_site.py: HEAD changed; drone_page() looks for {old!r}')
+        head = head.replace(old, new)
+    return head + app + page
+
+
 def section_id(name):
     """A section's short name for the page address ("Hymns" -> "hymns", as in .../#hymns)."""
     return re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
@@ -563,6 +589,27 @@ def main():
     (ROOT / SIGHT / 'flash' / 'index.html').write_text(flash, encoding='utf-8', newline='\n')
     offline[f'{SIGHT}/flash/'] = fingerprint(flash)
     print(f"  {SIGHT}: {len(pages)} book page(s) ({', '.join(p['id'] for p in pages)}), unlisted")
+
+    # The Drone (unlisted): its page, files and home-screen manifest, offline too.
+    for f in [*DRONE_FILES, 'manifest.webmanifest']:
+        if not (ROOT / DRONE / f).exists():
+            fail(f'missing {DRONE}/{f}')
+    try:
+        drone_manifest = json.loads(DRONE_MANIFEST.read_text(encoding='utf-8'))
+    except ValueError as e:
+        fail(f'{DRONE}/manifest.webmanifest is not valid JSON: {e}')
+    for icon in drone_manifest.get('icons', []):
+        src = icon['src'].removeprefix('../')
+        if src not in APP_FILES:
+            fail(f"{DRONE}/manifest.webmanifest lists {icon['src']}; it should be one of the site's icons in APP_FILES")
+    drone_revs = {f: fingerprint(ROOT / DRONE / f) for f in DRONE_FILES}
+    page = drone_page(app_script('../', app_rev), drone_revs)
+    (ROOT / DRONE / 'index.html').write_text(page, encoding='utf-8', newline='\n')
+    offline[f'{DRONE}/'] = fingerprint(page)
+    for f in DRONE_FILES:
+        offline[f'{DRONE}/{f}?v={drone_revs[f]}'] = drone_revs[f]
+    offline[f'{DRONE}/manifest.webmanifest'] = fingerprint(DRONE_MANIFEST)
+    print(f'  {DRONE}: the Drone page, unlisted')
 
     home = (ROOT / 'index.html').read_text(encoding='utf-8')
     a, z = '<!-- songs:start', '  <!-- songs:end -->'

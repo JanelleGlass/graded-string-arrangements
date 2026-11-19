@@ -79,10 +79,19 @@ What it checks
      (tests/listen_takes.js) it asks for the timing check first and keeps its answer, marks a round played as written
      with a tick on every note and "Every note right", marks a wrong note with a cross and a late one "late", and is
      still on after a reload.
+  2c. The Drone page (unlisted), at laptop, iPad (upright and sideways) and phone sizes (upright, sideways, iPhone SE
+     sideways): every key, Start, Previous, Next and setting on the screen with nothing sideways; no sound before a tap;
+     Start plays and keeps the screen awake; tapping a key changes to it. On the laptop: Next and Previous, and a pedal's
+     keys (arrows, Page Down / Page Up), step round the circle and wrap; the space bar starts and stops (on a focused
+     button too, without pressing it); stopped, the sound rests and Next stays stopped; a key tapped while stopped starts
+     it; each setting steps through its choices at one width; with Tonic, Tuning and Voicing are greyed out and a tap says
+     why; A stops at 445; the settings are kept after a reload, which waits for a tap. (tests/drone.py checks the tuning
+     and the sound itself.)
   3. The Claude preview version (reader/reader.html) with a fake two-person room:
      the teacher conducts, a student follows, and the student's music keeps up with the teacher's.
-  4. The app layer: the browser can install the site, every file is saved after one visit, every song (and the
-     sight-reading page, New exercise too) opens and plays with the server stopped and the network off, and an update reaches the saved
+  4. The app layer: the browser can install the site (and the Drone on its own), every file is saved after one visit,
+     every song (and the sight-reading page, New exercise too, and the Drone) opens and plays with the server stopped and
+     the network off, and an update reaches the saved
      copy without downloading the unchanged files (the string sounds) again.
 
 Offline options (only needed where the internet is filtered):
@@ -1263,6 +1272,135 @@ async def listen_checks(browser, base):
     await ctx.close()
 
 
+# The Drone page: the screen wake lock, stood in for (headless Chromium refuses the real one), so the test can see it
+# asked for on Start and let go on Stop.
+WAKE_STUB = '''(() => { window.__wake = { asked: 0, held: 0 };
+  Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: { request: async () => {
+    __wake.asked++; __wake.held++; const s = new EventTarget(); let gone = false;
+    s.release = async () => { if (gone) return; gone = true; __wake.held--; s.dispatchEvent(new Event('release')); }; return s; } } }); })();'''
+# Every key, Start, Previous, Next and setting inside the window, and nothing wider than it.
+DRONE_FIT_JS = '''() => {
+  const els = [...document.querySelectorAll('.dr-key, .dr-opt, #start, #prev, #next')];
+  const out = els.filter(el => { const b = el.getBoundingClientRect(); return b.width === 0 || b.left < -0.5 || b.top < -0.5 || b.right > innerWidth + 0.5 || b.bottom > innerHeight + 0.5; });
+  return { n: els.length, out: out.map(el => el.dataset.key || el.dataset.set || el.id || el.className), wide: document.documentElement.scrollWidth - innerWidth };
+}'''
+DRONE_STATE = '() => { const s = drone.state(); return { playing: s.playing, key: s.key, ctx: s.ctx, level: s.level, s: s.settings, wake: __wake } }'
+
+
+async def drone_checks(browser, base):
+    """The Drone page (/drone/, unlisted): keys round the circle, Start / Stop, Previous / Next, a pedal's keys, the
+    settings greyed out where they don't apply, kept after a reload."""
+    print('Drone page')
+    sizes = [('laptop', 1366, 860), ('iPad upright', 820, 1180), ('iPad sideways', 1180, 820), ('phone upright', 390, 844),
+             ('phone landscape', 844, 390), ('iPhone SE landscape', 667, 375)]
+    for label, w, h in sizes:
+        ctx = await browser.new_context(device_scale_factor=1, viewport={'width': w, 'height': h}, has_touch=w < 1300)
+        await setup(ctx)
+        await ctx.add_init_script(WAKE_STUB)
+        errors = []
+        pg = await ctx.new_page()
+        pg.on('pageerror', lambda e: errors.append(str(e)))
+        ck = lambda ok, what: check(ok, f'Drone, {label}: {what}')
+        try:
+            await pg.goto(f'{base}/drone/')
+            await pg.wait_for_function('() => window.drone', timeout=30000)
+            fit = await pg.evaluate(DRONE_FIT_JS)
+            ck(fit['n'] == 24 + 7 + 3 and not fit['out'] and fit['wide'] <= 0,
+               f"the 24 keys, Start, Previous, Next and the settings are all on the screen, nothing sideways ({fit})")
+            st = await pg.evaluate(DRONE_STATE)
+            ck(st['ctx'] == 'none' and not st['playing'], 'no sound before a tap')
+            await pg.click('#start')
+            await pg.wait_for_function('() => drone.state().ctx === "running" && drone.state().level > 0.02', timeout=10000)
+            st = await pg.evaluate(DRONE_STATE)
+            ck(st['playing'] and st['key'] == 'C' and st['wake']['held'] == 1, 'Start plays C major and keeps the screen awake')
+            await pg.click('[data-key="Em"]')
+            await pg.wait_for_timeout(100)
+            ck((await pg.evaluate(DRONE_STATE))['key'] == 'Em', 'tapping E minor changes to it')
+            if label != 'laptop':
+                await pg.click('#start')
+                await pg.wait_for_function('() => drone.state().level < 0.0005', timeout=5000)
+                ck(not (await pg.evaluate(DRONE_STATE))['playing'], 'Stop fades to silence')
+                await ctx.close()
+                ck(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
+                continue
+
+            # The rest on the laptop: Previous and Next, a pedal's keys, the settings, a reload.
+            order = []
+            for sel in ['#next', '#next', '#prev']:
+                await pg.click(sel)
+                order.append((await pg.evaluate(DRONE_STATE))['key'])
+            ck(order == ['D', 'Bm', 'D'], f'Next and Previous step round the circle: E minor, D, B minor, D ({order})')
+            order = []
+            for key in ['ArrowRight', 'PageDown', 'ArrowDown', 'ArrowLeft', 'PageUp', 'ArrowUp']:
+                await pg.keyboard.press(key)
+                order.append((await pg.evaluate(DRONE_STATE))['key'])
+            ck(order == ['Bm', 'A', 'F#m', 'A', 'Bm', 'D'], f'a pedal (arrows, Page Down / Page Up) steps the same way ({order})')
+            await pg.focus('#next')  # the space bar on a button: starts or stops, and doesn't press the button too
+            await pg.keyboard.press('Space')
+            await pg.wait_for_timeout(150)
+            st = await pg.evaluate(DRONE_STATE)
+            ck(not st['playing'] and st['key'] == 'D' and st['wake']['held'] == 0, 'the space bar stops it (once, with Next not pressed), and lets the screen sleep')
+            await pg.wait_for_function('() => drone.state().level < 0.0005', timeout=5000)
+            await pg.wait_for_timeout(500)
+            ck((await pg.evaluate(DRONE_STATE))['ctx'] == 'suspended', 'stopped, the sound rests after its fade')
+            await pg.keyboard.press('ArrowRight')
+            st = await pg.evaluate(DRONE_STATE)
+            ck(st['key'] == 'Bm' and not st['playing'], 'Next while stopped changes key and stays stopped')
+            await pg.keyboard.press('Space')
+            await pg.wait_for_function('() => drone.state().ctx === "running" && drone.state().level > 0.02', timeout=10000)
+            ck((await pg.evaluate(DRONE_STATE))['playing'], 'the space bar starts it again')
+            await pg.click('[data-key="Dm"]')
+            await pg.click('#next')
+            ck((await pg.evaluate(DRONE_STATE))['key'] == 'C', 'Next from D minor wraps round to C')
+            await pg.click('#prev')
+            ck((await pg.evaluate(DRONE_STATE))['key'] == 'Dm', 'Previous from C wraps back to D minor')
+            await pg.click('#start')
+            await pg.click('[data-key="G"]')
+            st = await pg.evaluate(DRONE_STATE)
+            ck(st['playing'] and st['key'] == 'G', 'tapping a key while stopped starts it in that key')
+
+            # The settings: each a button stepping through its choices; Tuning and Voicing greyed out where they do nothing.
+            opt = lambda k: f'.dr-opt[data-set="{k}"]'
+            shown = lambda k: pg.evaluate(f'() => document.querySelector(\'{opt(k)} .dr-swap span.on\').textContent')
+            widths = []
+            for _ in range(3):
+                widths.append(await pg.evaluate(f"() => document.querySelector('{opt('notes')}').getBoundingClientRect().width"))
+                await pg.click(opt('notes'))
+            ck(len(set(widths)) == 1, f'Notes keeps one width whatever it says ({widths})')
+            ck(await shown('notes') == 'Triad', 'Notes steps Triad, Tonic, Tonic + 5th and back to Triad')
+            await pg.click(opt('notes'))  # Tonic
+            st = await pg.evaluate(DRONE_STATE)
+            grey = await pg.evaluate("() => ['tuning', 'voicing', 'sound'].map(k => document.querySelector(`.dr-opt[data-set=\"${k}\"]`).classList.contains('off'))")
+            ck(st['s']['notes'] == 'tonic' and grey == [True, True, False], f'Tonic: Tuning and Voicing greyed out in their places, Sound not ({grey})')
+            await pg.click(opt('tuning'), force=True)  # greyed out (aria-disabled), which Playwright won't press by itself; a finger can
+            toast = await pg.text_content('#toast')
+            ck((await pg.evaluate(DRONE_STATE))['s']['tuning'] == 'pure' and 'same' in toast, f'a tap on greyed-out Tuning says why and changes nothing ("{toast}")')
+            await pg.click(opt('notes'))  # Tonic + 5th
+            await pg.click(opt('tuning'))
+            await pg.click(opt('sound'))
+            await pg.click(opt('octave'))
+            for _ in range(3):
+                await pg.click('#aUp')
+            for _ in range(10):
+                await pg.click('#aUp', force=True)  # stops at 445 (greyed out there: a tap says it's the highest)
+            toast = await pg.text_content('#toast')
+            ck('445 is the highest' in toast, f'+ at A = 445 says it is the highest ("{toast}")')
+            await pg.evaluate("() => { const v = document.getElementById('vol'); v.value = 35; v.dispatchEvent(new Event('input', { bubbles: true })); }")
+            st = await pg.evaluate(DRONE_STATE)
+            want = {'key': 'G', 'notes': 'fifth', 'tuning': 'piano', 'a': 445, 'octave': 'high', 'voicing': 'open', 'sound': 'organ', 'volume': 0.35}
+            ck(st['s'] == want, f'the settings change as tapped, A stopping at 445 ({st["s"]})')
+            ck((await pg.text_content('#keyNotes')) == 'G · D', 'the notes sounding are named under the key (G · D)')
+            await pg.reload()
+            await pg.wait_for_function('() => window.drone', timeout=30000)
+            st = await pg.evaluate(DRONE_STATE)
+            ck(st['s'] == want and not st['playing'] and st['ctx'] == 'none', 'after a reload the settings are kept, and it waits for a tap')
+            ck(await shown('sound') == 'Organ' and await pg.text_content('#aVal') == '445', 'and the buttons show them')
+        except Exception as e:
+            check(False, f'Drone, {label}: page works ({e.__class__.__name__}: {str(e)[:200]})')
+        ck(not errors, 'no script errors' + (f': {errors[:3]}' if errors else ''))
+        await ctx.close()
+
+
 async def sheets_printed(pg):
     pdf = await pg.pdf(format='Letter', prefer_css_page_size=True, print_background=True)
     return len(re.findall(rb'/Type\s*/Page(?![a-zA-Z])', pdf))
@@ -1426,6 +1564,8 @@ async def home_checks(browser, base):
     for s in SONGS:
         check(f"songs/{s['slug']}/" in links, f"card for {s['title']}")
     check(len(links) == len(SONGS), f'{len(links)} cards for {len(SONGS)} songs')
+    quiet = await pg.evaluate("() => [...document.querySelectorAll('footer a.quiet-link')].map(a => a.getAttribute('href'))")
+    check(quiet == ['sight-reading/', 'drone/'], f'the quiet pills at the bottom open sight-reading and the drone ({quiet})')
     # The cards sit in sections (Christmas, Hymns, Other), each under its heading, in the build's order.
     under = await pg.evaluate("""() => Object.fromEntries([...document.querySelectorAll('a.song')].map(a =>
       [a.getAttribute('href'), a.closest('section')?.querySelector('h2')?.textContent || '']))""")
@@ -1561,6 +1701,12 @@ async def app_checks(browser):
     if saved:
         missing = await pg.evaluate(MISSING_JS)
         check(not missing, 'every file in sw.js is saved' + (f' (missing {missing})' if missing else ''))
+        dp = await ctx.new_page()
+        await dp.goto(base + '/drone/')
+        await dp.wait_for_function('() => window.drone', timeout=30000)
+        blockers = (await (await ctx.new_cdp_session(dp)).send('Page.getInstallabilityErrors')).get('installabilityErrors', [])
+        check(not blockers, 'the browser offers to install the Drone as an app of its own' + (f': {blockers}' if blockers else ''))
+        await dp.close()
 
         # A new version where one song page changed: only that page is fetched again, the string sounds stay.
         sw = (ROOT / 'sw.js').read_text(encoding='utf-8')
@@ -1625,6 +1771,16 @@ async def app_checks(browser):
         await fp.close()
     except Exception as e:
         check(False, f'offline: Flash a bar opens ({e.__class__.__name__})')
+    try:
+        dp = await ctx.new_page()
+        await dp.goto(f'{base}/drone/')
+        await dp.wait_for_function('() => window.drone', timeout=30000)
+        await dp.click('[data-key="Bbm"]')
+        await dp.wait_for_function('() => drone.state().playing && drone.state().level > 0.02', timeout=10000)
+        check(True, 'offline: the Drone page opens, and a tap on B-flat minor plays it')
+        await dp.close()
+    except Exception as e:
+        check(False, f'offline: the Drone page opens and plays ({e.__class__.__name__})')
     stray = await ctx.new_page()
     try:
         await stray.goto(base + '/songs/not-saved/')
@@ -1921,6 +2077,7 @@ async def main():
         await duet_checks(browser, base)
         await flash_checks(browser, base)
         await listen_checks(browser, base)
+        await drone_checks(browser, base)
         await print_checks(browser, base)
         await extras_checks(browser, base)
         await piano_checks(browser, base)
