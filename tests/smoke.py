@@ -334,10 +334,14 @@ async def song_checks(browser, base):
             await pg.wait_for_function("() => !document.getElementById('sheet').classList.contains('counts-off')", timeout=10000)
             check(off and on and off_again, f'{label}: the Counting button in the strip hides and shows the counts')
             await pg.wait_for_timeout(1000)
-            # The bouncing ball: above the part, on the beat at first; its button in the strip steps to the rhythm, off,
-            # and the beat again.
+            # The bouncing ball: above the part, on Rhythm + beats at first (since 2026-11-19); its button in the strip
+            # steps off, then the beat, the rhythm and both again. From off on, the checks below run as before.
             fingers = "() => document.querySelectorAll('#sheet .pointer').length"
             said = "() => document.getElementById('g-point').title"
+            first_ball = await pg.evaluate(said)
+            check('rhythm and the beat' in first_ball, f'{label}: the ball starts on Rhythm + beats ("{first_ball}")')
+            await pg.click('#g-point'); await pg.wait_for_timeout(1500)  # off
+            await pg.click('#g-point'); await pg.wait_for_timeout(1500)  # the beat
             had, by = await pg.evaluate(fingers), await pg.evaluate(said)
             await pg.click('#g-point'); await pg.wait_for_timeout(1500)
             rhythm, by2 = await pg.evaluate(fingers), await pg.evaluate(said)
