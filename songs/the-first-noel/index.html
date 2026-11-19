@@ -1202,7 +1202,8 @@ body.following .host-only { display: none !important; }
     // A device following the teacher never clicks (Janelle, 2026-11-19, with the metronome now on from the start): its
     // sound is off anyway (startFollowing), and this keeps it so whatever its own button says.
     api.metronomeVolume = clicksSet() && !conductor.following ? 1 : 0;
-    api.countInVolume = countInSet() ? 1 : 0;
+    // Its count-in too: while following, the teacher's commands say when to count in (startAt).
+    api.countInVolume = countInSet() && !conductor.following ? 1 : 0;
     if (!countInSet() && counting) endCountIn();
     applyLoopMode();
   }
@@ -2442,7 +2443,7 @@ body.following .host-only { display: none !important; }
       card.id = 'wakeCard'; card.type = 'button'; card.className = 'wake-card';
       document.body.append(card);
     }
-    card.textContent = 'Tap to follow your teacher';
+    card.textContent = conductor.site && conductor.site.duo && conductor.site.duo() ? 'Tap to follow the leader' : 'Tap to follow your teacher';
     card.hidden = false;
   }
   function wakeAudio() {
@@ -2465,7 +2466,10 @@ body.following .host-only { display: none !important; }
     conductor.following = true;
     conductor.offset = 0; conductor.bestRtt = Infinity; conductor.pongs = 0; conductor.synced = false; conductor.pings.clear(); conductor.seenVer = -1;
     // Sound stays on the conductor's device only.
-    conductor.volume = api.masterVolume; api.masterVolume = 0; api.metronomeVolume = 0;
+    // No clicks and no count-in of its own: the play-and-pause below (to wake the sound) with a count-in set began the
+    // player's own count-in, which left it stalled, its music barely moving while the teacher's played (found
+    // 2026-11-19 with "On + count-in" as the first-visit setting; a student who chose a count-in had it before).
+    conductor.volume = api.masterVolume; api.masterVolume = 0; api.metronomeVolume = 0; api.countInVolume = 0;
     // Wake this device's audio while we have the tap, so a start later on isn't blocked.
     const keep = api.tickPosition; api.play(); api.pause(); api.tickPosition = keep;
     followerControls(true);
@@ -2526,7 +2530,9 @@ body.following .host-only { display: none !important; }
       : away && !other ? 'Follow the teacher' + (away.title ? ': your screen goes to ' + away.title : '')
       : 'Follow the teacher: start, stop and tempo come from the teacher; sound is off on this device';
     $('teachLine').hidden = !site;
-    if (site) $('teachBtn').textContent = canLead && conductor.room ? 'Conducting: you’re signed in as the teacher' : 'Teacher? Sign in to conduct';
+    const duo = site && site.duo && site.duo(); // duo practice (app/together.js): two tablets, one leads
+    if (site) $('teachBtn').textContent = duo ? 'Duo practice: ' + (duo.role === 'lead' ? 'this tablet leads' : 'this tablet follows') + ' (swap or sign out)'
+      : canLead && conductor.room ? 'Conducting: you’re signed in as the teacher' : 'Teacher? Sign in to conduct';
     setDockH();
     keepAwake();
   }
