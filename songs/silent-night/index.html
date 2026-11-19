@@ -1141,7 +1141,7 @@ body.following .host-only { display: none !important; }
   // A button's labels, all in one spot (the button is as wide as the longest), with the current one showing.
   const stackBadge = (labels, now) => '<span class="cyc-badge stack">' + labels.map(t => '<span' + (t === now ? ' class="now"' : '') + '>' + t + '</span>').join('') + '</span>';
   // The ball and its switch's icon: a teal ball after its bounces, dotted: two even ones for the beat, a long one and
-  // two short ones for the rhythm, a long one and two tiny ones on the spot for the rhythm and the beat (grey and
+  // two short ones for the rhythm, a long one and two low ones for the rhythm and the beat (grey and
   // crossed out when off).
   const pointIco = (on, by) => { const c = on ? '#1D5B72' : '#8A948F';
     const hops = on && by === 'rhythm' ? 'M1 21C1 4.5 9 4.5 9 21C9 14.5 12 14.5 12 21C12 15 15 15 15 20'
@@ -3977,8 +3977,8 @@ body.following .host-only { display: none !important; }
       const fine = state.ballBy === 'rhythm' ? notes : state.ballBy === 'both' ? merge(counts) : [first, ...counts.filter(inside)];
       const big = state.ballBy === 'both' ? merge(bigTicks()) : [first, ...bigTicks().filter(inside)];
       // How many times it lands from each note to the next (roomForBounces gives the bar room for them). The rhythm and
-      // the beat travel only from note to note (a count inside a note is a hop on the spot), so they need the rhythm's.
-      const travel = state.ballBy === 'both' ? notes : fine;
+      // the beat travel forward on every count too, as on the beat, so they need the same room.
+      const travel = fine;
       for (let k = 0, j = 0; k < stops.length; k++) {
         const a = stops[k].tick, b = stops[k + 1] ? stops[k + 1].tick : stops[k].end;
         while (j < travel.length && travel[j] < a - 1) j++;
@@ -4270,13 +4270,6 @@ body.following .host-only { display: none !important; }
     const tx = other ? cur.right - cur.space : nxt.x, ty = other ? cur.y : nxt.y;
     return { x: cur.x + (tx - cur.x) * f, y: cur.y + (ty - cur.y) * f, ceil: other ? cur.ceil : Math.max(cur.ceil, nxt.ceil), space: cur.space, sys: cur.sys, right: cur.right, rest: cur.rest, k: lo };
   }
-  // The rhythm and the beat: the note (or rest) sounding at this tick, where the ball sits until the next note.
-  function noteSpot(run, T) {
-    const s = run.stops;
-    let lo = 0, hi = s.length - 1;
-    while (lo < hi) { const m = (lo + hi + 1) >> 1; if (s[m].tick <= T + 1) lo = m; else hi = m - 1; }
-    return { ...s[lo], k: lo };
-  }
   function updatePointer(now) {
     if (!pointRuns.length) return;
     if (counting || now < heardAt) { ballClock = null; idlePointer(); return; }
@@ -4300,17 +4293,13 @@ body.following .host-only { display: none !important; }
       const a = L[i], b = i + 1 < L.length && L[i + 1] < end ? L[i + 1] : end;
       if (!(b > a)) { const sp = ballSpot(run, a); putPointer(run, sp.x, sp.y, sp.rest); continue; }
       const p = Math.max(0, Math.min(1, (t - a) / (b - a)));
-      const spot = state.ballBy === 'both' ? noteSpot : ballSpot;
-      const from = spot(run, a), to = b === end && toLoop ? spot(run, r.startTick) : spot(run, b);
+      const from = ballSpot(run, a), to = b === end && toLoop ? ballSpot(run, r.startTick) : ballSpot(run, b);
       const beats = (b - a) / 960; // this flight, in quarter notes
-      // The rhythm and the beat, a count inside a held note (or rest): a small hop on the spot, so "a new note" (a full
-      // flight to it) and "keep holding and count" look different (Janelle, 2026-11-19).
-      if (state.ballBy === 'both' && from.k === to.k && !(b === end && toLoop)) {
-        const room = from.y - ballD(from.space) - (from.ceil ?? -Infinity);
-        const h = Math.max(0, Math.min(from.space * 0.5, room));
-        putPointer(run, from.x, from.y - h * 4 * p * (1 - p), from.rest);
-        continue;
-      }
+      // The rhythm and the beat: a landing on a count inside a held note (or rest) is a low bounce, still moving forward
+      // through the note as on the beat; a landing on a new note is a full one, so "a new note" and "keep holding and
+      // count" look different (Janelle, 2026-11-19: first a hop on the spot, then "the ball still needs to move forward
+      // ... can they just be lower bounces").
+      const inside = state.ballBy === 'both' && !(b === end && toLoop) && b < end && Math.abs(run.stops[to.k].tick - b) > 1;
       if (to.sys !== from.sys) {
         if (p < 0.35) { // off the end of the line
           const q = p / 0.35, ex = from.right + from.space;
@@ -4323,7 +4312,8 @@ body.following .host-only { display: none !important; }
         continue;
       }
       const room = Math.min(from.y, to.y) - ballD(from.space) - Math.max(from.ceil ?? -Infinity, to.ceil ?? -Infinity);
-      const H = Math.max(from.space * 0.4, Math.min(from.space * (0.9 + 0.7 * Math.min(2, beats)), room));
+      const H = inside ? Math.max(0, Math.min(from.space * 0.5, room))
+        : Math.max(from.space * 0.4, Math.min(from.space * (0.9 + 0.7 * Math.min(2, beats)), room));
       const x = from.x + (to.x - from.x) * p, y = from.y + (to.y - from.y) * p - H * 4 * p * (1 - p);
       putPointer(run, x, y, p < 0.5 ? from.rest : to.rest);
     }

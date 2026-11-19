@@ -721,12 +721,14 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   widened bars (one bounce per note), so switching between the beat and the rhythm draws the music again too (the
   setting is part of the `bounceRoom` key). On by default, on the beat, saved (`pointer`: 'beat', 'rhythm', 'both' or 'off';
   'on', saved before 2026-11-12, is the beat). Rhythm + beats ('both'; Janelle, 2026-11-19: "bounces on every note of
-  the rhythm and also on every beat", so a long note is counted as a pulse inside it): the ball flies from note to note
-  as on the rhythm, and on each count inside a held note (or rest) it makes a small hop on the spot (half a staff space,
-  `noteSpot`), so a new note and "keep holding and count" look different; it needs the rhythm's room, not the beat's.
-  Fast, the hops inside notes come on the big beats only. Its switch is a round button in the strip, after Counting,
+  the rhythm and also on every beat", so a long note is counted as a pulse inside it): the ball lands on every note
+  and on every count, moving forward through a held note a share of the way per count as on the beat; a landing on a
+  count inside a held note (or rest) is a low bounce (half a staff space), a landing on a new note a full one, so a
+  new note and "keep holding and count" look different (it first hopped on the spot; Janelle, 2026-11-19: "the ball
+  still needs to move forward ... can they just be lower bounces"). It gets the beat's room. Fast, the counts inside
+  notes come on the big beats only. Its switch is a round button in the strip, after Counting,
   stepping Beat → Rhythm → Rhythm + beats → Off → Beat (the ball after its dotted bounces: two even ones for the beat, a
-  long one and two short ones for the rhythm, a long one and two tiny ones on the spot for both, teal; grey and crossed out when off; a tap shows a toast, "Bouncing ball on the beat (a bounce
+  long one and two short ones for the rhythm, a long one and two low ones for both, teal; grey and crossed out when off; a tap shows a toast, "Bouncing ball on the beat (a bounce
   on every count)"), on every screen, icon only so the strip keeps its width. It sat at the top right, left of Print,
   until Janelle moved it down (2026-11-10), where Follow now sits.
   Never printed.
