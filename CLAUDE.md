@@ -719,7 +719,7 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   The room per bounce was raised from about two ball widths to three (Janelle: the first bars got no more room). Switching the ball off or on draws the music again, so the bars go back to their own width without
   it. Pages lay out bars by alphaTab's rules (no `displayWidth`), so there the spacing is as always. The rhythm needs no
   widened bars (one bounce per note), so switching between the beat and the rhythm draws the music again too (the
-  setting is part of the `bounceRoom` key). On by default, on the beat, saved (`pointer`: 'beat', 'rhythm', 'both' or 'off';
+  setting is part of the `bounceRoom` key). On by default, on Rhythm + beats since 2026-11-19 (Janelle; on the beat before), saved (`pointer`: 'beat', 'rhythm', 'both' or 'off';
   'on', saved before 2026-11-12, is the beat). Rhythm + beats ('both'; Janelle, 2026-11-19: "bounces on every note of
   the rhythm and also on every beat", so a long note is counted as a pulse inside it): the ball lands on every note
   and on every count, moving forward through a held note a share of the way per count as on the beat; a landing on a

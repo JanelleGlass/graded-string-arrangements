@@ -963,8 +963,9 @@ body.following .host-only { display: none !important; }
     // The bouncing ball: on unless switched off (Janelle, 2026-11-05), bouncing on the beat (every count) or on the
     // rhythm (every note; Janelle, 2026-11-12). Saved as 'beat', 'rhythm' or 'off' ('on', from before, is the beat).
     pointer: saved.pointer !== 'off',
-    // Or both (Janelle, 2026-11-19): every note, and every count inside a held note as a small bounce on the spot.
-    ballBy: saved.pointer === 'rhythm' || saved.pointer === 'both' ? saved.pointer : 'beat',
+    // Or both (Janelle, 2026-11-19): every note, and every count inside a held note as a low bounce. A first visit
+    // starts on both (Janelle, 2026-11-19; it started on the beat).
+    ballBy: saved.pointer === 'beat' || saved.pointer === 'on' ? 'beat' : saved.pointer === 'rhythm' ? 'rhythm' : 'both',
     layout: saved.layout === 'page' ? 'page' : 'line',
     // Letter names inside the notes: off on a first visit, phones too (Janelle, 2026-11-19; phones started with them
     // on); each kind of screen keeps its own choice.
