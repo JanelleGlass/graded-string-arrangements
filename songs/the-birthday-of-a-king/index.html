@@ -4531,6 +4531,10 @@ body.following .host-only { display: none !important; }
   function fitToHeight() {
     if (zoomRender) { zoomRender = false; return false; }
     if (state.layout !== 'line' || !shortLand.matches || !api) return false;
+    // Not while printing: the screen goes back to the size it had (fitScale is kept). Measured as the screen came back,
+    // the band still held the paper's layout (twice the room), so the line shrank, grew and ran out of tries a step
+    // smaller (3.35 to 3.25 with Counting off, found 2026-11-19).
+    if (printing) return false;
     const band = musicBand();
     if (!band) return false;
     const lim = visibleRoom(), room = lim.bottom - lim.top - 6;

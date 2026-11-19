@@ -1074,6 +1074,8 @@ async def look_ahead_checks(browser, base):
         if pages:
             await pg.click('#g-layout'); await pg.wait_for_timeout(2000)
         await pg.evaluate("() => { const t = document.getElementById('tempo'); t.value = 90; t.dispatchEvent(new Event('input')); }")
+        while (await pg.text_content('#g-metro .now')) != 'Off':  # from no metronome (a first visit has On + count-in since 2026-11-19)
+            await pg.click('#g-metro')
         await pg.click('#g-ahead')
         got = await pg.evaluate("() => ({ label: document.getElementById('g-ahead').getAttribute('aria-label'), metro: document.querySelector('#g-metro .now').textContent, tempo: document.getElementById('tempoChip').textContent })")
         ck('level 1: each note vanishes half a beat' in got['label'] and got['metro'] == 'Count-in only' and got['tempo'] == '60',
@@ -1298,6 +1300,11 @@ async def print_checks(browser, base):
         rows = await pg.evaluate("() => new Set([...document.querySelectorAll('#fabRow .fab-btn, #fabRow .play')].filter(e => e.offsetParent).map(e => Math.round(e.getBoundingClientRect().top))).size")
         check(where and rows == 1, f'{label}: the Print button sits at the top beside the size buttons, and the strip stays one row ({rows} rows)')
         await pg.evaluate(PRINT_STUB_JS, False)
+        # Counting on, and on a laptop Fingers inside (a first visit has neither since 2026-11-19), so paper shows both.
+        await pg.click('#g-count'); await pg.wait_for_timeout(1500)
+        if label == 'laptop':
+            while (await pg.text_content('#g-look .now .word')) != 'Fingers inside':
+                await pg.click('#g-look'); await pg.wait_for_timeout(800)
         # A small phone's line settles on its size at the next drawing after the first (as it always has): draw it again
         # first (string colors round to where they were), so the size compared is the settled one.
         await pg.evaluate(DRAWS_JS)
@@ -1320,7 +1327,7 @@ async def print_checks(browser, base):
         after = await pg.evaluate(SCREEN_JS)
         check(after == before, f'{label}: then the music on the screen is just as it was (one long line, same size, same place: {before}, then {after})')
         if label == 'laptop':
-            # A laptop starts on Fingers inside; on paper the finger numbers go beside the notes, to the left (Janelle,
+            # On Fingers inside; on paper the finger numbers go beside the notes, to the left (Janelle,
             # 2026-10-30 and 2026-11-02).
             screen = await pg.evaluate('() => (' + FINGERS_JS + ")(document.getElementById('sheet'))")
             check(paper['fingers']['left'] > 0 and not paper['fingers']['inside'] and not paper['fingers']['right'] and screen['inside'] > 0,
