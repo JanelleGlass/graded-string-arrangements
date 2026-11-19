@@ -197,6 +197,22 @@ one goes missing.
   pressing Conduct ends following. Followers keep the teacher on `conduct:__site` whose `since` is latest. Checked with
   `SCENARIO=two node tests/together_sim.js`: before, after Conduct was pressed on the second iPad and it played, the
   student stood still the whole time; after, it moved over and kept up.
+- Class settings (Janelle's group-class notes, 2026-11-16, and her choices 2026-11-19: parts with assigning by seat,
+  what's on the notes, the bouncing ball): while conducting, a round lock button at the top of the music (left of Print)
+  opens "Class settings". Parts: "Each student chooses", "Everyone sees the parts on my page", or "By seat" (a list of
+  the seats students typed, each with a part or "Their own choice"). Ticks for "What's on the notes" (string colors, the
+  look, counting) and "Bouncing ball": ticked, every follower shows what the teacher's device shows. Each setting on its
+  own; anything not ticked stays each student's. The teacher's device sends a `class` message on the room (not through
+  `conductSend`: no `ver`, never `conductor.last`) on any change (`classChanged`, from `save()`), when someone starts
+  following, and every 4 s; a follower applies it (`applyClass`), keeps its own settings aside (`classOwn`, and `save()`
+  keeps those for anything held: `savedView`), greys out the held buttons in place (`data-class-lock`, Parts eyes dimmed;
+  a tap's toast: "Your teacher has set this for the class"), and goes back to its own when unlocked or when it stops
+  following (`releaseClass`). Parts travel by name as the Parts table has them ("Violin — Easy Melody", "Piano";
+  `partKey`; the score's own names are short, "Vln"), so a seat keeps its part on every song that has it. The teacher's
+  choices carry from song to song in her tab (sessionStorage `gsa-class`). By seat: a follower with no seat gets a small
+  card, "Your seat or stand number" (kept on the device, `localStorage` `gsa-seat`, sent in its presence; no names: the
+  repo is public), and its Follow button says "Following · Seat 3". Size of the music isn't lockable (Janelle left it
+  out). Checked with tests/mockroom.js, a teacher and two students on the Claude preview (scratchpad script, 2026-11-19).
 - What the logs can tell (Janelle asked, 2026-11-13): Supabase keeps about a day of logs. `edge_logs` has a line for each
   page that connects (`/realtime/v1/websocket` with `eventsPerSecond=60` in the query: the website), with the browser
   and network, and each check of the teacher's sign-in (`/rest/v1/conduct_classes`, one per page she opens); `realtime_logs`

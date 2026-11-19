@@ -177,7 +177,8 @@
     joined = true;
 
     function track() {
-      const want = JSON.stringify({ following: !!mine.following, lead: !!lead });
+      // A student's seat (or stand) number, so the teacher can give a seat its part (the reader's class settings).
+      const want = JSON.stringify({ following: !!mine.following, lead: !!lead, ...(mine.seat ? { seat: String(mine.seat).slice(0, 12) } : {}) });
       if (want === tracked) return Promise.resolve();
       tracked = want;
       return inn.track(JSON.parse(want));
