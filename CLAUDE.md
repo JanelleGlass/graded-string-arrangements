@@ -447,8 +447,10 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   overlap, in the music's own units, through the same replaced spacing method as Even spacing below (`springHook`,
   installed with the ball off too), and the music is drawn again, at most three times. It changes no heights, so the
   music keeps its size: checked on every Silent Night part, both keys, phone sideways and upright. Finger numbers and note names show on every note (no "first time
-  only"). The music stays the same size for all six looks, Plain notes too. Phones start on
-  "Note names and fingers", laptops on "Fingers inside" (note names kept separately for each).
+  only"). The music stays the same size for all six looks, Plain notes too. Every screen starts on
+  "Fingers to the left" (Janelle, 2026-11-19: finger numbers outside the notes, nothing inside; until then phones
+  started on "Note names and fingers" and laptops on "Fingers inside"); note names are kept separately for phones and
+  bigger screens.
   Each look's little note head and words sit together in the middle of the button (black head for
   Plain notes, blue otherwise).
   History (2026-10-16): the "On the page" panel became separate buttons, then Note Names, Fingers
@@ -560,7 +562,10 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   of the written tempo, so below that the reader halves (or quarters) the score's tempo marks and plays at a speed
   alphaTab allows on top (`playSpeed`, `tempoScale`; the numbers are never drawn, and everything that times the music
   reads the marks). The conductor sends the tempo as a share of the written one, not alphaTab's speed.
-- Metronome is one button that cycles Off → On → On with count-in → Count-in only.
+- Metronome is one button that cycles Off → On → On with count-in → Count-in only. A first visit starts on "On +
+  count-in" (Janelle, 2026-11-19; it started Off). A device following the teacher never clicks, whatever its own
+  button says (Janelle chose "stay silent", 2026-11-19): only the teacher's device sounds.
+- Counting starts off on a first visit (Janelle, 2026-11-19; it started on).
   A count-in before a pickup counts the missing beats of its bar ("1 2 3 1 2" before a one-beat pickup in 3/4). The player only counts whole beats and starts the music straight after, so a pickup shorter than a beat (the Wellerman's eighth in 4/4) came in on the beat, with an empty beat before it, and every click while playing fell on an "&" (Janelle heard the gap, 2026-11-03). The reader now puts an unseen half beat of silence in front of such a pickup (a MusicXML forward in each part's first bar, `padPickup`), laid out with no room, so it counts "1 2 3 4 1 2 3", the gap is 4 and the pickup lands on its "&". The counts and the start ring skip the gap. A count-in started anywhere in the first bar counts from the top of it, like any other bar.
 - Bouncing ball (Janelle, 2026-11-05/06: for young students who can't read rhythms yet and don't know when the next
   note comes): a small teal ball for each part on the page that lands right above each note head, following the shape
@@ -603,10 +608,14 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   The room per bounce was raised from about two ball widths to three (Janelle: the first bars got no more room). Switching the ball off or on draws the music again, so the bars go back to their own width without
   it. Pages lay out bars by alphaTab's rules (no `displayWidth`), so there the spacing is as always. The rhythm needs no
   widened bars (one bounce per note), so switching between the beat and the rhythm draws the music again too (the
-  setting is part of the `bounceRoom` key). On by default, on the beat, saved (`pointer`: 'beat', 'rhythm' or 'off';
-  'on', saved before 2026-11-12, is the beat). Its switch is a round button in the strip, after Counting, stepping
-  Beat → Rhythm → Off → Beat (the ball after its dotted bounces: two even ones for the beat, a long one and two short
-  ones for the rhythm, teal; grey and crossed out when off; a tap shows a toast, "Bouncing ball on the beat (a bounce
+  setting is part of the `bounceRoom` key). On by default, on the beat, saved (`pointer`: 'beat', 'rhythm', 'both' or 'off';
+  'on', saved before 2026-11-12, is the beat). Rhythm + beats ('both'; Janelle, 2026-11-19: "bounces on every note of
+  the rhythm and also on every beat", so a long note is counted as a pulse inside it): the ball flies from note to note
+  as on the rhythm, and on each count inside a held note (or rest) it makes a small hop on the spot (half a staff space,
+  `noteSpot`), so a new note and "keep holding and count" look different; it needs the rhythm's room, not the beat's.
+  Fast, the hops inside notes come on the big beats only. Its switch is a round button in the strip, after Counting,
+  stepping Beat → Rhythm → Rhythm + beats → Off → Beat (the ball after its dotted bounces: two even ones for the beat, a
+  long one and two short ones for the rhythm, a long one and two tiny ones on the spot for both, teal; grey and crossed out when off; a tap shows a toast, "Bouncing ball on the beat (a bounce
   on every count)"), on every screen, icon only so the strip keeps its width. It sat at the top right, left of Print,
   until Janelle moved it down (2026-11-10), where Follow now sits.
   Never printed.
@@ -703,6 +712,14 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   (no title) the Strings key moves over beside it (`--home-room`), so on an iPhone SE turned sideways with Parts open
   the key steps aside until the panel closes. It is `hidden` in the master reader (the Claude preview has no song list);
   the build shows it. Never printed.
+- The page itself never zooms (Janelle, 2026-11-19: a pinch beside the music zoomed the whole page and the buttons
+  went off the screen): song and sight-reading pages have `user-scalable=no` in the viewport (`HEAD` in
+  `tools/build_site.py`), `touch-action: pan-x pan-y` on the page, and stop Safari's gesture events and any two-finger
+  move (Safari ignores user-scalable=no). Only the music zooms, by pinch or − / +. The home page still zooms. A
+  computer's Ctrl + / − is left alone. Headless Chromium doesn't zoom the page on a synthesized pinch either way, so
+  this can only be checked on a real phone or iPad.
+- One size for every song on a device (`localStorage` `gsa-zoom`, Janelle, 2026-11-19: "lots of zooming in and out"
+  in class): the last − / + or pinch size, wherever it was set; a song's own saved size only until then.
 - Pinch to zoom on touch screens: two fingers on the music make it bigger or smaller, over a clef, key or time signature too (their explain buttons pass two-finger touches on to the music; they swallowed them until 2026-11-10). The music grows
   and shrinks under the fingers, then settles on the nearest − / + size. A second finger cancels a tap
   or a press-and-hold; the browser's own page zoom is kept off the music.

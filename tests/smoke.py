@@ -291,7 +291,7 @@ async def song_checks(browser, base):
                 await pg.click('#g-look'); await pg.wait_for_timeout(2200)
                 seen.append(await pg.evaluate(look_js))
             order = ['Fingers inside', 'Fingers to the left', 'Note names and fingers', 'Note names', 'Plain notes']
-            first = 0 if label == 'laptop' else 2
+            first = 1  # every screen starts on Fingers to the left (Janelle, 2026-11-19), and five taps come back to it
             want_looks = [order[(first + k) % 5] for k in range(6)]
             check([x['look'] for x in seen] == want_looks, f'{label}: the On the note button steps through the five looks ({[x["look"] for x in seen]})')
             drawn = {x['look']: (x['names'], x['fingers']) for x in seen}
@@ -306,21 +306,24 @@ async def song_checks(browser, base):
             check(all(abs(o) <= 1 for o in offs.values()), f'{label}: each look sits in the middle of the On the note button ({offs})')
             sizes = {x['look']: x['size'] for x in seen}
             check(len(set(sizes.values())) == 1, f'{label}: the music stays the same size for all five looks ({sizes})')
-            if label != 'laptop':
-                for _ in range(3): await pg.click('#g-look')  # back to where a phone starts
-                await pg.wait_for_timeout(1500)
+            # Counting starts off (Janelle, 2026-11-19); switched on, the counts come once the music is drawn again with
+            # their room, and the rest of this page's checks go on with them showing.
             said = (await pg.text_content('#g-count .now')).strip()
-            check(said == 'Counting: On', f'{label}: the Counting button says so in words ("{said}")')
-            await pg.click('#g-count')
+            check(said == 'Counting: Off', f'{label}: the Counting button says so in words ("{said}")')
             off = await pg.evaluate("() => document.getElementById('sheet').classList.contains('counts-off')")
-            await pg.wait_for_timeout(1500)
             await pg.click('#g-count')
-            try:  # the counts come back once the music is drawn again with their room
+            try:
                 await pg.wait_for_function("() => !document.getElementById('sheet').classList.contains('counts-off')", timeout=10000)
                 on = True
             except Exception:
                 on = False
-            check(off and on, f'{label}: the Counting button in the strip hides and shows the counts')
+            await pg.wait_for_timeout(1500)
+            await pg.click('#g-count')
+            off_again = await pg.evaluate("() => document.getElementById('sheet').classList.contains('counts-off')")
+            await pg.wait_for_timeout(1500)
+            await pg.click('#g-count')
+            await pg.wait_for_function("() => !document.getElementById('sheet').classList.contains('counts-off')", timeout=10000)
+            check(off and on and off_again, f'{label}: the Counting button in the strip hides and shows the counts')
             await pg.wait_for_timeout(1000)
             # The bouncing ball: above the part, on the beat at first; its button in the strip steps to the rhythm, off,
             # and the beat again.
@@ -329,12 +332,15 @@ async def song_checks(browser, base):
             had, by = await pg.evaluate(fingers), await pg.evaluate(said)
             await pg.click('#g-point'); await pg.wait_for_timeout(1500)
             rhythm, by2 = await pg.evaluate(fingers), await pg.evaluate(said)
+            await pg.click('#g-point'); await pg.wait_for_timeout(1500)  # the rhythm and the beat (Janelle, 2026-11-19)
+            both, by4 = await pg.evaluate(fingers), await pg.evaluate(said)
             await pg.click('#g-point'); await pg.wait_for_timeout(300)
             gone = await pg.evaluate(fingers)
             await pg.click('#g-point'); await pg.wait_for_timeout(300)
             back_on, by3 = await pg.evaluate(fingers), await pg.evaluate(said)
-            check(had > 0 and 'beat' in by and rhythm == had and 'rhythm' in by2 and gone == 0 and back_on == had and 'beat' in by3,
-                  f'{label}: the bouncing ball button steps through the beat, the rhythm and off ({had} "{by}", {rhythm} "{by2}", off {gone}, {back_on} "{by3}")')
+            check(had > 0 and 'beat' in by and rhythm == had and by2.endswith('(a bounce on every note)') and both == had and 'rhythm and the beat' in by4
+                  and gone == 0 and back_on == had and 'beat' in by3,
+                  f'{label}: the bouncing ball button steps through the beat, the rhythm, both and off ({had} "{by}", {rhythm} "{by2}", {both} "{by4}", off {gone}, {back_on} "{by3}")')
             # Nothing in the strip moves as labels change: each changing button keeps one width.
             widths = []
             for _ in range(5):

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#E6EAE8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0F1513" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="../../assets/icon.svg" type="image/svg+xml">
@@ -66,6 +66,8 @@
 * { box-sizing: border-box; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 body { background: var(--stand); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.45; }
+/* The page never zooms, only the music (Janelle, 2026-11-19): no pinch or double-tap zoom anywhere; scrolling stays. */
+html { touch-action: pan-x pan-y; }
 button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -888,6 +890,7 @@ body.following .host-only { display: none !important; }
     set(v) { try { localStorage.setItem('twinkle-harmony-reader', JSON.stringify(v)); } catch {} },
   };
   const saved = store.get();
+  function deviceZoom() { try { return +localStorage.getItem('gsa-zoom') || null; } catch { return null; } }
   // The title opens and closes the song's details card.
   (() => {
     const btn = document.getElementById('infoBtn'), pop = document.getElementById('infoPop');
@@ -946,21 +949,27 @@ body.following .host-only { display: none !important; }
     unit: 0,
     // Finger numbers go inside the notes or to their left (Janelle chose the left over the right, 2026-11-02: on the
     // right a dotted note's dot could read as a 0 beside the number). A choice saved as the right becomes the left.
-    fingers: saved.fingers === 'right' || saved.fingers === 'left' ? 'left' : 'inside',
-    // The counts under the notes: on unless switched off with the Counting switch beside them.
-    countAlong: saved.counts !== 'off',
+    // A first visit starts with them to the left and nothing inside the notes (Janelle, 2026-11-19; until then phones
+    // started on "Note names and fingers", bigger screens on "Fingers inside").
+    fingers: saved.fingers === 'inside' ? 'inside' : 'left',
+    // The counts under the notes: off on a first visit (Janelle, 2026-11-19; they were on), then as last left.
+    countAlong: saved.counts === 'on',
     // The bouncing ball: on unless switched off (Janelle, 2026-11-05), bouncing on the beat (every count) or on the
     // rhythm (every note; Janelle, 2026-11-12). Saved as 'beat', 'rhythm' or 'off' ('on', from before, is the beat).
     pointer: saved.pointer !== 'off',
-    ballBy: saved.pointer === 'rhythm' ? 'rhythm' : 'beat',
+    // Or both (Janelle, 2026-11-19): every note, and every count inside a held note as a small bounce on the spot.
+    ballBy: saved.pointer === 'rhythm' || saved.pointer === 'both' ? saved.pointer : 'beat',
     layout: saved.layout === 'page' ? 'page' : 'line',
-    // Letter names inside the notes: phones start with them on, bigger screens off (each kept on its own).
-    letterMode: saved.letterMode === 'off' ? 'off' : 'all',
+    // Letter names inside the notes: off on a first visit, phones too (Janelle, 2026-11-19; phones started with them
+    // on); each kind of screen keeps its own choice.
+    letterMode: saved.letterMode === 'all' ? 'all' : 'off',
     letterModeBig: saved.lettersBig && saved.lettersBig !== 'off' ? 'all' : 'off',
-    // One button steps through: metronome on, metronome on with a count-in, a count-in only, metronome off.
-    metro: ['off', 'on', 'count', 'countonly'].includes(saved.metro) ? saved.metro : 'off',
-    // Bigger or smaller music (the − and + in the corner): a step on ZOOMS.
-    zoom: ZOOMS.includes(saved.zoom) ? saved.zoom : 1,
+    // One button steps through: metronome on, metronome on with a count-in, a count-in only, metronome off. A first
+    // visit starts on, with a count-in (Janelle, 2026-11-19; it started off).
+    metro: ['off', 'on', 'count', 'countonly'].includes(saved.metro) ? saved.metro : 'count',
+    // Bigger or smaller music (the − and + in the corner): a step on ZOOMS. One size for every song on this device
+    // (`gsa-zoom`; Janelle, 2026-11-19: lots of zooming in class, song after song); a song's own saved size until then.
+    zoom: ZOOMS.includes(deviceZoom()) ? deviceZoom() : ZOOMS.includes(saved.zoom) ? saved.zoom : 1,
     // Look ahead (the sight-reading page only): off, or how far ahead of the music the notes vanish.
     ahead: !LOOK_AHEAD ? 'off' : saved.ahead === 'two' ? 'beat' : AHEAD.some(a => a.id === saved.ahead) ? saved.ahead : 'off', // 2 beats is gone
   };
@@ -1104,15 +1113,19 @@ body.following .host-only { display: none !important; }
   // A button's labels, all in one spot (the button is as wide as the longest), with the current one showing.
   const stackBadge = (labels, now) => '<span class="cyc-badge stack">' + labels.map(t => '<span' + (t === now ? ' class="now"' : '') + '>' + t + '</span>').join('') + '</span>';
   // The ball and its switch's icon: a teal ball after its bounces, dotted: two even ones for the beat, a long one and
-  // two short ones for the rhythm (grey and crossed out when off).
+  // two short ones for the rhythm, a long one and two tiny ones on the spot for the rhythm and the beat (grey and
+  // crossed out when off).
   const pointIco = (on, by) => { const c = on ? '#1D5B72' : '#8A948F';
-    const hops = on && by === 'rhythm' ? 'M1 21C1 4.5 9 4.5 9 21C9 14.5 12 14.5 12 21C12 15 15 15 15 20' : 'M1 21C1 8 8 8 8 21C8 8 15 8 15 20';
+    const hops = on && by === 'rhythm' ? 'M1 21C1 4.5 9 4.5 9 21C9 14.5 12 14.5 12 21C12 15 15 15 15 20'
+      : on && by === 'both' ? 'M1 21C1 4.5 9 4.5 9 21C9 17.5 11 17.5 11 21C11 17.5 13 17.5 13 21C13 16 15 16 15 20'
+      : 'M1 21C1 8 8 8 8 21C8 8 15 8 15 20';
     return `<svg class="pt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="${hops}" fill="none" stroke="${c}" stroke-width="1.6" stroke-dasharray="1.4 1.9" stroke-linecap="round"/><circle cx="19.4" cy="18.4" r="3.8" fill="${c}"/>`
       + (on ? '' : '<path d="M3 21 21 3" stroke="#FFFFFF" stroke-width="4.4" stroke-linecap="round"/><path d="M3 21 21 3" stroke="#8A948F" stroke-width="2.2" stroke-linecap="round"/>') + '</svg>'; };
   // Look ahead: an eye looking to the right (teal when on, grey when off).
   const aheadIco = (on) => { const c = on ? '#1D5B72' : '#8A948F';
     return `<svg class="cyc-ico" viewBox="0 0 24 24" style="width:22px;height:22px" aria-hidden="true"><path d="M2 12c2.6-4.2 5.9-6.3 10-6.3s7.4 2.1 10 6.3c-2.6 4.2-5.9 6.3-10 6.3S4.6 16.2 2 12z" fill="none" stroke="${c}" stroke-width="1.8" stroke-linejoin="round"/><circle cx="15" cy="12" r="3" fill="${c}"/></svg>`; };
-  const BALL_WORD = { beat: 'on the beat (a bounce on every count)', rhythm: 'on the rhythm (a bounce on every note)' };
+  const BALL_WORD = { beat: 'on the beat (a bounce on every count)', rhythm: 'on the rhythm (a bounce on every note)',
+    both: 'on the rhythm and the beat (a bounce on every note, and a small one on each count of a long note)' };
   function renderCycles() {
     $('g-metro').innerHTML = metroIco(state.metro !== 'off') + stackBadge(Object.values(METRO_BADGE), METRO_BADGE[state.metro]);
     $('g-metro').setAttribute('aria-label', METRO_WORD[state.metro] + '. Tap to change.');
@@ -1128,7 +1141,7 @@ body.following .host-only { display: none !important; }
     $('g-count').innerHTML = stackBadge(['Counting: On', 'Counting: Off'], cOn ? 'Counting: On' : 'Counting: Off');
     $('g-count').setAttribute('aria-label', 'Counts under the notes: ' + (cOn ? 'on' : 'off') + '. Tap to change.');
     const pOn = state.pointer;
-    // The bouncing ball's switch: a round button in the strip, stepping through the beat, the rhythm and off.
+    // The bouncing ball's switch: a round button in the strip, stepping through the beat, the rhythm, both and off.
     $('g-point').innerHTML = pointIco(pOn, state.ballBy);
     $('g-point').setAttribute('aria-pressed', String(pOn));
     $('g-point').setAttribute('aria-label', 'Bouncing ball: ' + (pOn ? BALL_WORD[state.ballBy] : 'off') + '. Tap to change.');
@@ -1158,7 +1171,9 @@ body.following .host-only { display: none !important; }
     return `<svg class="cyc-ico" viewBox="0 0 24 24" style="width:22px;height:22px" aria-hidden="true"><path d="M9.2 3h5.6l4.4 17.5H4.8z" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"/><path d="M12 16.2 16.6 6.8" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="16.2" r="2" fill="${c}"/></svg>`; };
   function applyMetro() {
     if (!api) return;
-    api.metronomeVolume = clicksSet() ? 1 : 0;
+    // A device following the teacher never clicks (Janelle, 2026-11-19, with the metronome now on from the start): its
+    // sound is off anyway (startFollowing), and this keeps it so whatever its own button says.
+    api.metronomeVolume = clicksSet() && !conductor.following ? 1 : 0;
     api.countInVolume = countInSet() ? 1 : 0;
     if (!countInSet() && counting) endCountIn();
     applyLoopMode();
@@ -2128,6 +2143,12 @@ body.following .host-only { display: none !important; }
     sheet.addEventListener('touchcancel', endPinch);
     // Safari's own pinch gesture stays off the music too.
     for (const t of ['gesturestart', 'gesturechange']) sheet.addEventListener(t, (e) => e.preventDefault());
+    // Nor does the page itself ever zoom (Janelle, 2026-11-19: a pinch beside the music zoomed the whole page, and the
+    // buttons went off the screen): only the music grows and shrinks, under two fingers on it, or with − / +. Safari
+    // ignores the viewport's user-scalable=no, so its pinch (gesture events), a two-finger move anywhere and a
+    // double tap (touch-action in the CSS) are stopped here too. A computer's Ctrl + / − is left alone.
+    for (const t of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(t, (e) => e.preventDefault(), { passive: false });
+    document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
     // A click on the page away from the music also stops a loop.
     document.addEventListener('pointerdown', (e) => {
       if (!loop || conductor.following || !e.target.closest) return;
@@ -2414,7 +2435,7 @@ body.following .host-only { display: none !important; }
     conductor.following = true;
     conductor.offset = 0; conductor.bestRtt = Infinity; conductor.pongs = 0; conductor.synced = false; conductor.pings.clear(); conductor.seenVer = -1;
     // Sound stays on the conductor's device only.
-    conductor.volume = api.masterVolume; api.masterVolume = 0;
+    conductor.volume = api.masterVolume; api.masterVolume = 0; api.metronomeVolume = 0;
     // Wake this device's audio while we have the tap, so a start later on isn't blocked.
     const keep = api.tickPosition; api.play(); api.pause(); api.tickPosition = keep;
     followerControls(true);
@@ -2434,6 +2455,7 @@ body.following .host-only { display: none !important; }
     clearTimers(); clearInterval(conductor.pingTimer);
     if (playing) api.pause();
     api.masterVolume = conductor.volume || 1;
+    applyMetro(); // its own metronome again
     followerControls(false);
     wakeCard(false);
     if (conductor.room) conductor.room.presence({ following: null, ping: null, t: null }).catch(() => {});
@@ -3508,6 +3530,7 @@ body.following .host-only { display: none !important; }
   function setZoom(z) {
     if (z === state.zoom) return;
     state.zoom = z; save(); showZoom();
+    try { localStorage.setItem('gsa-zoom', String(z)); } catch {}
     if (api) { zoomRender = true; applySize(); api.render(); }
   }
   function stepZoom(d) {
@@ -3724,14 +3747,19 @@ body.following .host-only { display: none !important; }
       const first = stops[0].tick, lastEnd = stops[stops.length - 1].end, inside = (c) => c > first + 1 && c < lastEnd - 1;
       // Where the ball lands: on the beat, every count (it starts on the first note, a pickup too); on the rhythm,
       // every note (fine). Fast, on the beat: only the big beats (big).
-      const fine = state.ballBy === 'rhythm' ? stops.map(st => st.tick) : [first, ...counts.filter(inside)];
-      const big = [first, ...bigTicks().filter(inside)];
-      // How many times it lands from each note to the next (roomForBounces gives the bar room for them).
+      // The rhythm and the beat: every note, and every count between (fast, the big beats between), merged in order.
+      const notes = stops.map(st => st.tick);
+      const merge = (more) => [...notes, ...more.filter(inside)].sort((x, y) => x - y).filter((x, i, a) => !i || x - a[i - 1] > 1);
+      const fine = state.ballBy === 'rhythm' ? notes : state.ballBy === 'both' ? merge(counts) : [first, ...counts.filter(inside)];
+      const big = state.ballBy === 'both' ? merge(bigTicks()) : [first, ...bigTicks().filter(inside)];
+      // How many times it lands from each note to the next (roomForBounces gives the bar room for them). The rhythm and
+      // the beat travel only from note to note (a count inside a note is a hop on the spot), so they need the rhythm's.
+      const travel = state.ballBy === 'both' ? notes : fine;
       for (let k = 0, j = 0; k < stops.length; k++) {
         const a = stops[k].tick, b = stops[k + 1] ? stops[k + 1].tick : stops[k].end;
-        while (j < fine.length && fine[j] < a - 1) j++;
+        while (j < travel.length && travel[j] < a - 1) j++;
         let n = 0;
-        while (j + n < fine.length && fine[j + n] < b - 1) n++;
+        while (j + n < travel.length && travel[j + n] < b - 1) n++;
         stops[k].hops = n;
       }
       const d = ballD(stops[0].space), rr = d / 2;
@@ -4018,6 +4046,13 @@ body.following .host-only { display: none !important; }
     const tx = other ? cur.right - cur.space : nxt.x, ty = other ? cur.y : nxt.y;
     return { x: cur.x + (tx - cur.x) * f, y: cur.y + (ty - cur.y) * f, ceil: other ? cur.ceil : Math.max(cur.ceil, nxt.ceil), space: cur.space, sys: cur.sys, right: cur.right, rest: cur.rest, k: lo };
   }
+  // The rhythm and the beat: the note (or rest) sounding at this tick, where the ball sits until the next note.
+  function noteSpot(run, T) {
+    const s = run.stops;
+    let lo = 0, hi = s.length - 1;
+    while (lo < hi) { const m = (lo + hi + 1) >> 1; if (s[m].tick <= T + 1) lo = m; else hi = m - 1; }
+    return { ...s[lo], k: lo };
+  }
   function updatePointer(now) {
     if (!pointRuns.length) return;
     if (counting || now < heardAt) { ballClock = null; idlePointer(); return; }
@@ -4041,8 +4076,17 @@ body.following .host-only { display: none !important; }
       const a = L[i], b = i + 1 < L.length && L[i + 1] < end ? L[i + 1] : end;
       if (!(b > a)) { const sp = ballSpot(run, a); putPointer(run, sp.x, sp.y, sp.rest); continue; }
       const p = Math.max(0, Math.min(1, (t - a) / (b - a)));
-      const from = ballSpot(run, a), to = b === end && toLoop ? ballSpot(run, r.startTick) : ballSpot(run, b);
+      const spot = state.ballBy === 'both' ? noteSpot : ballSpot;
+      const from = spot(run, a), to = b === end && toLoop ? spot(run, r.startTick) : spot(run, b);
       const beats = (b - a) / 960; // this flight, in quarter notes
+      // The rhythm and the beat, a count inside a held note (or rest): a small hop on the spot, so "a new note" (a full
+      // flight to it) and "keep holding and count" look different (Janelle, 2026-11-19).
+      if (state.ballBy === 'both' && from.k === to.k && !(b === end && toLoop)) {
+        const room = from.y - ballD(from.space) - (from.ceil ?? -Infinity);
+        const h = Math.max(0, Math.min(from.space * 0.5, room));
+        putPointer(run, from.x, from.y - h * 4 * p * (1 - p), from.rest);
+        continue;
+      }
       if (to.sys !== from.sys) {
         if (p < 0.35) { // off the end of the line
           const q = p / 0.35, ex = from.right + from.space;
@@ -4062,9 +4106,10 @@ body.following .host-only { display: none !important; }
   }
   $('g-point').addEventListener('click', () => {
     setPop(null);
-    // The beat, then the rhythm, then off, then the beat again.
+    // The beat, then the rhythm, then the rhythm and the beat, then off, then the beat again.
     if (!state.pointer) { state.pointer = true; state.ballBy = 'beat'; }
     else if (state.ballBy === 'beat') state.ballBy = 'rhythm';
+    else if (state.ballBy === 'rhythm') state.ballBy = 'both';
     else state.pointer = false;
     save(); renderCycles();
     if (state.pointer && api && score) { const wrap = $('sheet').querySelector('.at-cursors'); if (wrap && !pointLayer.parentNode) wrap.insertBefore(pointLayer, markLayer); }
