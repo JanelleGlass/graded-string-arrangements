@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#E6EAE8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0F1513" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="../../assets/icon.svg" type="image/svg+xml">
@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Graded Strings">
 <style>body{margin:0;padding:0}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <script src="../../app/app.js?v=fbce6b0ba4"></script>
-<script src="../../app/together.js?v=9655ca92b0"></script>
+<script src="../../app/together.js?v=1004043293"></script>
 <title>Drunken Sailor</title>
 <meta name="description" content="Read and play along with Drunken Sailor in four levels for violin, viola, cello and bass.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -66,6 +66,8 @@
 * { box-sizing: border-box; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 body { background: var(--stand); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.45; }
+/* The page never zooms, only the music (Janelle, 2026-11-19): no pinch or double-tap zoom anywhere; scrolling stays. */
+html { touch-action: pan-x pan-y; }
 button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -482,6 +484,25 @@ html.small .small-only[hidden], html.small .big-only { display: none !important;
 .toast[hidden] { display: none; }
 /* A device following the conductor shows only what it can use */
 body.following .host-only { display: none !important; }
+/* Class settings (the teacher locks a setting for everyone): a card under the lock button while conducting; on a
+   student's device a locked button is greyed out in its place (a tap says the teacher set it). */
+.class-pop { position: fixed; z-index: 1200; top: calc(48px + env(safe-area-inset-top, 0px)); right: 12px; width: min(22rem, calc(100vw - 24px)); max-height: calc(100dvh - var(--dock-h) - 60px); overflow: auto; }
+.class-pop[hidden] { display: none; }
+.cl-body { display: grid; gap: 4px; }
+.cl-h { margin: 6px 0 0 !important; font-weight: 700; font-size: 0.9rem; }
+.cl-note { color: var(--muted); font-size: 0.82rem; }
+.cl-seats { display: grid; gap: 6px; margin: 2px 0 4px 26px; }
+.cl-seat { display: grid; grid-template-columns: 4.2rem minmax(0, 1fr); align-items: center; gap: 8px; font-weight: 600; font-size: 0.88rem; }
+.cl-seat select { min-width: 0; padding: 5px 6px; border: 1px solid var(--line); border-radius: 6px; background: #FFFFFF; font-size: 0.86rem; }
+#g-class[aria-expanded="true"] { background: #D8E7ED; border-color: #1D5B72; }
+.fab-btn[data-class-lock] { opacity: 0.42; box-shadow: none; cursor: default; }
+.mix-list.class-lock .tog:not(.none) { opacity: 0.55; cursor: default; }
+.seat-card { position: fixed; z-index: 3000; left: 50%; top: 30%; transform: translate(-50%, -50%); width: min(20rem, calc(100vw - 32px)); display: grid; gap: 10px; padding: 18px 20px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); font-family: var(--font-body); }
+.seat-card[hidden] { display: none; }
+.seat-card p { margin: 0; font-weight: 600; }
+.seat-card label { display: grid; gap: 6px; }
+.seat-card input { font: 600 1.4rem var(--font-body); padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; width: 100%; }
+.seat-card button { justify-self: end; border-radius: 999px; padding: 9px 22px; font-weight: 700; border: 0; background: var(--accent); color: var(--accent-ink); }
 
 .foot { color: var(--muted); font-size: 0.84rem; max-width: 75ch; margin: 0; }
 
@@ -663,7 +684,7 @@ body.following .host-only { display: none !important; }
   <p class="err" id="err" role="alert"></p>
 
   <div class="sheet-wrap">
-    <div class="tools-dock"><div class="top-tools" id="topTools"><button class="fab-btn follow-btn" id="g-follow" type="button" aria-pressed="false" hidden>Follow</button><button class="fab-btn round host-only" id="printBtn" type="button" aria-label="Print the music" title="Print the music"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg></button><button class="fab-btn round host-only" id="pdfBtn" type="button" aria-label="Download the music as a PDF" title="Download a PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/></svg></button><div class="zoom-pill" role="group" aria-label="Size of the music"><button type="button" id="zoomOut" aria-label="Smaller music" title="Smaller">−</button><button type="button" id="zoomIn" aria-label="Bigger music" title="Bigger">+</button></div><button class="fab-btn big-only cyc" id="g-layout" type="button"></button></div></div>
+    <div class="tools-dock"><div class="top-tools" id="topTools"><button class="fab-btn round" id="g-class" type="button" hidden aria-expanded="false" aria-controls="pop-class" aria-label="Class settings: lock settings for everyone" title="Class settings: lock settings for everyone"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 9h-1V7a4 4 0 0 0-8 0v2H7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2zm-7-2a2 2 0 0 1 4 0v2h-4V7zm2 10.2a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4z"/></svg></button><button class="fab-btn follow-btn" id="g-follow" type="button" aria-pressed="false" hidden>Follow</button><button class="fab-btn round host-only" id="printBtn" type="button" aria-label="Print the music" title="Print the music"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg></button><button class="fab-btn round host-only" id="pdfBtn" type="button" aria-label="Download the music as a PDF" title="Download a PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/></svg></button><div class="zoom-pill" role="group" aria-label="Size of the music"><button type="button" id="zoomOut" aria-label="Smaller music" title="Smaller">−</button><button type="button" id="zoomIn" aria-label="Bigger music" title="Bigger">+</button></div><button class="fab-btn big-only cyc" id="g-layout" type="button"></button></div></div>
     <div class="key-dock"><div class="key" id="legend" role="note" aria-label="String colors"></div></div>
     <div class="sheet" id="sheet"></div>
     <div class="loading" id="loading">Setting out the music…</div>
@@ -678,6 +699,10 @@ body.following .host-only { display: none !important; }
 <div class="count" id="count" aria-hidden="true" hidden><span id="countNum"></span></div>
 
 <div class="fab-bar" aria-hidden="true"></div>
+<section class="pop class-pop" id="pop-class" aria-labelledby="h-class" hidden>
+  <div class="pop-head"><h2 id="h-class">Class settings</h2><button class="pop-x" type="button" aria-label="Close">×</button></div>
+  <div class="cl-body"></div>
+</section>
 <section class="pop drawer" id="pop-parts" aria-labelledby="h-parts">
   <div class="pop-head"><h2 id="h-parts">Parts</h2><button class="pop-x drawer-x" id="partsX" type="button" aria-label="Close">×</button></div>
   <div class="mix">
@@ -888,6 +913,7 @@ body.following .host-only { display: none !important; }
     set(v) { try { localStorage.setItem('drunken-sailor-reader', JSON.stringify(v)); } catch {} },
   };
   const saved = store.get();
+  function deviceZoom() { try { return +localStorage.getItem('gsa-zoom') || null; } catch { return null; } }
   // The title opens and closes the song's details card.
   (() => {
     const btn = document.getElementById('infoBtn'), pop = document.getElementById('infoPop');
@@ -946,21 +972,27 @@ body.following .host-only { display: none !important; }
     unit: 0,
     // Finger numbers go inside the notes or to their left (Janelle chose the left over the right, 2026-11-02: on the
     // right a dotted note's dot could read as a 0 beside the number). A choice saved as the right becomes the left.
-    fingers: saved.fingers === 'right' || saved.fingers === 'left' ? 'left' : 'inside',
-    // The counts under the notes: on unless switched off with the Counting switch beside them.
-    countAlong: saved.counts !== 'off',
+    // A first visit starts with them to the left and nothing inside the notes (Janelle, 2026-11-19; until then phones
+    // started on "Note names and fingers", bigger screens on "Fingers inside").
+    fingers: saved.fingers === 'inside' ? 'inside' : 'left',
+    // The counts under the notes: off on a first visit (Janelle, 2026-11-19; they were on), then as last left.
+    countAlong: saved.counts === 'on',
     // The bouncing ball: on unless switched off (Janelle, 2026-11-05), bouncing on the beat (every count) or on the
     // rhythm (every note; Janelle, 2026-11-12). Saved as 'beat', 'rhythm' or 'off' ('on', from before, is the beat).
     pointer: saved.pointer !== 'off',
-    ballBy: saved.pointer === 'rhythm' ? 'rhythm' : 'beat',
+    // Or both (Janelle, 2026-11-19): every note, and every count inside a held note as a small bounce on the spot.
+    ballBy: saved.pointer === 'rhythm' || saved.pointer === 'both' ? saved.pointer : 'beat',
     layout: saved.layout === 'page' ? 'page' : 'line',
-    // Letter names inside the notes: phones start with them on, bigger screens off (each kept on its own).
-    letterMode: saved.letterMode === 'off' ? 'off' : 'all',
+    // Letter names inside the notes: off on a first visit, phones too (Janelle, 2026-11-19; phones started with them
+    // on); each kind of screen keeps its own choice.
+    letterMode: saved.letterMode === 'all' ? 'all' : 'off',
     letterModeBig: saved.lettersBig && saved.lettersBig !== 'off' ? 'all' : 'off',
-    // One button steps through: metronome on, metronome on with a count-in, a count-in only, metronome off.
-    metro: ['off', 'on', 'count', 'countonly'].includes(saved.metro) ? saved.metro : 'off',
-    // Bigger or smaller music (the − and + in the corner): a step on ZOOMS.
-    zoom: ZOOMS.includes(saved.zoom) ? saved.zoom : 1,
+    // One button steps through: metronome on, metronome on with a count-in, a count-in only, metronome off. A first
+    // visit starts on, with a count-in (Janelle, 2026-11-19; it started off).
+    metro: ['off', 'on', 'count', 'countonly'].includes(saved.metro) ? saved.metro : 'count',
+    // Bigger or smaller music (the − and + in the corner): a step on ZOOMS. One size for every song on this device
+    // (`gsa-zoom`; Janelle, 2026-11-19: lots of zooming in class, song after song); a song's own saved size until then.
+    zoom: ZOOMS.includes(deviceZoom()) ? deviceZoom() : ZOOMS.includes(saved.zoom) ? saved.zoom : 1,
     // Look ahead (the sight-reading page only): off, or how far ahead of the music the notes vanish.
     ahead: !LOOK_AHEAD ? 'off' : saved.ahead === 'two' ? 'beat' : AHEAD.some(a => a.id === saved.ahead) ? saved.ahead : 'off', // 2 beats is gone
   };
@@ -998,7 +1030,12 @@ body.following .host-only { display: none !important; }
   // While the music is drawn for paper (Print), it is on pages for a moment; the saved choice stays the screen's.
   let printing = null;
   const onPaper = () => !!printing && printing.stage === 'paper'; // drawing the music for paper
-  const save = () => store.set({ zoom: state.zoom, parts: savedId(), partsFull: layout, seen: state.seen, heard: state.heard, hearOpen: state.hearOpen, colorMode: state.colorMode, fingerMode: state.fingerMode, tempo: state.tempo, follow: state.follow, countBy: state.unit, fingers: state.fingers, counts: state.countAlong ? 'on' : 'off', pointer: state.pointer ? state.ballBy : 'off', layout: printing ? printing.layout : state.layout, letterMode: state.letterMode, lettersBig: state.letterModeBig, metro: state.metro, ahead: state.ahead });
+  // A device following the teacher saves its own choice for anything the teacher holds (classOwn); the teacher's
+  // device passes each change on to the class (classChanged). Both are with Play together, further down (and safe to
+  // call before it starts: classOn).
+  const save = () => { const s = savedView();
+    store.set({ zoom: s.zoom, parts: savedId(), partsFull: layout, seen: s.seen, heard: s.heard, hearOpen: s.hearOpen, colorMode: s.colorMode, fingerMode: s.fingerMode, tempo: s.tempo, follow: s.follow, countBy: s.unit, fingers: s.fingers, counts: s.countAlong ? 'on' : 'off', pointer: s.pointer ? s.ballBy : 'off', layout: printing ? printing.layout : s.layout, letterMode: s.letterMode, lettersBig: s.letterModeBig, metro: s.metro, ahead: s.ahead });
+    classChanged(); };
 
   // ---- Room reverb ----
   // alphaTab plays through Web Audio; route whatever it sends to the speakers through a small reverb bus.
@@ -1104,15 +1141,19 @@ body.following .host-only { display: none !important; }
   // A button's labels, all in one spot (the button is as wide as the longest), with the current one showing.
   const stackBadge = (labels, now) => '<span class="cyc-badge stack">' + labels.map(t => '<span' + (t === now ? ' class="now"' : '') + '>' + t + '</span>').join('') + '</span>';
   // The ball and its switch's icon: a teal ball after its bounces, dotted: two even ones for the beat, a long one and
-  // two short ones for the rhythm (grey and crossed out when off).
+  // two short ones for the rhythm, a long one and two tiny ones on the spot for the rhythm and the beat (grey and
+  // crossed out when off).
   const pointIco = (on, by) => { const c = on ? '#1D5B72' : '#8A948F';
-    const hops = on && by === 'rhythm' ? 'M1 21C1 4.5 9 4.5 9 21C9 14.5 12 14.5 12 21C12 15 15 15 15 20' : 'M1 21C1 8 8 8 8 21C8 8 15 8 15 20';
+    const hops = on && by === 'rhythm' ? 'M1 21C1 4.5 9 4.5 9 21C9 14.5 12 14.5 12 21C12 15 15 15 15 20'
+      : on && by === 'both' ? 'M1 21C1 4.5 9 4.5 9 21C9 17.5 11 17.5 11 21C11 17.5 13 17.5 13 21C13 16 15 16 15 20'
+      : 'M1 21C1 8 8 8 8 21C8 8 15 8 15 20';
     return `<svg class="pt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="${hops}" fill="none" stroke="${c}" stroke-width="1.6" stroke-dasharray="1.4 1.9" stroke-linecap="round"/><circle cx="19.4" cy="18.4" r="3.8" fill="${c}"/>`
       + (on ? '' : '<path d="M3 21 21 3" stroke="#FFFFFF" stroke-width="4.4" stroke-linecap="round"/><path d="M3 21 21 3" stroke="#8A948F" stroke-width="2.2" stroke-linecap="round"/>') + '</svg>'; };
   // Look ahead: an eye looking to the right (teal when on, grey when off).
   const aheadIco = (on) => { const c = on ? '#1D5B72' : '#8A948F';
     return `<svg class="cyc-ico" viewBox="0 0 24 24" style="width:22px;height:22px" aria-hidden="true"><path d="M2 12c2.6-4.2 5.9-6.3 10-6.3s7.4 2.1 10 6.3c-2.6 4.2-5.9 6.3-10 6.3S4.6 16.2 2 12z" fill="none" stroke="${c}" stroke-width="1.8" stroke-linejoin="round"/><circle cx="15" cy="12" r="3" fill="${c}"/></svg>`; };
-  const BALL_WORD = { beat: 'on the beat (a bounce on every count)', rhythm: 'on the rhythm (a bounce on every note)' };
+  const BALL_WORD = { beat: 'on the beat (a bounce on every count)', rhythm: 'on the rhythm (a bounce on every note)',
+    both: 'on the rhythm and the beat (a bounce on every note, and a small one on each count of a long note)' };
   function renderCycles() {
     $('g-metro').innerHTML = metroIco(state.metro !== 'off') + stackBadge(Object.values(METRO_BADGE), METRO_BADGE[state.metro]);
     $('g-metro').setAttribute('aria-label', METRO_WORD[state.metro] + '. Tap to change.');
@@ -1128,7 +1169,7 @@ body.following .host-only { display: none !important; }
     $('g-count').innerHTML = stackBadge(['Counting: On', 'Counting: Off'], cOn ? 'Counting: On' : 'Counting: Off');
     $('g-count').setAttribute('aria-label', 'Counts under the notes: ' + (cOn ? 'on' : 'off') + '. Tap to change.');
     const pOn = state.pointer;
-    // The bouncing ball's switch: a round button in the strip, stepping through the beat, the rhythm and off.
+    // The bouncing ball's switch: a round button in the strip, stepping through the beat, the rhythm, both and off.
     $('g-point').innerHTML = pointIco(pOn, state.ballBy);
     $('g-point').setAttribute('aria-pressed', String(pOn));
     $('g-point').setAttribute('aria-label', 'Bouncing ball: ' + (pOn ? BALL_WORD[state.ballBy] : 'off') + '. Tap to change.');
@@ -1158,8 +1199,11 @@ body.following .host-only { display: none !important; }
     return `<svg class="cyc-ico" viewBox="0 0 24 24" style="width:22px;height:22px" aria-hidden="true"><path d="M9.2 3h5.6l4.4 17.5H4.8z" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"/><path d="M12 16.2 16.6 6.8" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="16.2" r="2" fill="${c}"/></svg>`; };
   function applyMetro() {
     if (!api) return;
-    api.metronomeVolume = clicksSet() ? 1 : 0;
-    api.countInVolume = countInSet() ? 1 : 0;
+    // A device following the teacher never clicks (Janelle, 2026-11-19, with the metronome now on from the start): its
+    // sound is off anyway (startFollowing), and this keeps it so whatever its own button says.
+    api.metronomeVolume = clicksSet() && !conductor.following ? 1 : 0;
+    // Its count-in too: while following, the teacher's commands say when to count in (startAt).
+    api.countInVolume = countInSet() && !conductor.following ? 1 : 0;
     if (!countInSet() && counting) endCountIn();
     applyLoopMode();
   }
@@ -1372,6 +1416,7 @@ body.following .host-only { display: none !important; }
 
   function buildControls() {
     renderCycles();
+    classLockUi();
     renderMix();
     $('sheet').classList.toggle('line', state.layout === 'line');
     renderKey();
@@ -2128,6 +2173,12 @@ body.following .host-only { display: none !important; }
     sheet.addEventListener('touchcancel', endPinch);
     // Safari's own pinch gesture stays off the music too.
     for (const t of ['gesturestart', 'gesturechange']) sheet.addEventListener(t, (e) => e.preventDefault());
+    // Nor does the page itself ever zoom (Janelle, 2026-11-19: a pinch beside the music zoomed the whole page, and the
+    // buttons went off the screen): only the music grows and shrinks, under two fingers on it, or with − / +. Safari
+    // ignores the viewport's user-scalable=no, so its pinch (gesture events), a two-finger move anywhere and a
+    // double tap (touch-action in the CSS) are stopped here too. A computer's Ctrl + / − is left alone.
+    for (const t of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(t, (e) => e.preventDefault(), { passive: false });
+    document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
     // A click on the page away from the music also stops a loop.
     document.addEventListener('pointerdown', (e) => {
       if (!loop || conductor.following || !e.target.closest) return;
@@ -2160,7 +2211,7 @@ body.following .host-only { display: none !important; }
   const LOOP_GLIDE_MS = 450;       // how long the slide back to the loop's first note takes
   const conductor = { room: null, me: null, hosting: false, following: false, hostPeer: null, offset: 0, bestRtt: Infinity, pongs: 0, synced: false,
     pings: new Map(), last: null, seq: 0, timers: [], posTimer: 0, pingTimer: 0, followers: 0, volume: 1, errs: [], startedAt: 0, lastFix: 0,
-    sentVer: 0, seenVer: -1, startingUntil: 0, quiet: 0, waiting: false, odd: 0, since: 0, lastBy: new Map() };
+    sentVer: 0, seenVer: -1, startingUntil: 0, quiet: 0, waiting: false, odd: 0, since: 0, lastBy: new Map(), classBy: new Map(), classBeat: 0, seats: [] };
   const clock = () => performance.now();
   // The written tempo (quarter notes a minute) at a tick: the last tempo mark at or before it.
   function tempoAtTick(tick) {
@@ -2230,6 +2281,7 @@ body.following .host-only { display: none !important; }
   // Host: say where we are, twice a second while playing and every 2 s while still, with everything a follower that
   // missed a command needs to catch up.
   function hostReport() {
+    if (conductor.hosting && ++conductor.classBeat % 8 === 0) sendClass(true); // the class settings again every 4 s
     const st = conductor.hosting && hostPhase();
     if (!st) return;
     if (st === 'still' && conductor.quiet++ % 4) return;
@@ -2391,7 +2443,7 @@ body.following .host-only { display: none !important; }
       card.id = 'wakeCard'; card.type = 'button'; card.className = 'wake-card';
       document.body.append(card);
     }
-    card.textContent = 'Tap to follow your teacher';
+    card.textContent = conductor.site && conductor.site.duo && conductor.site.duo() ? 'Tap to follow the leader' : 'Tap to follow your teacher';
     card.hidden = false;
   }
   function wakeAudio() {
@@ -2414,11 +2466,16 @@ body.following .host-only { display: none !important; }
     conductor.following = true;
     conductor.offset = 0; conductor.bestRtt = Infinity; conductor.pongs = 0; conductor.synced = false; conductor.pings.clear(); conductor.seenVer = -1;
     // Sound stays on the conductor's device only.
-    conductor.volume = api.masterVolume; api.masterVolume = 0;
+    // No clicks and no count-in of its own: the play-and-pause below (to wake the sound) with a count-in set began the
+    // player's own count-in, which left it stalled, its music barely moving while the teacher's played (found
+    // 2026-11-19 with "On + count-in" as the first-visit setting; a student who chose a count-in had it before).
+    conductor.volume = api.masterVolume; api.masterVolume = 0; api.metronomeVolume = 0; api.countInVolume = 0;
     // Wake this device's audio while we have the tap, so a start later on isn't blocked.
     const keep = api.tickPosition; api.play(); api.pause(); api.tickPosition = keep;
     followerControls(true);
-    conductor.room.presence({ following: true }).catch(() => {});
+    conductor.room.presence({ following: true, seat: mySeat() || null }).catch(() => {});
+    const cls = conductor.classBy.get(conductor.hostPeer);
+    if (cls) applyClass(cls);
     pingHost(8);
     // No answer yet (the conductor hadn't seen this device arrive): ask again, until it answers.
     clearInterval(conductor.repingTimer);
@@ -2434,6 +2491,8 @@ body.following .host-only { display: none !important; }
     clearTimers(); clearInterval(conductor.pingTimer);
     if (playing) api.pause();
     api.masterVolume = conductor.volume || 1;
+    applyMetro(); // its own metronome again
+    releaseClass(); // and its own parts, look and ball
     followerControls(false);
     wakeCard(false);
     if (conductor.room) conductor.room.presence({ following: null, ping: null, t: null }).catch(() => {});
@@ -2453,6 +2512,8 @@ body.following .host-only { display: none !important; }
     if (conductor.hosting) { on = true; label = conductor.followers ? 'Conducting · ' + conductor.followers : 'Conducting'; }
     else label = 'Conduct';
     g.hidden = !show;
+    $('g-class').hidden = !conductor.hosting;
+    if (!conductor.hosting && !$('pop-class').hidden) openClassPop(false);
     g.classList.toggle('on', on);
     g.classList.remove('offer');
     g.setAttribute('aria-pressed', String(on));
@@ -2463,13 +2524,15 @@ body.following .host-only { display: none !important; }
     f.hidden = !(keen || (other && conductor.room) || away);
     f.classList.toggle('on', keen);
     f.setAttribute('aria-pressed', String(keen));
-    f.textContent = keen ? 'Following' : 'Follow';
+    f.textContent = keen ? 'Following' + (conductor.following && classLocks.parts === 'seats' && mySeat() ? ' · Seat ' + mySeat() : '') : 'Follow';
     f.title = conductor.following ? 'Stop following (sound is off while following)'
       : keen ? 'Waiting for the teacher. Tap to stop following'
       : away && !other ? 'Follow the teacher' + (away.title ? ': your screen goes to ' + away.title : '')
       : 'Follow the teacher: start, stop and tempo come from the teacher; sound is off on this device';
     $('teachLine').hidden = !site;
-    if (site) $('teachBtn').textContent = canLead && conductor.room ? 'Conducting: you’re signed in as the teacher' : 'Teacher? Sign in to conduct';
+    const duo = site && site.duo && site.duo(); // duo practice (app/together.js): two tablets, one leads
+    if (site) $('teachBtn').textContent = duo ? 'Duo practice: ' + (duo.role === 'lead' ? 'this tablet leads' : 'this tablet follows') + ' (swap or sign out)'
+      : canLead && conductor.room ? 'Conducting: you’re signed in as the teacher' : 'Teacher? Sign in to conduct';
     setDockH();
     keepAwake();
   }
@@ -2506,6 +2569,7 @@ body.following .host-only { display: none !important; }
     conductor.room.presence({ conducting: true, since: conductor.since }).catch(() => {});
     clearInterval(conductor.posTimer);
     conductor.posTimer = setInterval(hostReport, 500);
+    classSent = ''; setTimeout(() => sendClass(true), 300);
     if (conductor.site) conductor.site.setConducting(true, conductor.since); // carries on when the teacher opens another song
     conductorUi();
   }
@@ -2526,6 +2590,7 @@ body.following .host-only { display: none !important; }
     clearTimers();
     conductor.offset = 0; conductor.bestRtt = Infinity; conductor.pongs = 0; conductor.synced = false; conductor.pings.clear();
     conductor.seenVer = -1; conductor.odd = 0;
+    classLast = ''; const cls = conductor.classBy.get(conductor.hostPeer); if (cls) applyClass(cls);
     pingHost(8);
     clearInterval(conductor.repingTimer);
     conductor.repingTimer = setInterval(() => {
@@ -2534,6 +2599,176 @@ body.following .host-only { display: none !important; }
     }, 3000);
   }
   const hostLast = () => conductor.lastBy.get(conductor.hostPeer) || null;
+
+  // ---- Class settings: the teacher locks a setting for everyone (Janelle, 2026-11-16 notes and 2026-11-19) ----
+  // Each setting on its own: locked, every following device shows what the teacher's device shows; unlocked, each
+  // student chooses. Parts can be the same as the teacher's for everyone, or given seat by seat (a seat or stand
+  // number the student types once; no names). What's on the notes (string colors, the look, counting) and the
+  // bouncing ball are the teacher's own settings. The teacher's choices carry from song to song in her tab
+  // (sessionStorage gsa-class); parts travel by part name, so a seat keeps "Viola — Easy Melody" on every song that
+  // has one. A following device keeps its own settings aside (classOwn) and goes back to them when the teacher
+  // unlocks or it stops following; locked buttons are greyed out in place, and a tap says the teacher set it.
+  const CLASS_KEY = 'gsa-class', SEAT_KEY = 'gsa-seat';
+  const classGet = () => { try { return JSON.parse(sessionStorage.getItem(CLASS_KEY) || 'null') || {}; } catch { return {}; } };
+  let classSet = Object.assign({ parts: 'own', notes: false, ball: false, seats: {} }, classGet());
+  function mySeat() { try { return localStorage.getItem('gsa-seat') || ''; } catch { return ''; } }
+  // A part's name as the Parts table has it ("Violin — Easy Melody", "Piano"): the score's own names are short ("Vln").
+  const partKey = (ti) => { const p = PARTS[ti], row = p && ROWS[p.row]; return !row ? null : row.piano ? row.name : INSTRUMENTS[p.inst] + ' — ' + row.name; };
+  const partNames = (list) => list.map(partKey).filter(Boolean);
+  const partIndexes = (names) => (names || []).map(n => PARTS.findIndex((_, ti) => partKey(ti) === n)).filter(i => i >= 0).sort((a, b) => a - b);
+  // Host: the message every follower applies.
+  function classMsg() {
+    const c = { type: 'class', locks: { parts: classSet.parts, notes: !!classSet.notes, ball: !!classSet.ball } };
+    if (classSet.parts === 'all') c.parts = partNames(state.seen);
+    if (classSet.parts === 'seats') c.seats = classSet.seats;
+    if (classSet.notes) c.notes = { colorMode: state.colorMode, fingerMode: state.fingerMode, fingers: state.fingers, letters: lettersOn() ? 'all' : 'off', counts: state.countAlong };
+    if (classSet.ball) c.ball = { pointer: state.pointer, ballBy: state.ballBy };
+    return c;
+  }
+  var classSent = '', classTimer = 0;
+  function sendClass(force) {
+    if (!conductor.hosting || !conductor.room || !score) return;
+    const c = classMsg(), key = JSON.stringify(c);
+    if (!force && key === classSent) return;
+    classSent = key;
+    conductor.room.emit('conduct', c).catch(() => {});
+  }
+  // Something on the teacher's device changed (every change saves): send it on, a moment later.
+  function classChanged() { if (classOn && conductor.hosting) { clearTimeout(classTimer); classTimer = setTimeout(() => sendClass(false), 250); } }
+  function setClass(patch) {
+    Object.assign(classSet, patch);
+    try { sessionStorage.setItem(CLASS_KEY, JSON.stringify(classSet)); } catch {}
+    sendClass(false); renderClassPop();
+  }
+  // Follower: its own settings while the teacher holds some, and what the teacher holds.
+  // (var, not let: save() asks savedView() while the page is still starting, before this line has run)
+  var classOwn = null, classLocks = { parts: 'own', notes: false, ball: false }, classLast = '', classOn = true;
+  var OWN_FIELDS = ['seen', 'heard', 'hearOpen', 'colorMode', 'fingerMode', 'fingers', 'letterMode', 'letterModeBig', 'countAlong', 'pointer', 'ballBy'];
+  function lockedParts(L = classLocks) { return L.parts === 'all' || (L.parts === 'seats' && !!L.seatParts); }
+  // Which of the device's settings a set of locks holds.
+  const PART_FIELDS = ['seen', 'heard', 'hearOpen'], NOTE_FIELDS = ['colorMode', 'fingerMode', 'fingers', 'letterMode', 'letterModeBig', 'countAlong'], BALL_FIELDS = ['pointer', 'ballBy'];
+  const heldBy = (L, k) => (PART_FIELDS.includes(k) ? lockedParts(L) : NOTE_FIELDS.includes(k) ? !!L.notes : !!L.ball);
+  // What save() keeps for this device: its own choice for anything the teacher holds right now.
+  function savedView() {
+    if (!classOwn) return state;
+    const v = { ...state };
+    if (lockedParts()) { v.seen = classOwn.seen; v.heard = classOwn.heard; v.hearOpen = classOwn.hearOpen; }
+    if (classLocks.notes) for (const k of ['colorMode', 'fingerMode', 'fingers', 'letterMode', 'letterModeBig', 'countAlong']) v[k] = classOwn[k];
+    if (classLocks.ball) { v.pointer = classOwn.pointer; v.ballBy = classOwn.ballBy; }
+    return v;
+  }
+  function applyClass(c) {
+    if (!conductor.following || !score) return;
+    const seat = mySeat();
+    const seatNames = c.locks.parts === 'seats' && c.seats ? c.seats[seat] : null;
+    const key = JSON.stringify([c, seat]);
+    if (key === classLast) return;
+    classLast = key;
+    // Its own settings: everything not held until now is the student's live choice (changed since, maybe).
+    if (!classOwn) classOwn = {};
+    for (const k of OWN_FIELDS) if (!heldBy(classLocks, k)) classOwn[k] = Array.isArray(state[k]) ? [...state[k]] : state[k];
+    const before = JSON.stringify(OWN_FIELDS.map(k => state[k]));
+    for (const k of OWN_FIELDS) state[k] = Array.isArray(classOwn[k]) ? [...classOwn[k]] : classOwn[k]; // unlocked: its own
+    classLocks = { parts: c.locks.parts, notes: !!c.locks.notes, ball: !!c.locks.ball, seatParts: null };
+    const want = c.locks.parts === 'all' ? partIndexes(c.parts) : seatNames ? partIndexes(seatNames) : [];
+    if (want.length) { state.seen = want; state.hearOpen = false; if (c.locks.parts === 'seats') classLocks.seatParts = want; }
+    else if (c.locks.parts === 'all') classLocks.parts = 'own'; // none of the teacher's parts in this song's layout
+    if (c.locks.notes && c.notes) {
+      state.colorMode = c.notes.colorMode; state.fingerMode = c.notes.fingerMode; state.fingers = c.notes.fingers;
+      state[letterKey()] = c.notes.letters; state.countAlong = !!c.notes.counts;
+    }
+    if (c.locks.ball && c.ball) { state.pointer = !!c.ball.pointer; state.ballBy = c.ball.ballBy; }
+    seatCard(c.locks.parts === 'seats' && !seat);
+    if (JSON.stringify(OWN_FIELDS.map(k => state[k])) !== before) { holdPlace(); changed({ parts: true, marks: true, size: true }); }
+    else { save(); buildControls(); }
+    conductorUi();
+  }
+  // The teacher stopped, or this device stopped following: back to its own settings.
+  function releaseClass() {
+    seatCard(false);
+    classLast = '';
+    if (!classOwn) return;
+    const own = classOwn;
+    classOwn = null; classLocks = { parts: 'own', notes: false, ball: false };
+    const before = JSON.stringify(OWN_FIELDS.map(k => state[k]));
+    for (const k of OWN_FIELDS) state[k] = own[k];
+    if (score && JSON.stringify(OWN_FIELDS.map(k => state[k])) !== before) { holdPlace(); changed({ parts: true, marks: true, size: true }); }
+    else buildControls();
+  }
+  // Locked buttons are greyed out in their places; a tap says who set them.
+  var CLASS_BTNS = { 'g-colors': 'notes', 'g-look': 'notes', 'g-count': 'notes', 'g-point': 'ball' };
+  function classHeld(what) { return !!classOwn && (what === 'parts' ? lockedParts() : !!classLocks[what]); }
+  function classLockUi() {
+    if (!CLASS_BTNS) return; // the page is still starting
+    for (const [id, what] of Object.entries(CLASS_BTNS)) { const b = $(id); if (b) b.toggleAttribute('data-class-lock', classHeld(what)); }
+    $('mixParts').classList.toggle('class-lock', classHeld('parts'));
+  }
+  for (const [id, what] of Object.entries(CLASS_BTNS)) $(id).addEventListener('click', (e) => {
+    if (!classHeld(what)) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    toast('Your teacher has set this for the class', 2200);
+  }, true);
+  $('mixParts').addEventListener('click', (e) => {
+    if (!classHeld('parts') || !e.target.closest('.tog')) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    toast(classLocks.parts === 'seats' ? 'Your teacher has given seat ' + mySeat() + ' this part' : 'Your teacher has set the parts for the class', 2400);
+  }, true);
+  // A student whose teacher gives parts by seat, with no seat yet: one small card asks for it (kept on the device).
+  function seatCard(show) {
+    let card = $('seatCard');
+    if (!show) { if (card) card.hidden = true; return; }
+    if (!card) {
+      card = document.createElement('form');
+      card.id = 'seatCard'; card.className = 'seat-card';
+      card.innerHTML = '<p>Your teacher is giving parts by seat.</p><label>Your seat or stand number <input id="seatIn" inputmode="numeric" maxlength="12" autocomplete="off" required></label><button type="submit">OK</button>';
+      card.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const v = $('seatIn').value.trim().slice(0, 12);
+        if (!v) return;
+        try { localStorage.setItem(SEAT_KEY, v); } catch {}
+        card.hidden = true;
+        if (conductor.room) conductor.room.presence({ seat: v }).catch(() => {});
+        classLast = ''; const last = conductor.classBy && conductor.classBy.get(conductor.hostPeer); if (last) applyClass(last);
+      });
+      document.body.append(card);
+    }
+    card.hidden = false;
+    setTimeout(() => $('seatIn').focus(), 50);
+  }
+  // The teacher's class settings: a card from the lock button at the top while conducting.
+  function renderClassPop() {
+    const pop = $('pop-class');
+    if (!pop || pop.hidden) return;
+    const seats = [...new Set([...(conductor.seats || []), ...Object.keys(classSet.seats)])].sort((a, b) => (parseFloat(a) - parseFloat(b)) || a.localeCompare(b));
+    const opts = (sel) => '<option value="">Their own choice</option>' + PARTS.map((_, ti) => partKey(ti)).filter(Boolean).map(n => `<option${n === sel ? ' selected' : ''}>${n.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</option>`).join('');
+    const radio = (v, label) => `<label class="check"><input type="radio" name="cl-parts" value="${v}"${classSet.parts === v ? ' checked' : ''}> ${label}</label>`;
+    pop.querySelector('.cl-body').innerHTML =
+      '<p class="cl-h">Parts</p>' + radio('own', 'Each student chooses') + radio('all', 'Everyone sees the parts on my page') + radio('seats', 'By seat')
+      + (classSet.parts === 'seats' ? '<div class="cl-seats">' + (seats.length ? seats.map(s => `<label class="cl-seat"><span>Seat ${s.replace(/</g, '&lt;')}</span><select data-seat="${s.replace(/"/g, '&quot;')}">${opts((classSet.seats[s] || [])[0])}</select></label>`).join('')
+        : '<p class="cl-note">Students who follow are asked for their seat or stand number; their seats show here.</p>') + '</div>' : '')
+      + '<p class="cl-h">Same as my screen for everyone</p>'
+      + `<label class="check"><input type="checkbox" id="cl-notes"${classSet.notes ? ' checked' : ''}> What’s on the notes (string colors, fingers and note names, counting)</label>`
+      + `<label class="check"><input type="checkbox" id="cl-ball"${classSet.ball ? ' checked' : ''}> Bouncing ball</label>`
+      + '<p class="cl-note">Anything not ticked, each student chooses for themselves.</p>';
+  }
+  function openClassPop(open) {
+    const pop = $('pop-class');
+    pop.hidden = !open; $('g-class').setAttribute('aria-expanded', String(open));
+    // Just under the lock button, wherever the page has scrolled it.
+    if (open) { const r = $('g-class').getBoundingClientRect(); pop.style.top = Math.round(r.bottom + 8) + 'px'; }
+    renderClassPop();
+  }
+  $('g-class').addEventListener('click', () => openClassPop($('pop-class').hidden));
+  $('pop-class').querySelector('.pop-x').addEventListener('click', () => openClassPop(false));
+  $('pop-class').addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.name === 'cl-parts') setClass({ parts: t.value });
+    else if (t.id === 'cl-notes') setClass({ notes: t.checked });
+    else if (t.id === 'cl-ball') setClass({ ball: t.checked });
+    else if (t.dataset.seat != null) { const seats = { ...classSet.seats }; if (t.value) seats[t.dataset.seat] = [t.value]; else delete seats[t.dataset.seat]; setClass({ seats }); }
+  });
+  document.addEventListener('pointerdown', (e) => { const pop = $('pop-class'); if (!pop.hidden && !pop.contains(e.target) && !$('g-class').contains(e.target)) openClassPop(false); });
+
   $('g-together').addEventListener('click', () => {
     if (conductor.hosting) { stopHosting(); if (conductor.site) conductor.site.setConducting(false); conductorUi(); return; }
     if (!conductor.room) return;
@@ -2596,6 +2831,13 @@ body.following .host-only { display: none !important; }
       if (msg.sameTab || !msg.data) return;
       const cmd = msg.data;
       if (cmd.type === 'hello') return;
+      // The teacher's class settings: kept per device, applied while following that device (even before its clock is set).
+      if (cmd.type === 'class') {
+        if (!conductor.classBy) conductor.classBy = new Map();
+        conductor.classBy.set(msg.peer, cmd);
+        if (conductor.following && msg.peer === conductor.hostPeer) applyClass(cmd);
+        return;
+      }
       // Remember the host's latest command so a follower can catch up once its clock is set.
       if (cmd.type === 'play' || cmd.type === 'pause' || cmd.type === 'stop') conductor.lastBy.set(msg.peer, cmd);
       if (!(conductor.following && conductor.synced && msg.peer === conductor.hostPeer)) return;
@@ -2653,6 +2895,10 @@ body.following .host-only { display: none !important; }
         const wasCount = conductor.followers;
         conductor.followers = change.peers.filter(p => !p.sameTab && p.presence && p.presence.following).length;
         if (conductor.followers > wasCount && conductor.last) room.emit('conduct', conductor.last).catch(() => {});
+        if (conductor.followers > wasCount) sendClass(true);
+        // The seats students typed in, for the teacher's class settings.
+        conductor.seats = [...new Set(change.peers.filter(p => !p.sameTab && p.presence && p.presence.following && p.presence.seat).map(p => String(p.presence.seat)))];
+        renderClassPop();
       }
       conductorUi();
     });
@@ -3508,6 +3754,7 @@ body.following .host-only { display: none !important; }
   function setZoom(z) {
     if (z === state.zoom) return;
     state.zoom = z; save(); showZoom();
+    try { localStorage.setItem('gsa-zoom', String(z)); } catch {}
     if (api) { zoomRender = true; applySize(); api.render(); }
   }
   function stepZoom(d) {
@@ -3724,14 +3971,19 @@ body.following .host-only { display: none !important; }
       const first = stops[0].tick, lastEnd = stops[stops.length - 1].end, inside = (c) => c > first + 1 && c < lastEnd - 1;
       // Where the ball lands: on the beat, every count (it starts on the first note, a pickup too); on the rhythm,
       // every note (fine). Fast, on the beat: only the big beats (big).
-      const fine = state.ballBy === 'rhythm' ? stops.map(st => st.tick) : [first, ...counts.filter(inside)];
-      const big = [first, ...bigTicks().filter(inside)];
-      // How many times it lands from each note to the next (roomForBounces gives the bar room for them).
+      // The rhythm and the beat: every note, and every count between (fast, the big beats between), merged in order.
+      const notes = stops.map(st => st.tick);
+      const merge = (more) => [...notes, ...more.filter(inside)].sort((x, y) => x - y).filter((x, i, a) => !i || x - a[i - 1] > 1);
+      const fine = state.ballBy === 'rhythm' ? notes : state.ballBy === 'both' ? merge(counts) : [first, ...counts.filter(inside)];
+      const big = state.ballBy === 'both' ? merge(bigTicks()) : [first, ...bigTicks().filter(inside)];
+      // How many times it lands from each note to the next (roomForBounces gives the bar room for them). The rhythm and
+      // the beat travel only from note to note (a count inside a note is a hop on the spot), so they need the rhythm's.
+      const travel = state.ballBy === 'both' ? notes : fine;
       for (let k = 0, j = 0; k < stops.length; k++) {
         const a = stops[k].tick, b = stops[k + 1] ? stops[k + 1].tick : stops[k].end;
-        while (j < fine.length && fine[j] < a - 1) j++;
+        while (j < travel.length && travel[j] < a - 1) j++;
         let n = 0;
-        while (j + n < fine.length && fine[j + n] < b - 1) n++;
+        while (j + n < travel.length && travel[j + n] < b - 1) n++;
         stops[k].hops = n;
       }
       const d = ballD(stops[0].space), rr = d / 2;
@@ -4018,6 +4270,13 @@ body.following .host-only { display: none !important; }
     const tx = other ? cur.right - cur.space : nxt.x, ty = other ? cur.y : nxt.y;
     return { x: cur.x + (tx - cur.x) * f, y: cur.y + (ty - cur.y) * f, ceil: other ? cur.ceil : Math.max(cur.ceil, nxt.ceil), space: cur.space, sys: cur.sys, right: cur.right, rest: cur.rest, k: lo };
   }
+  // The rhythm and the beat: the note (or rest) sounding at this tick, where the ball sits until the next note.
+  function noteSpot(run, T) {
+    const s = run.stops;
+    let lo = 0, hi = s.length - 1;
+    while (lo < hi) { const m = (lo + hi + 1) >> 1; if (s[m].tick <= T + 1) lo = m; else hi = m - 1; }
+    return { ...s[lo], k: lo };
+  }
   function updatePointer(now) {
     if (!pointRuns.length) return;
     if (counting || now < heardAt) { ballClock = null; idlePointer(); return; }
@@ -4041,8 +4300,17 @@ body.following .host-only { display: none !important; }
       const a = L[i], b = i + 1 < L.length && L[i + 1] < end ? L[i + 1] : end;
       if (!(b > a)) { const sp = ballSpot(run, a); putPointer(run, sp.x, sp.y, sp.rest); continue; }
       const p = Math.max(0, Math.min(1, (t - a) / (b - a)));
-      const from = ballSpot(run, a), to = b === end && toLoop ? ballSpot(run, r.startTick) : ballSpot(run, b);
+      const spot = state.ballBy === 'both' ? noteSpot : ballSpot;
+      const from = spot(run, a), to = b === end && toLoop ? spot(run, r.startTick) : spot(run, b);
       const beats = (b - a) / 960; // this flight, in quarter notes
+      // The rhythm and the beat, a count inside a held note (or rest): a small hop on the spot, so "a new note" (a full
+      // flight to it) and "keep holding and count" look different (Janelle, 2026-11-19).
+      if (state.ballBy === 'both' && from.k === to.k && !(b === end && toLoop)) {
+        const room = from.y - ballD(from.space) - (from.ceil ?? -Infinity);
+        const h = Math.max(0, Math.min(from.space * 0.5, room));
+        putPointer(run, from.x, from.y - h * 4 * p * (1 - p), from.rest);
+        continue;
+      }
       if (to.sys !== from.sys) {
         if (p < 0.35) { // off the end of the line
           const q = p / 0.35, ex = from.right + from.space;
@@ -4062,9 +4330,10 @@ body.following .host-only { display: none !important; }
   }
   $('g-point').addEventListener('click', () => {
     setPop(null);
-    // The beat, then the rhythm, then off, then the beat again.
+    // The beat, then the rhythm, then the rhythm and the beat, then off, then the beat again.
     if (!state.pointer) { state.pointer = true; state.ballBy = 'beat'; }
     else if (state.ballBy === 'beat') state.ballBy = 'rhythm';
+    else if (state.ballBy === 'rhythm') state.ballBy = 'both';
     else state.pointer = false;
     save(); renderCycles();
     if (state.pointer && api && score) { const wrap = $('sheet').querySelector('.at-cursors'); if (wrap && !pointLayer.parentNode) wrap.insertBefore(pointLayer, markLayer); }
@@ -4268,6 +4537,10 @@ body.following .host-only { display: none !important; }
   function fitToHeight() {
     if (zoomRender) { zoomRender = false; return false; }
     if (state.layout !== 'line' || !shortLand.matches || !api) return false;
+    // Not while printing: the screen goes back to the size it had (fitScale is kept). Measured as the screen came back,
+    // the band still held the paper's layout (twice the room), so the line shrank, grew and ran out of tries a step
+    // smaller (3.35 to 3.25 with Counting off, found 2026-11-19).
+    if (printing) return false;
     const band = musicBand();
     if (!band) return false;
     const lim = visibleRoom(), room = lim.bottom - lim.top - 6;
@@ -5497,7 +5770,7 @@ body.following .host-only { display: none !important; }
     api = new alphaTab.AlphaTabApi($('sheet'), s);
     api.customScrollHandler = scroller;
     holdPictureForSound();
-    window.reader = { api, get score() { return score; }, conductor, xmap: () => xmap, line: () => lineState, at: () => playedTick(performance.now()), lag: reportLag, newScore,
+    window.reader = { api, get score() { return score; }, conductor, seen: () => [...state.seen], partKey, xmap: () => xmap, line: () => lineState, at: () => playedTick(performance.now()), lag: reportLag, newScore,
       // The parts on the page and the parts that play, from outside (the sight-reading page's "I play" in a duet).
       parts: ({ seen, heard, hearOpen } = {}) => {
         const s = indexList(seen, PARTS.length), h = indexList(heard, PARTS.length);

@@ -58,6 +58,23 @@
   };
   const hadTeacher = () => !!store.get(AUTH_KEY);
 
+  // ---- Duo practice (Janelle, 2026-11-19: a couple practising at home on two tablets) ----
+  // A duo login (a username and password Janelle makes for them; not a studio account) opens a room of their own,
+  // duo:<room>, instead of each song's open room. One tablet leads (it conducts by itself on every song), the other
+  // follows (by itself, from song to song). They can swap. The room name comes from the gsa-duo function after the
+  // password check; the device keeps it (localStorage gsa-duo) so it opens connected from then on.
+  const DUO_KEY = 'gsa-duo';
+  let duo = null;
+  try { const d = JSON.parse(store.get(DUO_KEY) || 'null'); if (d && /^[0-9a-f]{32}$/.test(d.room)) duo = { user: String(d.user || ''), room: d.room, role: d.role === 'follow' ? 'follow' : 'lead' }; } catch {}
+  const saveDuo = () => store.set(DUO_KEY, duo ? JSON.stringify(duo) : null);
+  const leader = () => (duo ? duo.role === 'lead' : teacher); // this device may conduct
+  if (duo && song) {
+    // The leader conducts every song it opens; the follower follows (both carry on from page to page anyway).
+    try { if (duo.role === 'lead') { if (!sessionStorage.getItem(CONDUCT_KEY)) sessionStorage.setItem(CONDUCT_KEY, String(Date.now())); sessionStorage.removeItem(FOLLOW_KEY); }
+      else { sessionStorage.setItem(FOLLOW_KEY, '1'); sessionStorage.removeItem(CONDUCT_KEY); } } catch {}
+  } else if (duo && home) tab.set(FOLLOW_KEY, duo.role === 'follow');
+  let duoConn = 'connecting', duoOthers = 0; // the room's state, for the duo bar
+
   let sb = null, libLoading = null;
   let teacher = false;                // signed in as a teacher who may conduct
   let signedInNoClass = false;        // signed in, but this account may not conduct
@@ -103,8 +120,8 @@
   async function openRoom(lead) {
     await sb.realtime.setAuth();
     const me = 'p' + Math.random().toString(36).slice(2, 10);
-    const main = sb.channel(`conduct:${TEST}${song}`, { config: { private: true, broadcast: { self: false } } });
-    const inn = sb.channel(`conduct-in:${TEST}${song}`, { config: { private: true, broadcast: { self: false }, presence: { key: me } } });
+    const main = sb.channel(duo ? `duo:${duo.room}` : `conduct:${TEST}${song}`, { config: { private: true, broadcast: { self: false } } });
+    const inn = sb.channel(duo ? `duo:${duo.room}:in` : `conduct-in:${TEST}${song}`, { config: { private: true, broadcast: { self: false }, presence: { key: me } } });
     const handlers = new Map(), peerCbs = [], connCbs = [];
     const hosts = new Map();    // peer -> { t: when last heard on the teacher's channel, since: when it took the lead }
     let here = new Map();       // peer -> presence on the students' channel
@@ -130,6 +147,7 @@
       const left = [...last.keys()].filter((p) => !now.has(p)).map((peer) => ({ peer }));
       last = now;
       pings.clear();
+      if (duo) { duoOthers = here.size; duoUi(); }
       for (const cb of peerCbs) { try { cb({ peers: list, joined, updated, left }); } catch {} }
     }
     const connected = () => connCbs.forEach((cb) => { try { cb(); } catch {} });
@@ -168,6 +186,7 @@
         // Joined again after the connection dropped: the server has forgotten who this device is (supabase-js doesn't
         // say it again by itself), so say it again.
         if (status === 'SUBSCRIBED' && ch === inn && joined && !closed) { tracked = null; track().catch(() => {}); }
+        if (duo && ch === main) { duoConn = status === 'SUBSCRIBED' ? 'ok' : status === 'CLOSED' && closed ? duoConn : 'lost'; duoUi(); }
         if (status === 'SUBSCRIBED') { resolve(); connected(); }
         else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') { reject(new Error(status)); connected(); }
         else if (status === 'CLOSED') connected();
@@ -177,7 +196,8 @@
     joined = true;
 
     function track() {
-      const want = JSON.stringify({ following: !!mine.following, lead: !!lead });
+      // A student's seat (or stand) number, so the teacher can give a seat its part (the reader's class settings).
+      const want = JSON.stringify({ following: !!mine.following, lead: !!lead, ...(mine.seat ? { seat: String(mine.seat).slice(0, 12) } : {}) });
       if (want === tracked) return Promise.resolve();
       tracked = want;
       return inn.track(JSON.parse(want));
@@ -192,7 +212,7 @@
       lead,
       emit(event, data) {
         if (closed) return Promise.reject(new Error('This room was closed'));
-        if (!lead) return Promise.reject(new Error('Only the teacher conducts'));
+        if (!lead) return Promise.reject(new Error(duo ? 'Only the leader leads' : 'Only the teacher conducts'));
         return sendMain(event, data).then((r) => { if (r !== 'ok') throw new Error(String(r)); });
       },
       on(event, cb) { if (!handlers.has(event)) handlers.set(event, []); handlers.get(event).push(cb); },
@@ -226,8 +246,8 @@
     if (current) { current.leave(); current = null; }
     if (!started) { started = true; await new Promise((r) => setTimeout(r, START_MS)); }
     await client();
-    if (!teacher && hadTeacher()) await loadTeacher().catch(() => {});
-    current = await openRoom(!!teacher);
+    if (!duo && !teacher && hadTeacher()) await loadTeacher().catch(() => {});
+    current = await openRoom(leader());
     return current;
   }
   addEventListener('online', () => { if (!current) changed(); if (!site) startSite(); });
@@ -243,21 +263,23 @@
     location.href = songUrl(slug);
   }
   function sayHere() {
-    if (!site || !teacher || !conducting()) return;
+    if (!site || !leader() || !conducting()) return;
     const title = song ? document.title : null;
     site.send({ type: 'broadcast', event: 'here', payload: { song, title, from: tabId, since: conductSince() } });
   }
   async function startSite() {
     if (site) return;
     try { await client(); } catch { return; }
-    if (!teacher && hadTeacher()) await loadTeacher().catch(() => {});
+    if (!duo && !teacher && hadTeacher()) await loadTeacher().catch(() => {});
     await sb.realtime.setAuth().catch(() => {});
-    const ch = sb.channel(`conduct:${TEST}__site`, { config: { private: true, broadcast: { self: false } } });
+    const ch = sb.channel(duo ? `duo:${duo.room}:site` : `conduct:${TEST}__site`, { config: { private: true, broadcast: { self: false } } });
+    // A duo swapped who leads, from the other tablet: take the other role, and open the page afresh in it.
+    ch.on('broadcast', { event: 'swap' }, ({ payload }) => { if (duo && payload && (payload.role === 'lead' || payload.role === 'follow')) setRole(payload.role, false); });
     ch.on('broadcast', { event: 'here' }, ({ payload }) => {
       if (!payload) return;
       const since = payload.since || 0;
       // Another device of the teacher's is conducting too: the one where Conduct was pressed last leads.
-      if (teacher && conducting() && payload.from !== tabId) {
+      if (leader() && conducting() && payload.from !== tabId) {
         if (since > conductSince()) giveWay(); else return;
       }
       // A student stays with the teacher it has while she is heard, whatever another (earlier) device says.
@@ -271,7 +293,7 @@
     });
     ch.on('broadcast', { event: 'off' }, ({ payload }) => {
       if (payload && payload.from && siteHost && siteHost.from && payload.from !== siteHost.from) return; // not the teacher it follows
-      siteHost = null; tab.set(FOLLOW_KEY, false); siteChanged();
+      siteHost = null; if (!duo) tab.set(FOLLOW_KEY, false); siteChanged(); // a duo's follower waits for its leader
     });
     ch.subscribe((status) => { if (status === 'SUBSCRIBED') sayHere(); });
     site = ch;
@@ -280,7 +302,7 @@
       sayHere();
       if (siteHost && Date.now() - siteSeen > (tab.get(FOLLOW_KEY) ? SITE_FOLLOWED_GONE_MS : SITE_GONE_MS)) {
         siteHost = null;
-        tab.set(FOLLOW_KEY, false);
+        if (!duo) tab.set(FOLLOW_KEY, false);
         siteChanged();
       }
     }, BEAT_MS);
@@ -318,6 +340,7 @@
       document.body.append(pill);
     }
     const kids = [];
+    if (duo) { pill.hidden = true; duoUi(); return; } // a duo has its own bar
     if (teacher && conducting()) {
       kids.push(el('span', { class: 'pt-pill-txt' }, 'Conducting: open a song'),
         el('button', { class: 'pt-pill-btn', type: 'button', on: () => setConducting(false) }, 'Stop'));
@@ -335,6 +358,47 @@
   }
   if (home) setTimeout(startSite, START_MS); else if (song) setTimeout(() => { startSite(); }, START_MS);
   try { localStorage.removeItem('gsa-class-code'); } catch {} // from the first version, which had class codes
+
+  // ---- Duo practice: the bar at the top, swapping, and the gsa-duo function ----
+  // A big, plain bar at the top of every page while a duo is signed in: who this tablet is and whether the two are
+  // connected ("Leading · the other tablet is following", "Following · waiting for the leader", "Not connected").
+  // A tap opens the duo box (swap, sign out).
+  let duoBar = null;
+  function duoUi() {
+    if (!duo || !document.body) return;
+    if (!styled) { document.head.append(el('style', {}, CSS)); styled = true; }
+    if (!duoBar) {
+      duoBar = el('button', { class: 'pt-duo', type: 'button', title: 'Duo practice: swap who leads, or sign out', on: () => open() });
+      document.body.append(duoBar);
+    }
+    const lead = duo.role === 'lead', heard = !!siteHost && !siteHost.pending;
+    const ok = duoConn === 'ok' || (home && !!site);
+    let state = !ok && duoConn !== 'connecting' ? 'off' : 'on', words;
+    if (!ok && duoConn !== 'connecting') words = 'Not connected: check the internet';
+    else if (lead) words = home ? 'Leading: open a song' : duoOthers ? 'Leading · the other tablet is following' : 'Leading · waiting for the other tablet';
+    else words = home && heard && siteHost.song ? 'Following · going to the leader’s song' : heard || duoOthers ? 'Following the leader' : 'Following · waiting for the leader';
+    if (words.startsWith('Leading ·') && !duoOthers) state = 'wait';
+    if (words.includes('waiting')) state = 'wait';
+    duoBar.dataset.state = state;
+    duoBar.replaceChildren(el('span', { class: 'pt-duo-dot', 'aria-hidden': 'true' }), el('span', {}, 'Duo · ' + words));
+    if (window.gsaKeepAwake) window.gsaKeepAwake('duo', true); // a duo practising: the screens stay on
+  }
+  // This tablet takes a role; told: the other tablet takes the other one.
+  function setRole(role, tell = true) {
+    if (!duo || duo.role === role) return;
+    if (tell && site) site.send({ type: 'broadcast', event: 'swap', payload: { role: role === 'lead' ? 'follow' : 'lead' } });
+    duo.role = role; saveDuo();
+    try { sessionStorage.removeItem(CONDUCT_KEY); sessionStorage.removeItem(FOLLOW_KEY); } catch {}
+    setTimeout(() => location.reload(), tell ? 400 : 0); // opened afresh in the new role (the message goes out first)
+  }
+  // The gsa-duo function (Supabase): login for anyone, the rest for a signed-in teacher.
+  async function duoCall(body) {
+    await client().catch(() => { throw new Error('No internet connection.'); });
+    const { data, error } = await sb.functions.invoke('gsa-duo', { body });
+    if (error || !data) throw new Error('That didn’t work. Check the internet and try again.');
+    if (!data.ok) throw new Error(data.error || 'That didn’t work.');
+    return data;
+  }
 
   // ---- The Play together box ----
   const CSS = `
@@ -359,6 +423,19 @@
 .pt-pill-btn { padding: 6px 14px; border: 1px solid var(--line, #C9D2CE); border-radius: 999px; background: var(--paper, #fff); color: var(--ink, #17201C);
   font: inherit; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
 .pt-pill-btn.on { background: var(--accent, #1D5B72); border-color: var(--accent, #1D5B72); color: var(--accent-ink, #fff); }
+.pt-duo { position: fixed; top: calc(8px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 950; display: flex; align-items: center; gap: 10px;
+  max-width: calc(100vw - 24px); padding: 9px 18px; border-radius: 999px; border: 2px solid #1D5B72; background: #FFFFFF; color: #17201C; font: 700 1.05rem/1.2 var(--font-body, system-ui, sans-serif);
+  box-shadow: 0 6px 18px -10px rgba(0,0,0,.45); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pt-duo-dot { flex: none; width: 14px; height: 14px; border-radius: 50%; background: #1E8E5A; }
+.pt-duo[data-state="wait"] .pt-duo-dot { background: #E0A100; }
+.pt-duo[data-state="off"] { border-color: #B42318; color: #B42318; }
+.pt-duo[data-state="off"] .pt-duo-dot { background: #B42318; }
+.pt-list { margin: 0 0 12px; padding: 0; list-style: none; }
+.pt-list li { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--line, #C9D2CE); font-size: 0.92rem; }
+.pt-list li b { flex: 1 1 auto; overflow-wrap: anywhere; }
+.pt-list .pt-btn { flex: none; padding: 5px 10px; font-size: 0.82rem; }
+.pt-roles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 12px; }
+.pt-roles .pt-btn { padding: 16px 10px; font-size: 1.1rem; }
 .pt-x { float: right; margin: -6px -8px 0 0; padding: 4px 10px; border: 0; background: none; color: var(--muted, #55615B); font-size: 1.5rem; line-height: 1; cursor: pointer; }`;
   let styled = false;
   function el(tag, attrs = {}, ...kids) {
@@ -390,6 +467,58 @@
       btn.disabled = false;
     };
 
+    // Duo practice: signed in, the two roles (a tap swaps) and Sign out; not yet, a username and password.
+    function duoView() {
+      if (duo) {
+        const role = (r, label, sub) => el('button', { class: 'pt-btn' + (duo.role === r ? ' main' : ''), type: 'button', 'aria-pressed': String(duo.role === r),
+          on: () => { if (duo.role !== r) { close(); setRole(r); } } }, label, el('br'), el('small', {}, sub));
+        return show(...head('Duo practice'),
+          el('p', {}, 'Signed in as ' + duo.user + '. The leader picks the song and presses Play; the other tablet follows, each with its own part.'),
+          el('div', { class: 'pt-roles' }, role('lead', 'I lead', 'pick the song, Play'), role('follow', 'I follow', 'my tablet follows')),
+          el('p', {}, 'Tap the other choice to swap: the other tablet swaps too.'),
+          el('div', { class: 'pt-row' }, el('button', { class: 'pt-btn main', type: 'button', on: close }, 'OK'),
+            el('button', { class: 'pt-btn', type: 'button', on: () => { duo = null; saveDuo(); try { sessionStorage.removeItem(CONDUCT_KEY); sessionStorage.removeItem(FOLLOW_KEY); } catch {} location.reload(); } }, 'Sign out')));
+      }
+      const user = el('input', { id: 'pt-duo-user', autocomplete: 'username', autocapitalize: 'off', spellcheck: 'false' });
+      const pass = el('input', { id: 'pt-duo-pass', type: 'password', autocomplete: 'current-password' });
+      const lead = el('input', { id: 'pt-duo-lead', type: 'checkbox', style: 'width:auto;margin:0 8px 0 0' });
+      const go = el('button', { class: 'pt-btn main', type: 'submit' }, 'Sign in');
+      const form = el('form', {}, el('label', { for: 'pt-duo-user' }, 'Username'), user, el('label', { for: 'pt-duo-pass' }, 'Password'), pass,
+        el('label', { for: 'pt-duo-lead', style: 'display:flex;align-items:center;font-weight:600;margin:4px 0 12px' }, lead, 'This tablet leads'), msg, el('div', { class: 'pt-row' }, go));
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        busy(go, async () => {
+          const d = await duoCall({ action: 'login', username: user.value, password: pass.value });
+          duo = { user: d.username, room: d.room, role: lead.checked ? 'lead' : 'follow' }; saveDuo();
+          try { sessionStorage.removeItem(CONDUCT_KEY); sessionStorage.removeItem(FOLLOW_KEY); } catch {}
+          location.replace(location.pathname); // opened afresh, connected (and without ?duo)
+        });
+      });
+      show(...head('Duo practice'), el('p', {}, 'Sign in with the username and password your teacher gave you. You only need to do this once on each tablet.'), form);
+    }
+    // The teacher's duo logins: make one (she chooses the username and password), give one a new password, or remove it.
+    async function duoAdmin() {
+      show(...head('Duo logins'), el('p', {}, 'One moment…'));
+      let list = [];
+      try { list = (await duoCall({ action: 'list' })).duos || []; } catch (e) { msg.textContent = e.message; }
+      if (box !== back) return;
+      const user = el('input', { id: 'pt-new-user', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', placeholder: 'for example: practice-duo' });
+      const pass = el('input', { id: 'pt-new-pass', autocomplete: 'off', placeholder: 'at least 6 characters' });
+      const make = el('button', { class: 'pt-btn main', type: 'submit' }, 'Make duo login');
+      const form = el('form', {}, el('label', { for: 'pt-new-user' }, 'Username'), user, el('label', { for: 'pt-new-pass' }, 'Password'), pass, msg, el('div', { class: 'pt-row' }, make,
+        el('button', { class: 'pt-btn', type: 'button', on: () => teacherView() }, 'Back')));
+      form.addEventListener('submit', (e) => { e.preventDefault(); busy(make, async () => { await duoCall({ action: 'create', username: user.value, password: pass.value }); await duoAdmin(); msg.textContent = ''; }); });
+      const row = (d) => {
+        const reset = el('button', { class: 'pt-btn', type: 'button', on: (e) => { const p = prompt('New password for ' + d.username + ' (at least 6 characters). Both tablets will need to sign in again.'); if (p) busy(e.currentTarget, async () => { await duoCall({ action: 'reset', username: d.username, password: p }); msg.textContent = 'New password set for ' + d.username + '.'; }); } }, 'New password');
+        const remove = el('button', { class: 'pt-btn', type: 'button', on: (e) => { if (confirm('Remove the duo login ' + d.username + '? Its tablets stop connecting.')) busy(e.currentTarget, async () => { await duoCall({ action: 'remove', username: d.username }); await duoAdmin(); }); } }, 'Remove');
+        return el('li', {}, el('b', {}, d.username), reset, remove);
+      };
+      show(...head('Duo logins'),
+        el('p', {}, 'Make a username and password for two people practising together at home, and send it to them with this link: ' + new URL('?duo', root).href + ' . They sign in once on each tablet; one leads, one follows.'),
+        list.length ? el('ul', { class: 'pt-list' }, ...list.map(row)) : el('p', {}, 'No duo logins yet.'),
+        form);
+    }
+
     function teacherView() {
       const signOut = (e) => busy(e.currentTarget, async () => { await sb.auth.signOut(); teacher = false; signedInNoClass = false; changed(); close(); });
       if (teacher) {
@@ -398,6 +527,7 @@
           el('div', { class: 'pt-row' },
             opts.conducting ? el('button', { class: 'pt-btn main', type: 'button', on: close }, 'OK')
               : el('button', { class: 'pt-btn main', type: 'button', on: () => { close(); if (opts.conduct) opts.conduct(); } }, 'Start conducting'),
+            el('button', { class: 'pt-btn', type: 'button', on: () => duoAdmin() }, 'Duo logins'),
             el('button', { class: 'pt-btn', type: 'button', on: signOut }, 'Sign out')));
       }
       if (signedInNoClass) {
@@ -422,9 +552,10 @@
       });
       show(...head('Conduct the class'),
         el('p', {}, 'Sign in with your studio account (the same email and password). Students don’t sign in: a Follow button appears at the top of their music while you conduct this piece.'),
-        form);
+        form, el('div', { class: 'pt-row' }, el('button', { class: 'pt-btn', type: 'button', on: () => duoView() }, 'Practising as a duo? Sign in here')));
     }
 
+    if (duo || opts.duo) return duoView();
     if (hadTeacher() && !teacher && !signedInNoClass) {
       show(...head('Play together'), el('p', {}, 'One moment…'));
       try { await client(); await loadTeacher(); } catch {}
@@ -445,8 +576,17 @@
     // The song the teacher is conducting somewhere on the site (null: on the home page), or undefined: nobody conducting.
     teacherAt: () => (siteHost && !siteHost.pending && !(teacher && conducting()) ? { song: siteHost.song, title: siteHost.title } : undefined),
     room,
-    canLead: () => !!teacher,
+    canLead: () => leader(),
+    duo: () => (duo ? { role: duo.role } : null),
     open,
     onChange(cb) { changeCbs.push(cb); },
   };
+  // Duo practice: its bar from the start (the home page has no room, only the site channel, so it counts as connected
+  // once that is up).
+  if (duo) {
+    if (document.body) duoUi(); else addEventListener('DOMContentLoaded', duoUi);
+    if (home) setTimeout(() => { if (site) duoConn = 'ok'; duoUi(); }, START_MS + 3000);
+  }
+  // A link Janelle sends: …/?duo opens the duo sign-in.
+  if (/[?&]duo\b/.test(location.search)) addEventListener('load', () => open({ duo: true }));
 })();
