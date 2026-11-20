@@ -612,8 +612,18 @@ async def voices40_checks(browser, base):
         await pg.reload()
         await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
         check(await pg.evaluate(SHOWN_JS) == [6, 10, 14], 'the choices are still there after a reload')
+        # The same parts open on the next song (gsa-parts; Janelle, 2026-11-20).
+        other = next((s['slug'] for s in SONGS if s['slug'] != slug and PARTS[s['slug']] >= 40), None)
+        if other:
+            await pg.goto(f'{base}/songs/{other}/')
+            await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
+            carried = await pg.evaluate('() => reader.api.tracks.map(t => reader.partKey(t.index))')
+            check(carried == ['Cello — Easy Melody', 'Cello — Easy Inner', 'Cello — Easy Bass Line'],
+                  f'the same parts open on the next song, {other} ({carried})')
+            await pg.goto(f'{base}/songs/{slug}/')
+            await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
         # Saved with the six levels: violin Melody and cello Harmony on the page, violin Melody and Harmony playing.
-        await pg.evaluate(f"localStorage.setItem('{key}', JSON.stringify({{ seen: [8, 14], heard: [8, 12], hearOpen: true }}))")
+        await pg.evaluate(f"localStorage.removeItem('gsa-parts'); localStorage.setItem('{key}', JSON.stringify({{ seen: [8, 14], heard: [8, 12], hearOpen: true }}))")
         await pg.reload()
         await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
         await pg.evaluate(SPY_JS)
@@ -621,7 +631,7 @@ async def voices40_checks(browser, base):
         check(await pg.evaluate(SHOWN_JS) == [16, 26] and await pg.evaluate(PLAYING_JS) == [16, 20],
               'choices saved with the six levels move over (cello Harmony to Bass Line, violin Harmony to Inner)')
         # Saved with 34 parts: Viola Easy Inner, Cello Easy Bass Line, Violin Bass Line keep their names.
-        await pg.evaluate(f"localStorage.setItem('{key}', JSON.stringify({{ parts: 'voices', seen: [9, 12, 20] }}))")
+        await pg.evaluate(f"localStorage.removeItem('gsa-parts'); localStorage.setItem('{key}', JSON.stringify({{ parts: 'voices', seen: [9, 12, 20] }}))")
         await pg.reload()
         await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
         check(await pg.evaluate(SHOWN_JS) == [9, 14, 24], 'choices saved with 34 parts move to the same parts here')
@@ -688,7 +698,7 @@ async def voices_checks(browser, base):
         await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
         check(await pg.evaluate(SHOWN_JS) == [4, 9, 12], 'the choices are still there after a reload')
         # Saved with the six levels: violin Melody and cello Harmony on the page, violin Melody and Harmony playing.
-        await pg.evaluate(f"localStorage.setItem('{key}', JSON.stringify({{ seen: [8, 14], heard: [8, 12], hearOpen: true }}))")
+        await pg.evaluate(f"localStorage.removeItem('gsa-parts'); localStorage.setItem('{key}', JSON.stringify({{ seen: [8, 14], heard: [8, 12], hearOpen: true }}))")
         await pg.reload()
         await pg.wait_for_function("!document.getElementById('play').disabled", timeout=90000)
         await pg.evaluate(SPY_JS)
