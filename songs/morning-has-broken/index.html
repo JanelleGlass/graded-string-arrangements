@@ -913,6 +913,12 @@ body.following .host-only { display: none !important; }
     set(v) { try { localStorage.setItem('morning-has-broken-reader', JSON.stringify(v)); } catch {} },
   };
   const saved = store.get();
+  // The parts last chosen on this device, on any song (Janelle, 2026-11-20: a cellist on Easy Bass Line opens the next
+  // song on Easy Bass Line too, following or not). Kept by name ("Cello — Easy Bass Line"), read once here before
+  // anything is saved, and used once the score says which parts this song has (useLastParts).
+  const PARTS_KEY = 'gsa-parts';
+  const lastParts = (() => { try { return JSON.parse(localStorage.getItem(PARTS_KEY) || 'null'); } catch { return null; } })();
+  var partsReady = false; // (var: save() can run while the page starts, before this song's parts are known)
   function deviceZoom() { try { return +localStorage.getItem('gsa-zoom') || null; } catch { return null; } }
   // The title opens and closes the song's details card.
   (() => {
@@ -1036,6 +1042,7 @@ body.following .host-only { display: none !important; }
   // call before it starts: classOn).
   const save = () => { const s = savedView();
     store.set({ zoom: s.zoom, parts: savedId(), partsFull: layout, seen: s.seen, heard: s.heard, hearOpen: s.hearOpen, colorMode: s.colorMode, fingerMode: s.fingerMode, tempo: s.tempo, follow: s.follow, countBy: s.unit, fingers: s.fingers, counts: s.countAlong ? 'on' : 'off', pointer: s.pointer ? s.ballBy : 'off', layout: printing ? printing.layout : s.layout, letterMode: s.letterMode, lettersBig: s.letterModeBig, metro: s.metro, ahead: s.ahead });
+    if (partsReady) keepParts(s);
     classChanged(); };
 
   // ---- Room reverb ----
@@ -2617,6 +2624,30 @@ body.following .host-only { display: none !important; }
   const partKey = (ti) => { const p = PARTS[ti], row = p && ROWS[p.row]; return !row ? null : row.piano ? row.name : INSTRUMENTS[p.inst] + ' — ' + row.name; };
   const partNames = (list) => list.map(partKey).filter(Boolean);
   const partIndexes = (names) => (names || []).map(n => PARTS.findIndex((_, ti) => partKey(ti) === n)).filter(i => i >= 0).sort((a, b) => a - b);
+  // The parts on the page (and the Hear mix) carry from song to song on this device by name (lastParts, above). A song
+  // that has none of them (a Countermelody or the Piano on a song without one) keeps its own saved choice. A piece with
+  // one line takes the same instruments' parts, and doesn't write its choice back, so the levels and voices chosen
+  // before it are still there on the next song. The sight-reading page keeps to its own.
+  function keepParts(s) {
+    if (window.sightReading || ROWS[0].one || ROWS[0].duet) return;
+    try { localStorage.setItem(PARTS_KEY, JSON.stringify({ seen: partNames(s.seen), heard: s.heard ? partNames(s.heard) : null, hearOpen: !!s.hearOpen })); } catch {}
+  }
+  function useLastParts() {
+    partsReady = true;
+    const last = lastParts;
+    if (window.sightReading || ROWS[0].duet || !last || !Array.isArray(last.seen)) return false;
+    let seen = partIndexes(last.seen);
+    if (!seen.length && ROWS[0].one) {
+      const insts = new Set(last.seen.map(n => INSTRUMENTS.indexOf(String(n).split(' — ')[0])));
+      seen = PARTS.map((p, ti) => insts.has(p.inst) ? ti : -1).filter(ti => ti >= 0);
+    }
+    if (!seen.length) return false;
+    const heard = Array.isArray(last.heard) ? partIndexes(last.heard) : [];
+    state.seen = seen;
+    state.heard = heard.length ? heard : null;
+    state.hearOpen = !!last.hearOpen && !!state.heard;
+    return true;
+  }
   // Host: the message every follower applies.
   function classMsg() {
     const c = { type: 'class', locks: { parts: classSet.parts, notes: !!classSet.notes, ball: !!classSet.ball } };
@@ -5686,6 +5717,8 @@ body.following .host-only { display: none !important; }
       if (state.heard && !state.heard.length) state.heard = [...state.seen]; // nothing left to hear: hear what's seen
       buildControls();
     }
+    // The first score on a page: the parts last chosen on this device, where this song has them.
+    if (!partsReady && useLastParts()) buildControls();
     const next = alphaTab.importer.ScoreLoader.loadScoreFromBytes(new Uint8Array(xmlBuf), settings);
     score = next; pickupExtra = 0;
     prepareScore();
