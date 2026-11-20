@@ -833,6 +833,13 @@ on iPhone and iPad), the site opens like an app. After one visit every song work
   this can only be checked on a real phone or iPad.
 - One size for every song on a device (`localStorage` `gsa-zoom`, Janelle, 2026-11-19: "lots of zooming in and out"
   in class): the last − / + or pinch size, wherever it was set; a song's own saved size only until then.
+- The same parts on every song on a device (Janelle, 2026-11-20: a cellist on Easy Bass Line opens the next song on
+  Easy Bass Line, following the teacher or not): `localStorage` `gsa-parts` keeps the parts on the page and the Hear
+  mix by name ("Cello — Easy Bass Line", as `partKey`), and each song opens on those it has (`useLastParts`, once the
+  score's layout is known). A song with none of them (only a Countermelody or the Piano was chosen) keeps its own saved
+  choice. A piece with one line (Twinkle Harmony) takes the same instruments' parts and doesn't write the key, so the
+  level and voice are still there on the next song. The sight-reading page keeps its own. Class settings that hold
+  the parts still apply on top, and a follower's own choice (not the teacher's) is what carries.
 - Pinch to zoom on touch screens: two fingers on the music make it bigger or smaller, over a clef, key or time signature too (their explain buttons pass two-finger touches on to the music; they swallowed them until 2026-11-10). The music grows
   and shrinks under the fingers, then settles on the nearest − / + size. A second finger cancels a tap
   or a press-and-hold; the browser's own page zoom is kept off the music.
